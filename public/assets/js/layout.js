@@ -1,5 +1,5 @@
 /**
-* Theme: Larkon - Responsive Bootstrap 5 Admin Dashboard
+* Theme: Shopo - Responsive Bootstrap 5 Admin Dashboard
 * Author: Techzaa
 * Module/App: Theme Layout Customizer Js
 */
@@ -333,7 +333,7 @@ class ThemeLayout {
 
      setSwitchFromConfig() {
 
-          sessionStorage.setItem('__LARKON_CONFIG__', JSON.stringify(this.config));
+          sessionStorage.setItem('__SHOPO_CONFIG__', JSON.stringify(this.config));
 
           document.querySelectorAll('.settings-bar input[type=radio]').forEach(function (checkbox) {
                checkbox.checked = false;

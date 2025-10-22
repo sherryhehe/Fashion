@@ -7,7 +7,7 @@
 
 (function () {
 
-     var savedConfig = sessionStorage.getItem("__LARKON_CONFIG__");
+     var savedConfig = sessionStorage.getItem("__SHOPO_CONFIG__");
 
      var html = document.getElementsByTagName("html")[0];
 

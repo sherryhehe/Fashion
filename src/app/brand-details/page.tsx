@@ -129,7 +129,7 @@ export default function BrandDetails() {
             <div className="page-title-box">
               <div className="page-title-right">
                 <ol className="breadcrumb m-0">
-                  <li className="breadcrumb-item"><Link href="/">Larkon</Link></li>
+                  <li className="breadcrumb-item"><Link href="/">Shopo</Link></li>
                   <li className="breadcrumb-item"><Link href="/brand-list">Brands</Link></li>
                   <li className="breadcrumb-item active">Brand Details</li>
                 </ol>

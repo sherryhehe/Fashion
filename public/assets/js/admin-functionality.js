@@ -592,4 +592,4 @@ adminStyle.textContent = `
         height: 3rem;
     }
 `;
-document.head.appendChild(style);
+document.head.appendChild(adminStyle);

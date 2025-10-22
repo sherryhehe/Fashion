@@ -180,7 +180,7 @@ export default function OrderDetail() {
 
   const handleSendEmail = () => {
     setEmailSubject(`Order Update - Order #${order.id}`);
-    setEmailMessage(`Dear ${order.customer.name},\n\nWe wanted to update you on your order #${order.id}.\n\nCurrent Status: ${order.status}\n\nThank you for your business!\n\nBest regards,\nLarkon Team`);
+    setEmailMessage(`Dear ${order.customer.name},\n\nWe wanted to update you on your order #${order.id}.\n\nCurrent Status: ${order.status}\n\nThank you for your business!\n\nBest regards,\nShopo Team`);
     setShowEmailModal(true);
   };
 

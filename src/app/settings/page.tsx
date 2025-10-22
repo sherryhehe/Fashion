@@ -119,7 +119,7 @@ export default function Settings() {
                 <form>
                   <div className="mb-3">
                     <label className="form-label">Site Name</label>
-                    <input type="text" className="form-control" defaultValue="Larkon Admin Dashboard" />
+                    <input type="text" className="form-control" defaultValue="Shopo Admin Dashboard" />
                   </div>
                   <div className="mb-3">
                     <label className="form-label">Site Description</label>
@@ -127,7 +127,7 @@ export default function Settings() {
                   </div>
                   <div className="mb-3">
                     <label className="form-label">Admin Email</label>
-                    <input type="email" className="form-control" defaultValue="admin@larkon.com" />
+                    <input type="email" className="form-control" defaultValue="admin@shopo.com" />
                   </div>
                   <div className="mb-3">
                     <label className="form-label">Timezone</label>

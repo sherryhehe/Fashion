@@ -20,7 +20,7 @@ export default function CustomerList() {
       params.append('role', 'customer');
       if (statusFilter) params.append('status', statusFilter);
 
-      const response = await fetch(`http://localhost:8000/api/users?${params}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users?${params}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',

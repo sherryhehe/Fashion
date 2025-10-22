@@ -9,10 +9,10 @@ import QueryProvider from "@/providers/QueryProvider";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Larkon Admin Dashboard",
+  title: "Shopo Admin Dashboard",
   description: "A fully responsive premium admin dashboard template",
   keywords: ["admin", "dashboard", "ecommerce", "management"],
-  authors: [{ name: "Larkon Team" }],
+  authors: [{ name: "Shopo Team" }],
   viewport: "width=device-width, initial-scale=1",
 };
 

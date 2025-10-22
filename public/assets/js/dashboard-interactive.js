@@ -374,4 +374,4 @@ dashboardStyle.textContent = `
         box-shadow: 0 4px 8px rgba(0,0,0,0.1);
     }
 `;
-document.head.appendChild(style);
+document.head.appendChild(dashboardStyle);

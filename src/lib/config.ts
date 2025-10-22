@@ -9,7 +9,7 @@
  * API Configuration
  */
 export const API_CONFIG = {
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api',
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api',
   timeout: 30000, // 30 seconds
 } as const;
 
@@ -17,7 +17,7 @@ export const API_CONFIG = {
  * Application Configuration
  */
 export const APP_CONFIG = {
-  name: process.env.NEXT_PUBLIC_APP_NAME || 'Larkon Admin Dashboard',
+  name: process.env.NEXT_PUBLIC_APP_NAME || 'Shopo Admin Dashboard',
   version: process.env.NEXT_PUBLIC_APP_VERSION || '1.0.0',
   url: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
 } as const;

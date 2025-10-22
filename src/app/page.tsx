@@ -3,22 +3,32 @@
 import { Layout } from '@/components';
 import TimeFilter, { TimeFilterOption } from '@/components/molecules/TimeFilter';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function Home() {
+  const router = useRouter();
   const [timeFilter, setTimeFilter] = useState<TimeFilterOption>('1Y');
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
+    // Check authentication first
+    const token = localStorage.getItem('token');
+    if (!token) {
+      router.replace('/login');
+      return;
+    }
+    setIsAuthenticated(true);
     fetchDashboardStats();
-  }, []);
+  }, [router]);
 
   const fetchDashboardStats = async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
       
-      const response = await fetch('http://localhost:8000/api/dashboard/stats', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/dashboard/stats`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -41,6 +51,11 @@ export default function Home() {
     setTimeFilter(filter);
     // You can fetch filtered data here based on time period
   };
+
+  // Don't render anything while checking authentication
+  if (!isAuthenticated) {
+    return null;
+  }
 
   if (loading) {
     return (
