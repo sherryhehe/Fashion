@@ -45,5 +45,11 @@ export const brandsApi = {
    */
   getTop: (limit?: number) =>
     apiClient.get<any[]>('/brands/top', limit ? { limit } : undefined),
+
+  /**
+   * Update brand verification status
+   */
+  setVerified: (id: string, verified: boolean) =>
+    apiClient.patch<any>(`/brands/${id}/verify`, { verified }),
 };
 

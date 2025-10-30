@@ -28,7 +28,7 @@ export default function BrandList() {
       setBrands(response.data || []);
     } catch (error) {
       console.error('Failed to fetch brands:', error);
-      addNotification('Failed to load brands', 'error');
+      addNotification('error', 'Failed to load brands');
       setBrands([]);
     } finally {
       setLoading(false);
@@ -40,10 +40,21 @@ export default function BrandList() {
 
     try {
       await brandsApi.delete(id);
-      addNotification('Brand deleted successfully', 'success');
+      addNotification('success', 'Brand deleted successfully');
       fetchBrands(); // Refresh list
     } catch (error) {
-      addNotification('Failed to delete brand', 'error');
+      addNotification('error', 'Failed to delete brand');
+    }
+  };
+
+  const handleVerifyToggle = async (brand: any) => {
+    try {
+      const newVerified = !brand.verified;
+      await brandsApi.setVerified(brand._id || brand.id, newVerified);
+      addNotification('success', `Brand ${newVerified ? 'verified' : 'unverified'} successfully`);
+      fetchBrands();
+    } catch (error) {
+      addNotification('error', 'Failed to update verification status');
     }
   };
 
@@ -155,6 +166,22 @@ export default function BrandList() {
       key: 'createdAt',
       label: 'Joined',
       render: (value: string) => new Date(value).toLocaleDateString()
+    },
+    {
+      key: 'verifyAction',
+      label: 'Actions',
+      render: (_: any, row: any) => (
+        <button
+          className={`btn btn-sm ${row.verified ? 'btn-outline-secondary' : 'btn-outline-success'}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleVerifyToggle(row);
+          }}
+        >
+          <i className={`mdi ${row.verified ? 'mdi-cancel' : 'mdi-check-circle'} me-1`}></i>
+          {row.verified ? 'Unverify' : 'Verify'}
+        </button>
+      )
     }
   ];
 

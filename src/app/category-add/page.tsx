@@ -67,10 +67,10 @@ export default function CategoryAdd() {
       if (imageFile) {
         console.log('📤 UPLOADING IMAGE...');
         const uploadFormData = new FormData();
-        uploadFormData.append('images', imageFile);
+        uploadFormData.append('image', imageFile);
         
         const token = localStorage.getItem('token');
-        const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/upload/images`, {
+        const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/upload/image`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -83,7 +83,7 @@ export default function CategoryAdd() {
         }
         
         const uploadResult = await uploadResponse.json();
-        imageUrl = uploadResult.data.urls[0];
+        imageUrl = uploadResult.data.url;
         console.log('✅ IMAGE UPLOADED:', imageUrl);
       }
 

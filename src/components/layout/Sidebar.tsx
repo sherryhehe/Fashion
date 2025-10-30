@@ -84,12 +84,6 @@ export default function Sidebar({ className = '' }: SidebarProps) {
       ]
     },
     {
-      id: 'reviews',
-      label: 'Reviews',
-      icon: 'solar:chat-square-like-bold-duotone',
-      href: '/pages-review'
-    },
-    {
       id: 'notifications',
       label: 'Notifications',
       icon: 'solar:bell-bing-bold-duotone',
