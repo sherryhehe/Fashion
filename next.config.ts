@@ -7,8 +7,7 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  output: 'export',
-  trailingSlash: true,
+  // Removed 'output: export' for production server mode
   images: {
     unoptimized: true,
   },
