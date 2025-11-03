@@ -177,134 +177,105 @@ export default function BrandDetails() {
               style={{ 
                 minHeight: '450px',
                 background: brandBanner 
-                  ? `linear-gradient(135deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.5) 100%), url(${brandBanner})`
+                  ? `url(${brandBanner})`
                   : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
               }}
             >
-              {/* Decorative Overlay */}
-              <div 
-                className="position-absolute top-0 start-0 w-100 h-100"
-                style={{
-                  background: 'radial-gradient(circle at 30% 20%, rgba(255,255,255,0.1) 0%, transparent 50%)',
-                }}
-              ></div>
+            </div>
+          </div>
+        </div>
 
-              {/* Content Container */}
-              <div className="container-fluid">
-                <div className="row align-items-center justify-content-center" style={{ minHeight: '450px' }}>
-                  <div className="col-lg-6 col-md-8 text-center position-relative" style={{ zIndex: 2 }}>
-                    {/* Logo Section */}
-                    <div className="mb-4">
-                      <div 
-                        className="d-inline-block position-relative"
-                        style={{
-                          padding: '8px',
-                          background: 'rgba(255, 255, 255, 0.95)',
-                          borderRadius: '24px',
-                          boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-                          backdropFilter: 'blur(10px)',
+        {/* Brand Info Section - Below Banner */}
+        <div className="row mt-4">
+          <div className="col-12">
+            <div className="card shadow-sm">
+              <div className="card-body">
+                <div className="row align-items-center">
+                  {/* Logo - Smaller */}
+                  <div className="col-auto">
+                    <div className="position-relative">
+                      <img 
+                        src={getBrandLogo()} 
+                        alt="Brand Logo" 
+                        className="rounded-circle" 
+                        width="80" 
+                        height="80"
+                        style={{ 
+                          objectFit: 'contain',
+                          border: '3px solid #e9ecef',
+                          backgroundColor: '#f8f9fa',
                         }}
-                      >
-                        <img 
-                          src={getBrandLogo()} 
-                          alt="Brand Logo" 
-                          className="rounded-circle" 
-                          width="160" 
-                          height="160"
-                          style={{ 
-                            objectFit: 'cover',
-                            display: 'block',
-                            border: '4px solid white',
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = placeholderImage;
+                        }}
+                      />
+                      {/* Verified Badge Overlay - Smaller */}
+                      {brand.verified && (
+                        <div 
+                          className="position-absolute bottom-0 end-0"
+                          style={{
+                            background: '#10b981',
+                            borderRadius: '50%',
+                            width: '24px',
+                            height: '24px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            border: '2px solid white',
+                            boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
                           }}
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = placeholderImage;
-                          }}
-                        />
-                        {/* Verified Badge Overlay */}
-                        {brand.verified && (
-                          <div 
-                            className="position-absolute bottom-0 end-0"
-                            style={{
-                              background: '#10b981',
-                              borderRadius: '50%',
-                              width: '48px',
-                              height: '48px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              border: '4px solid white',
-                              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-                            }}
-                          >
-                            <i className="mdi mdi-check text-white fs-5"></i>
-                          </div>
-                        )}
-                      </div>
+                        >
+                          <i className="mdi mdi-check text-white" style={{ fontSize: '12px' }}></i>
+                        </div>
+                      )}
                     </div>
+                  </div>
 
-                    {/* Brand Info */}
-                    <div className="text-white">
-                      <h1 className="display-5 fw-bold mb-3 text-white" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
-                        {brand.name}
-                      </h1>
-                      <p className="fs-5 mb-4 text-white-50" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>
-                        <i className="mdi mdi-email-outline me-2"></i>
+                  {/* Brand Name, Email, Status */}
+                  <div className="col">
+                    <div className="d-flex flex-column">
+                      <h4 className="mb-2 fw-semibold">{brand.name}</h4>
+                      <p className="text-muted mb-2 small">
+                        <i className="mdi mdi-email-outline me-1"></i>
                         {brand.email}
                       </p>
                       
-                      {/* Status Badges */}
-                      <div className="d-flex flex-wrap justify-content-center gap-2 mb-4">
+                      {/* Status Badges - Smaller */}
+                      <div className="d-flex flex-wrap gap-2">
                         <span 
-                          className={`badge fs-6 px-3 py-2 ${
+                          className={`badge px-2 py-1 ${
                             brand.status === 'active' ? 'bg-success' : 
                             brand.status === 'pending' ? 'bg-warning text-dark' : 
                             'bg-secondary'
                           }`}
-                          style={{ borderRadius: '12px' }}
                         >
                           <i className={`mdi ${
                             brand.status === 'active' ? 'mdi-check-circle' :
                             brand.status === 'pending' ? 'mdi-clock-outline' :
                             'mdi-cancel'
-                          } me-1`}></i>
+                          } me-1`} style={{ fontSize: '12px' }}></i>
                           {brand.status?.toUpperCase() || 'INACTIVE'}
                         </span>
                         {brand.verified && (
-                          <span 
-                            className="badge bg-success fs-6 px-3 py-2"
-                            style={{ borderRadius: '12px' }}
-                          >
-                            <i className="mdi mdi-check-circle me-1"></i>
+                          <span className="badge bg-success px-2 py-1">
+                            <i className="mdi mdi-check-circle me-1" style={{ fontSize: '12px' }}></i>
                             Verified
                           </span>
                         )}
                         {brand.featured && (
-                          <span 
-                            className="badge bg-warning text-dark fs-6 px-3 py-2"
-                            style={{ borderRadius: '12px' }}
-                          >
-                            <i className="mdi mdi-star me-1"></i>
+                          <span className="badge bg-warning text-dark px-2 py-1">
+                            <i className="mdi mdi-star me-1" style={{ fontSize: '12px' }}></i>
                             Featured
                           </span>
                         )}
                       </div>
                     </div>
                   </div>
-
                 </div>
               </div>
-
-              {/* Bottom Gradient Fade */}
-              <div 
-                className="position-absolute bottom-0 start-0 w-100"
-                style={{
-                  height: '120px',
-                  background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.3))',
-                }}
-              ></div>
             </div>
           </div>
         </div>
