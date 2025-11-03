@@ -3,4 +3,5 @@ export { default as BurgerMenu } from './BurgerMenu';
 export { default as InteractiveDropdown } from './InteractiveDropdown';
 export { default as InteractiveForm } from './InteractiveForm';
 export { default as TimeFilter } from './TimeFilter';
+export { default as GlobalSearch } from './GlobalSearch';
 

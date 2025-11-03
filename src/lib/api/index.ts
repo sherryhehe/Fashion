@@ -15,4 +15,5 @@ export * from './dashboard';
 export * from './brands';
 export * from './notifications';
 export { bannersApi } from './banners';
+export { searchApi } from './search';
 

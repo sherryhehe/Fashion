@@ -5,6 +5,7 @@ import { useNotification } from '@/hooks/useInteractive';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { stylesApi } from '@/lib/api';
+import { getStyleImageUrl } from '@/utils/imageHelper';
 
 export default function StylesList() {
   const { addNotification } = useNotification();
@@ -51,25 +52,16 @@ export default function StylesList() {
       key: 'image',
       label: 'Image',
       render: (value: string, row: any) => {
-        const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:8000';
         const placeholderImage = '/assets/images/products/product-1.png';
-        
-        let imageUrl = placeholderImage;
-        
-        if (value) {
-          if (value.startsWith('http')) {
-            imageUrl = value;
-          } else if (value.startsWith('/uploads/')) {
-            imageUrl = `${API_URL}${value}`;
-          }
-        }
+        const imageUrl = getStyleImageUrl(value, placeholderImage);
         
         return (
           <img 
             src={imageUrl} 
             alt={row.name} 
             className="rounded" 
-            style={{ width: '50px', height: '50px', objectFit: 'cover' }} 
+            style={{ width: '50px', height: '50px', objectFit: 'cover', cursor: 'pointer' }} 
+            onClick={() => window.location.href = `/style-edit?id=${row._id || row.id}`}
             onError={(e) => {
               (e.target as HTMLImageElement).src = placeholderImage;
             }}
@@ -82,9 +74,17 @@ export default function StylesList() {
       label: 'Style Name',
       render: (value: string, row: any) => (
         <div>
-          <div className="fw-medium text-dark">{value}</div>
+          <a
+            href={`/style-edit?id=${row._id || row.id}`}
+            className="text-dark fw-medium text-decoration-none"
+            style={{ cursor: 'pointer' }}
+          >
+            {value}
+          </a>
           {row.slug && (
-            <small className="text-muted">/{row.slug}</small>
+            <div>
+              <small className="text-muted">/{row.slug}</small>
+            </div>
           )}
         </div>
       )

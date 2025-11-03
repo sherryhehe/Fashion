@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { BurgerMenu } from '@/components/molecules';
+import { BurgerMenu, GlobalSearch } from '@/components/molecules';
 
 interface HeaderProps {
   pageTitle: string;
@@ -118,13 +118,10 @@ export default function Header({ pageTitle }: HeaderProps) {
               </div>
             </div>
 
-            {/* Search */}
-            <form className="app-search d-none d-md-block ms-2">
-              <div className="position-relative">
-                <input type="search" className="form-control" placeholder="Search..." autoComplete="off" />
-                <iconify-icon icon="solar:magnifer-linear" className="search-widget-icon position-absolute top-50 end-0 translate-middle-y me-3"></iconify-icon>
-              </div>
-            </form>
+            {/* Global Search - Responsive */}
+            <div className="ms-2" style={{ flex: '1 1 auto', minWidth: '250px', maxWidth: '500px' }}>
+              <GlobalSearch />
+            </div>
           </div>
         </div>
       </div>

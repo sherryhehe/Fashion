@@ -14,7 +14,6 @@ export default function StyleAdd() {
   
   const [formData, setFormData] = useState({
     styleName: '',
-    styleType: '',
     styleSlug: '',
     styleStatus: 'active',
     styleDescription: '',
@@ -127,7 +126,6 @@ export default function StyleAdd() {
 
       const styleData = {
         name: formData.styleName,
-        type: formData.styleType as any,
         slug: formData.styleSlug,
         description: formData.styleDescription || undefined,
         status: formData.styleStatus as 'active' | 'inactive',
@@ -271,25 +269,7 @@ export default function StyleAdd() {
                         required 
                       />
                     </div>
-                    <div className="col-md-6 mb-3">
-                      <label htmlFor="styleType" className="form-label">Style Type <span className="text-danger">*</span></label>
-                      <select 
-                        className="form-select" 
-                        id="styleType" 
-                        name="styleType"
-                        value={formData.styleType}
-                        onChange={handleChange}
-                        required
-                      >
-                        <option value="">Select Type</option>
-                        <option value="western">Western</option>
-                        <option value="desi">Desi</option>
-                        <option value="eastern">Eastern</option>
-                        <option value="asian">Asian</option>
-                        <option value="traditional">Traditional</option>
-                        <option value="modern">Modern</option>
-                      </select>
-                    </div>
+              
                     <div className="col-md-6 mb-3">
                       <label htmlFor="styleSlug" className="form-label">Style Slug</label>
                       <input 
@@ -388,10 +368,6 @@ export default function StyleAdd() {
                   <li className="mb-2">
                     <i className="bx bx-check-circle text-success me-2"></i>
                     Use clear, descriptive names
-                  </li>
-                  <li className="mb-2">
-                    <i className="bx bx-check-circle text-success me-2"></i>
-                    Choose appropriate style type
                   </li>
                   <li className="mb-2">
                     <i className="bx bx-check-circle text-success me-2"></i>

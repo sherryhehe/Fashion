@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { brandsApi, productsApi } from '@/lib/api';
+import { getBrandLogoUrl, getBrandBannerUrl, getImageUrl } from '@/utils/imageHelper';
 
 export default function BrandDetails() {
   const searchParams = useSearchParams();
@@ -29,10 +30,24 @@ export default function BrandDetails() {
     }
   }, [brand?.name]);
 
+  // Log brand data changes (especially banner)
+  useEffect(() => {
+    if (brand) {
+      console.log('📦 Brand state updated:', {
+        id: brand._id || brand.id,
+        name: brand.name,
+        banner: brand.banner,
+        logo: brand.logo
+      });
+    }
+  }, [brand]);
+
   const fetchBrand = async () => {
     try {
       setLoading(true);
       const response = await brandsApi.getById(brandId!);
+      console.log('📥 Fetched brand data:', response.data);
+      console.log('🖼️ Banner in response:', response.data?.banner);
       setBrand(response.data);
     } catch (error) {
       console.error('Failed to fetch brand:', error);
@@ -48,9 +63,10 @@ export default function BrandDetails() {
       
       // Fetch products by this brand name
       const response = await productsApi.getAll({ brand: brand?.name });
-      console.log('📦 Brand products found:', response.data?.length || 0);
+      const products = Array.isArray(response.data) ? response.data : (response.data?.data || []);
+      console.log('📦 Brand products found:', products.length || 0);
       
-      setBrandProducts(response.data || []);
+      setBrandProducts(products);
     } catch (error) {
       console.error('Failed to fetch brand products:', error);
       setBrandProducts([]);
@@ -85,15 +101,25 @@ export default function BrandDetails() {
     );
   }
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:8000';
   const placeholderImage = '/assets/images/products/product-1.png';
   
   const getBrandLogo = () => {
-    if (!brand.logo) return placeholderImage;
-    if (brand.logo.startsWith('http')) return brand.logo;
-    if (brand.logo.startsWith('/uploads/')) return `${API_URL}${brand.logo}`;
-    return placeholderImage;
+    return getBrandLogoUrl(brand.logo, placeholderImage);
   };
+
+  const getBrandBanner = () => {
+    if (!brand || !brand.banner || brand.banner === 'null') {
+      console.log('🔍 No banner found in brand data:', brand?.banner);
+      return null;
+    }
+    const bannerUrl = getBrandBannerUrl(brand.banner);
+    console.log('✅ Banner URL:', bannerUrl);
+    return bannerUrl;
+  };
+
+  const brandBanner = getBrandBanner();
+  console.log('🖼️ Brand Banner:', brandBanner);
+  console.log('📦 Full Brand Data:', brand);
 
   // Toggle featured status
   const handleToggleFeatured = async () => {
@@ -138,24 +164,77 @@ export default function BrandDetails() {
             </div>
           </div>
         </div>
+      </div>
 
-        <div className="row">
-          {/* Brand Profile Card */}
-          <div className="col-lg-4">
+      {/* Brand Banner and Profile Section - Full Width */}
+      <div className="position-relative mb-4" style={{ width: '100vw', marginLeft: '50%', transform: 'translateX(-50%)' }}>
+        {brandBanner ? (
+          <div 
+            className="position-relative"
+            style={{ 
+              height: '400px',
+              width: '100%',
+              backgroundImage: `url(${brandBanner})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              overflow: 'hidden'
+            }}
+          >
+            <div 
+              className="position-absolute w-100 h-100"
+              style={{ 
+                background: 'linear-gradient(to bottom, rgba(0,0,0,0.4), rgba(0,0,0,0.7))'
+              }}
+            ></div>
+            <div className="position-absolute top-50 start-50 w-100 text-center text-white" style={{ transform: 'translate(-50%, -50%)', left: '50%' }}>
+              <img 
+                src={getBrandLogo()} 
+                alt="Brand Logo" 
+                className="rounded-circle mb-3 border-4 border-white" 
+                width="140" 
+                height="140"
+                style={{ objectFit: 'cover', display: 'block', margin: '0 auto' }}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = placeholderImage;
+                }}
+              />
+              <h2 className="mb-2 text-white fw-bold">{brand.name}</h2>
+              <p className="text-white-50 mb-3 fs-5">{brand.email}</p>
+              
+              <div className="d-flex justify-content-center gap-2">
+                <span className={`badge fs-6 ${brand.status === 'active' ? 'bg-success' : brand.status === 'pending' ? 'bg-warning' : 'bg-secondary'}`}>
+                  {brand.status}
+                </span>
+                {brand.verified && (
+                  <span className="badge bg-success fs-6">
+                    <i className="mdi mdi-check-circle me-1"></i>Verified
+                  </span>
+                )}
+                {brand.featured && (
+                  <span className="badge bg-warning fs-6">
+                    <i className="mdi mdi-star me-1"></i>Featured
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="container-fluid">
             <div className="card">
-              <div className="card-body text-center">
+              <div className="card-body text-center py-5">
                 <img 
                   src={getBrandLogo()} 
                   alt="Brand Logo" 
                   className="rounded-circle mb-3" 
-                  width="120" 
-                  height="120"
-                  style={{ objectFit: 'cover' }}
+                  width="150" 
+                  height="150"
+                  style={{ objectFit: 'cover', display: 'block', margin: '0 auto' }}
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = placeholderImage;
                   }}
                 />
-                <h4 className="mb-1">{brand.name}</h4>
+                <h3 className="mb-1">{brand.name}</h3>
                 <p className="text-muted mb-3">{brand.email}</p>
                 
                 <div className="d-flex justify-content-center gap-2 mb-3">
@@ -173,8 +252,20 @@ export default function BrandDetails() {
                     </span>
                   )}
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
 
-                <div className="row text-center">
+      <div className="container-fluid">
+
+        <div className="row">
+          {/* Brand Profile Card */}
+          <div className="col-lg-4">
+            <div className="card">
+              <div className="card-body">
+                <div className="row text-center mb-3">
                   <div className="col-6">
                     <h5 className="mb-1">{brand.productCount || 0}</h5>
                     <p className="text-muted mb-0">Products</p>
@@ -185,7 +276,7 @@ export default function BrandDetails() {
                   </div>
                 </div>
 
-                <style jsx>{`
+                <style dangerouslySetInnerHTML={{__html: `
                   .btn-featured {
                     font-weight: 500;
                     border-radius: 8px;
@@ -213,7 +304,7 @@ export default function BrandDetails() {
                     color: #212529;
                     font-weight: 600;
                   }
-                `}</style>
+                `}} />
 
                 <div className="mt-3 action-buttons">
                   <Link href={`/brand-edit?id=${brand._id || brand.id}`} className="btn btn-primary btn-featured w-100">
@@ -283,61 +374,23 @@ export default function BrandDetails() {
               </div>
             </div>
 
-            {/* Social Media */}
-            {brand.socialMedia && (Object.values(brand.socialMedia).some((v: any) => v)) && (
-              <div className="card">
-                <div className="card-body">
-                  <h5 className="card-title">Social Media</h5>
-                  <div className="d-flex gap-2">
-                    {brand.socialMedia.facebook && (
-                      <a href={brand.socialMedia.facebook} target="_blank" rel="noopener noreferrer" className="btn btn-outline-primary btn-sm">
-                        <i className="bx bxl-facebook"></i>
-                      </a>
-                    )}
-                    {brand.socialMedia.twitter && (
-                      <a href={brand.socialMedia.twitter} target="_blank" rel="noopener noreferrer" className="btn btn-outline-info btn-sm">
-                        <i className="bx bxl-twitter"></i>
-                      </a>
-                    )}
-                    {brand.socialMedia.instagram && (
-                      <a href={brand.socialMedia.instagram} target="_blank" rel="noopener noreferrer" className="btn btn-outline-danger btn-sm">
-                        <i className="bx bxl-instagram"></i>
-                      </a>
-                    )}
-                    {brand.socialMedia.linkedin && (
-                      <a href={brand.socialMedia.linkedin} target="_blank" rel="noopener noreferrer" className="btn btn-outline-primary btn-sm">
-                        <i className="bx bxl-linkedin"></i>
-                      </a>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Main Content */}
           <div className="col-lg-8">
-            {/* Business Information */}
+            {/* Brand Description */}
             <div className="card">
               <div className="card-body">
-                <h5 className="card-title">Business Information</h5>
+                <h5 className="card-title">Description</h5>
+                <p className="mb-0">{brand.description || 'No description provided.'}</p>
+              </div>
+            </div>
+
+            {/* Brand Stats */}
+            <div className="card">
+              <div className="card-body">
+                <h5 className="card-title">Brand Statistics</h5>
                 <div className="row">
-                  <div className="col-md-6 mb-3">
-                    <label className="form-label">Business Type</label>
-                    <p className="mb-0">{brand.businessInfo?.businessType || '-'}</p>
-                  </div>
-                  <div className="col-md-6 mb-3">
-                    <label className="form-label">Tax ID</label>
-                    <p className="mb-0">{brand.businessInfo?.taxId || '-'}</p>
-                  </div>
-                  <div className="col-md-6 mb-3">
-                    <label className="form-label">License Number</label>
-                    <p className="mb-0">{brand.businessInfo?.licenseNumber || '-'}</p>
-                  </div>
-                  <div className="col-md-6 mb-3">
-                    <label className="form-label">Established Year</label>
-                    <p className="mb-0">{brand.businessInfo?.establishedYear || '-'}</p>
-                  </div>
                   <div className="col-md-6 mb-3">
                     <label className="form-label">Commission Rate</label>
                     <p className="mb-0">
@@ -350,10 +403,6 @@ export default function BrandDetails() {
                       <strong>${(brand.totalSales || 0).toLocaleString()}</strong>
                     </p>
                   </div>
-                </div>
-                <div className="mb-3">
-                  <label className="form-label">Description</label>
-                  <p className="mb-0">{brand.description || 'No description provided.'}</p>
                 </div>
               </div>
             </div>
@@ -428,13 +477,7 @@ export default function BrandDetails() {
                               <div className="d-flex align-items-center">
                                 {product.images && product.images[0] && (
                                   <img 
-                                    src={
-                                      product.images[0].startsWith('http') 
-                                        ? product.images[0] 
-                                        : product.images[0].startsWith('/uploads/')
-                                        ? `${API_URL}${product.images[0]}`
-                                        : placeholderImage
-                                    }
+                                    src={getImageUrl(product.images[0], placeholderImage)}
                                     alt={product.name}
                                     className="rounded me-2"
                                     width="40"

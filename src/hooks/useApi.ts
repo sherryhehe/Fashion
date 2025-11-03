@@ -243,6 +243,76 @@ export const useCreateBrand = () => {
 };
 
 // =====================================================
+// BANNERS
+// =====================================================
+
+export const useBanners = () => {
+  return useQuery({
+    queryKey: ['banners'],
+    queryFn: () => apiRequest('/banners'),
+  });
+};
+
+export const useBanner = (id: string | null) => {
+  return useQuery({
+    queryKey: ['banners', id],
+    queryFn: () => apiRequest(`/banners/${id}`),
+    enabled: !!id,
+  });
+};
+
+export const useCreateBanner = () => {
+  return useMutation({
+    mutationFn: (bannerData: any) => {
+      console.log('📤 CREATE BANNER MUTATION');
+      console.log('  Data:', bannerData);
+      return apiRequest('/banners', {
+        method: 'POST',
+        body: JSON.stringify(bannerData),
+      });
+    },
+    onSuccess: () => {
+      console.log('✅ Banner created - invalidating queries');
+      queryClient.invalidateQueries({ queryKey: ['banners'] });
+    },
+  });
+};
+
+export const useUpdateBanner = () => {
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => {
+      console.log('📤 UPDATE BANNER MUTATION');
+      console.log('  ID:', id);
+      console.log('  Data:', data);
+      return apiRequest(`/banners/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      console.log('✅ Banner updated - invalidating queries');
+      queryClient.invalidateQueries({ queryKey: ['banners'] });
+    },
+  });
+};
+
+export const useDeleteBanner = () => {
+  return useMutation({
+    mutationFn: (id: string) => {
+      console.log('🗑️ DELETE BANNER MUTATION');
+      console.log('  ID:', id);
+      return apiRequest(`/banners/${id}`, {
+        method: 'DELETE',
+      });
+    },
+    onSuccess: () => {
+      console.log('✅ Banner deleted - invalidating queries');
+      queryClient.invalidateQueries({ queryKey: ['banners'] });
+    },
+  });
+};
+
+// =====================================================
 // ORDERS
 // =====================================================
 

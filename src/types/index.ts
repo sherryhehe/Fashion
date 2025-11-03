@@ -133,7 +133,6 @@ export interface Category {
 export interface Style {
   id: string;
   name: string;
-  type: 'western' | 'desi' | 'eastern' | 'asian' | 'traditional' | 'modern';
   slug: string;
   description?: string;
   image?: string;

@@ -27,7 +27,7 @@ export const bannersApi = {
 		return apiClient.post<Banner>('/banners', payload);
 	},
 	update(id: string, payload: Partial<Banner>) {
-		return apiClient.put<Banner>(`/banners/${id}`);
+		return apiClient.put<Banner>(`/banners/${id}`, payload);
 	},
 	remove(id: string) {
 		return apiClient.delete<Banner>(`/banners/${id}`);
