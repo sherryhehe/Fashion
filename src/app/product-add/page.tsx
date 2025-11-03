@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useCategories, useBrands, useCreateProduct } from '@/hooks/useApi';
+import { formatCurrency } from '@/utils/currencyHelper';
 
 export default function ProductAdd() {
   console.log('🎨 Product Add Page Loaded');
@@ -696,7 +697,7 @@ export default function ProductAdd() {
                                     <tr key={variation.id}>
                                       <td>{variation.size || '-'}</td>
                                       <td>{variation.color || '-'}</td>
-                                      <td>{variation.price ? `$${variation.price}` : '-'}</td>
+                                      <td>{variation.price ? formatCurrency(variation.price) : '-'}</td>
                                       <td>{variation.stock || '-'}</td>
                                       <td>
                                         <button 

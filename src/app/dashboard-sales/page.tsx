@@ -2,6 +2,7 @@
 
 import Layout from '@/components/layout/Layout';
 import { useState, useEffect } from 'react';
+import { formatCurrencyNoDecimals, formatCurrency } from '@/utils/currencyHelper';
 
 export default function DashboardSales() {
   const [loading, setLoading] = useState(true);
@@ -72,7 +73,7 @@ export default function DashboardSales() {
                 <div className="flex-grow-1 overflow-hidden">
                   <p className="text-uppercase fw-medium text-muted text-truncate mb-3">Total Sales</p>
                   <h4 className="fs-22 fw-semibold mb-0">
-                    ${salesData.totalSales.toLocaleString()}
+                    {formatCurrencyNoDecimals(salesData.totalSales)}
                   </h4>
                 </div>
                 <div className="flex-shrink-0">
@@ -95,7 +96,7 @@ export default function DashboardSales() {
                 <div className="flex-grow-1 overflow-hidden">
                   <p className="text-uppercase fw-medium text-muted text-truncate mb-3">Today's Sales</p>
                   <h4 className="fs-22 fw-semibold mb-0">
-                    ${salesData.todaySales.toLocaleString()}
+                    {formatCurrencyNoDecimals(salesData.todaySales)}
                   </h4>
                 </div>
                 <div className="flex-shrink-0">
@@ -141,7 +142,7 @@ export default function DashboardSales() {
                 <div className="flex-grow-1 overflow-hidden">
                   <p className="text-uppercase fw-medium text-muted text-truncate mb-3">Avg. Order Value</p>
                   <h4 className="fs-22 fw-semibold mb-0">
-                    ${salesData.averageOrderValue.toFixed(2)}
+                    {formatCurrency(salesData.averageOrderValue)}
                   </h4>
                 </div>
                 <div className="flex-shrink-0">

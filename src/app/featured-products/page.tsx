@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { productsApi } from '@/lib/api';
 import { getProductImageUrl } from '@/utils/imageHelper';
+import { formatCurrency } from '@/utils/currencyHelper';
 
 export default function FeaturedProducts() {
   const { addNotification } = useNotificationContext();
@@ -88,7 +89,7 @@ export default function FeaturedProducts() {
     {
       key: 'price',
       label: 'Price',
-      render: (value: number) => `$${value?.toFixed(2) || '0.00'}`
+      render: (value: number) => formatCurrency(value)
     },
     {
       key: 'stock',

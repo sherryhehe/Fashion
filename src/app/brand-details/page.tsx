@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { brandsApi, productsApi } from '@/lib/api';
 import { getBrandLogoUrl, getBrandBannerUrl, getImageUrl } from '@/utils/imageHelper';
+import { formatCurrencyNoDecimals, formatCurrency } from '@/utils/currencyHelper';
 
 export default function BrandDetails() {
   const searchParams = useSearchParams();
@@ -451,7 +452,7 @@ export default function BrandDetails() {
                   <div className="col-md-6 mb-3">
                     <label className="form-label">Total Sales</label>
                     <p className="mb-0">
-                      <strong>${(brand.totalSales || 0).toLocaleString()}</strong>
+                      <strong>{formatCurrencyNoDecimals(brand.totalSales || 0)}</strong>
                     </p>
                   </div>
                 </div>
@@ -473,7 +474,7 @@ export default function BrandDetails() {
                 <div className="card">
                   <div className="card-body text-center">
                     <i className="bx bx-dollar-circle fs-24 text-success mb-2"></i>
-                    <h4 className="mb-1">${(brand.totalSales || 0).toLocaleString()}</h4>
+                    <h4 className="mb-1">{formatCurrencyNoDecimals(brand.totalSales || 0)}</h4>
                     <p className="text-muted mb-0">Total Sales</p>
                   </div>
                 </div>
@@ -542,7 +543,7 @@ export default function BrandDetails() {
                                 <span>{product.name}</span>
                               </div>
                             </td>
-                            <td>${product.price?.toFixed(2) || '0.00'}</td>
+                            <td>{formatCurrency(product.price)}</td>
                             <td>
                               <span className={`badge ${product.stock > 20 ? 'bg-success' : product.stock > 0 ? 'bg-warning' : 'bg-danger'}`}>
                                 {product.stock || 0}

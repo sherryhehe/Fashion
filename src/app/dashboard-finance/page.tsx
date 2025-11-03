@@ -1,6 +1,7 @@
 'use client';
 
 import Layout from '@/components/layout/Layout';
+import { formatCurrencyNoDecimals } from '@/utils/currencyHelper';
 import { useState, useEffect } from 'react';
 
 export default function DashboardFinance() {
@@ -63,7 +64,7 @@ export default function DashboardFinance() {
                 <div className="flex-grow-1 overflow-hidden">
                   <p className="text-uppercase fw-medium text-muted text-truncate mb-3">Total Revenue</p>
                   <h4 className="fs-22 fw-semibold mb-0">
-                    ${financialData.totalRevenue.toLocaleString()}
+                    {formatCurrencyNoDecimals(financialData.totalRevenue)}
                   </h4>
                 </div>
                 <div className="flex-shrink-0">
@@ -86,7 +87,7 @@ export default function DashboardFinance() {
                 <div className="flex-grow-1 overflow-hidden">
                   <p className="text-uppercase fw-medium text-muted text-truncate mb-3">Monthly Revenue</p>
                   <h4 className="fs-22 fw-semibold mb-0">
-                    ${financialData.monthlyRevenue.toLocaleString()}
+                    {formatCurrencyNoDecimals(financialData.monthlyRevenue)}
                   </h4>
                 </div>
                 <div className="flex-shrink-0">
@@ -109,7 +110,7 @@ export default function DashboardFinance() {
                 <div className="flex-grow-1 overflow-hidden">
                   <p className="text-uppercase fw-medium text-muted text-truncate mb-3">Total Profit</p>
                   <h4 className="fs-22 fw-semibold mb-0">
-                    ${financialData.profit.toLocaleString()}
+                    {formatCurrencyNoDecimals(financialData.profit)}
                   </h4>
                 </div>
                 <div className="flex-shrink-0">
@@ -132,7 +133,7 @@ export default function DashboardFinance() {
                 <div className="flex-grow-1 overflow-hidden">
                   <p className="text-uppercase fw-medium text-muted text-truncate mb-3">Total Expenses</p>
                   <h4 className="fs-22 fw-semibold mb-0">
-                    ${financialData.expenses.toLocaleString()}
+                    {formatCurrencyNoDecimals(financialData.expenses)}
                   </h4>
                 </div>
                 <div className="flex-shrink-0">

@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { productsApi } from '@/lib/api';
 import { getProductImageUrl } from '@/utils/imageHelper';
+import { formatCurrency } from '@/utils/currencyHelper';
 
 export default function ProductList() {
   const { addNotification } = useNotificationContext();
@@ -122,7 +123,7 @@ export default function ProductList() {
     {
       key: 'price',
       label: 'Price',
-      render: (value: number) => `$${value?.toFixed(2) || '0.00'}`
+      render: (value: number) => formatCurrency(value)
     },
     {
       key: 'stock',

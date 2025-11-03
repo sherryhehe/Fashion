@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { useProduct } from '@/hooks/useApi';
 import { productsApi } from '@/lib/api';
 import { getProductImageUrl } from '@/utils/imageHelper';
+import { formatCurrency } from '@/utils/currencyHelper';
 
 export default function ProductDetails() {
   const searchParams = useSearchParams();
@@ -172,10 +173,10 @@ export default function ProductDetails() {
                     </div>
                     
                     <div className="mt-3">
-                      <h4 className="text-primary">${product.price?.toFixed(2)}</h4>
+                      <h4 className="text-primary">{formatCurrency(product.price)}</h4>
                       {product.originalPrice && product.originalPrice > product.price && (
                         <p className="text-muted">
-                          <del>${product.originalPrice.toFixed(2)}</del>
+                          <del>{formatCurrency(product.originalPrice)}</del>
                           <span className="badge bg-danger ms-2">{product.discount}% OFF</span>
                         </p>
                       )}
@@ -353,7 +354,7 @@ export default function ProductDetails() {
                           <tr key={idx}>
                             <td>{variation.size || '-'}</td>
                             <td>{variation.color || '-'}</td>
-                            <td>{variation.price ? `$${variation.price}` : '-'}</td>
+                            <td>{variation.price ? formatCurrency(variation.price) : '-'}</td>
                             <td>{variation.stock || '-'}</td>
                           </tr>
                         ))}
@@ -445,12 +446,12 @@ export default function ProductDetails() {
               <div className="card-body">
                 <div className="mb-3">
                   <p className="text-muted mb-1">Current Price</p>
-                  <h4 className="mb-0 text-primary">${product.price?.toFixed(2)}</h4>
+                  <h4 className="mb-0 text-primary">{formatCurrency(product.price)}</h4>
                 </div>
                 {product.originalPrice && (
                   <div className="mb-3">
                     <p className="text-muted mb-1">Original Price</p>
-                    <p className="mb-0"><del>${product.originalPrice.toFixed(2)}</del></p>
+                    <p className="mb-0"><del>{formatCurrency(product.originalPrice)}</del></p>
                   </div>
                 )}
                 {product.discount > 0 && (

@@ -3,6 +3,7 @@
 import Layout from '@/components/layout/Layout';
 import Link from 'next/link';
 import { useState } from 'react';
+import { formatCurrency } from '@/utils/currencyHelper';
 
 export default function OrderDetail() {
   // State for modals and functionality
@@ -148,19 +149,19 @@ export default function OrderDetail() {
               ${order.items.map(item => `
                 <tr>
                   <td>${item.name}</td>
-                  <td>$${item.price.toFixed(2)}</td>
+                  <td>${formatCurrency(item.price)}</td>
                   <td>${item.quantity}</td>
-                  <td>$${item.total.toFixed(2)}</td>
+                  <td>${formatCurrency(item.total)}</td>
                 </tr>
               `).join('')}
             </tbody>
           </table>
           
           <div class="totals">
-            <p>Subtotal: $${order.totals.subtotal.toFixed(2)}</p>
-            <p>Shipping: $${order.shipping.cost.toFixed(2)}</p>
-            <p>Tax: $${order.totals.tax.toFixed(2)}</p>
-            <p><strong>Total: $${order.totals.total.toFixed(2)}</strong></p>
+            <p>Subtotal: ${formatCurrency(order.totals.subtotal)}</p>
+            <p>Shipping: ${formatCurrency(order.shipping.cost)}</p>
+            <p>Tax: ${formatCurrency(order.totals.tax)}</p>
+            <p><strong>Total: ${formatCurrency(order.totals.total)}</strong></p>
           </div>
           
           <div style="margin-top: 30px;">
@@ -268,11 +269,11 @@ export default function OrderDetail() {
                               </div>
                             </div>
                           </td>
-                          <td>${item.price.toFixed(2)}</td>
+                          <td>{formatCurrency(item.price)}</td>
                           <td>
                             <span className="badge bg-primary">{item.quantity}</span>
                           </td>
-                          <td className="fw-semibold">${item.total.toFixed(2)}</td>
+                          <td className="fw-semibold">{formatCurrency(item.total)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -338,20 +339,20 @@ export default function OrderDetail() {
               <div className="card-body">
                 <div className="d-flex justify-content-between mb-2">
                   <span>Subtotal:</span>
-                  <span>${order.totals.subtotal.toFixed(2)}</span>
+                  <span>{formatCurrency(order.totals.subtotal)}</span>
                 </div>
                 <div className="d-flex justify-content-between mb-2">
                   <span>Shipping:</span>
-                  <span>${order.shipping.cost.toFixed(2)}</span>
+                  <span>{formatCurrency(order.shipping.cost)}</span>
                 </div>
                 <div className="d-flex justify-content-between mb-2">
                   <span>Tax:</span>
-                  <span>${order.totals.tax.toFixed(2)}</span>
+                  <span>{formatCurrency(order.totals.tax)}</span>
                 </div>
                 <hr />
                 <div className="d-flex justify-content-between">
                   <strong>Total:</strong>
-                  <strong>${order.totals.total.toFixed(2)}</strong>
+                  <strong>{formatCurrency(order.totals.total)}</strong>
                 </div>
               </div>
             </div>

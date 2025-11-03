@@ -3,6 +3,7 @@
 import Layout from '@/components/layout/Layout';
 import { useEffect, useState } from 'react';
 import { productsApi, dashboardApi } from '@/lib/api';
+import { formatCurrency, formatCurrencyNoDecimals } from '@/utils/currencyHelper';
 
 export default function TopSellingProducts() {
   const [stats, setStats] = useState<any>(null);
@@ -77,7 +78,7 @@ export default function TopSellingProducts() {
                   </div>
                   <div className="col-6 text-end">
                     <p className="text-muted mb-0 text-truncate fs-12">Revenue</p>
-                    <h4 className="text-dark mt-1 mb-0 fs-18">{stats?.overview?.totalRevenue || '$0.00'}</h4>
+                    <h4 className="text-dark mt-1 mb-0 fs-18">{stats?.overview?.totalRevenue ? formatCurrencyNoDecimals(stats.overview.totalRevenue) : 'PKR 0'}</h4>
                   </div>
                 </div>
               </div>
@@ -122,7 +123,7 @@ export default function TopSellingProducts() {
                             <h6 className="card-title">{product.name}</h6>
                             <p className="card-text text-muted">{product.description}</p>
                             <div className="d-flex justify-content-between align-items-center">
-                              <span className="text-success fw-bold">${product.price?.toFixed?.(2) ?? product.price}</span>
+                              <span className="text-success fw-bold">{formatCurrency(product.price)}</span>
                             </div>
                           </div>
                         </div>

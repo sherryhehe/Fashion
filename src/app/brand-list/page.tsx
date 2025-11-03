@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { brandsApi } from '@/lib/api';
 import { getBrandLogoUrl } from '@/utils/imageHelper';
+import { formatCurrencyNoDecimals } from '@/utils/currencyHelper';
 
 export default function BrandList() {
   const { addNotification } = useNotificationContext();
@@ -113,7 +114,7 @@ export default function BrandList() {
     {
       key: 'totalSales',
       label: 'Total Sales',
-      render: (value: number) => `$${(value || 0).toLocaleString()}`
+      render: (value: number) => formatCurrencyNoDecimals(value || 0)
     },
     {
       key: 'commission',

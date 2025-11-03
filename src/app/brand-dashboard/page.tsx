@@ -4,6 +4,7 @@ import Layout from '@/components/layout/Layout';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { brandsApi, dashboardApi } from '@/lib/api';
+import { formatCurrencyNoDecimals } from '@/utils/currencyHelper';
 
 export default function BrandDashboard() {
   const [stats, setStats] = useState<any>(null);
@@ -76,7 +77,7 @@ export default function BrandDashboard() {
                       <div className="card bg-light">
                         <div className="card-body">
                           <p className="text-muted mb-1">Revenue</p>
-                          <h4 className="mb-0">{stats?.overview?.totalRevenue || '$0.00'}</h4>
+                          <h4 className="mb-0">{stats?.overview?.totalRevenue ? formatCurrencyNoDecimals(stats.overview.totalRevenue) : 'PKR 0'}</h4>
                         </div>
                       </div>
                     </div>

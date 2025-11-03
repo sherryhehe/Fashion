@@ -4,6 +4,7 @@ import { Layout, InteractiveTable, InteractiveButton } from '@/components';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { ordersApi } from '@/lib/api';
+import { formatCurrency } from '@/utils/currencyHelper';
 
 export default function OrdersList() {
   const [statusFilter, setStatusFilter] = useState('');
@@ -40,7 +41,7 @@ export default function OrdersList() {
     {
       key: 'total',
       label: 'Total',
-      render: (value: number) => `$${value?.toFixed(2) || '0.00'}`
+      render: (value: number) => formatCurrency(value)
     },
     {
       key: 'status',

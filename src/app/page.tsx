@@ -4,6 +4,7 @@ import { Layout } from '@/components';
 import TimeFilter, { TimeFilterOption } from '@/components/molecules/TimeFilter';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { formatCurrencyNoDecimals, formatCurrency } from '@/utils/currencyHelper';
 
 export default function Home() {
   const router = useRouter();
@@ -82,7 +83,7 @@ export default function Home() {
                   <h5 className="text-muted fw-normal mt-0 text-truncate" title="Revenue">
                     Revenue
                   </h5>
-                  <h3 className="my-2 py-1">{stats?.overview?.totalRevenue || '$0.00'}</h3>
+                  <h3 className="my-2 py-1">{stats?.overview?.totalRevenue ? formatCurrencyNoDecimals(stats.overview.totalRevenue) : 'PKR 0'}</h3>
                 </div>
                 <div className="col-6">
                   <div className="text-end">
@@ -193,7 +194,7 @@ export default function Home() {
                         <tr key={order.id}>
                           <td>{order.orderNumber}</td>
                           <td>{order.customer}</td>
-                          <td>${order.total?.toFixed(2)}</td>
+                          <td>{formatCurrency(order.total)}</td>
                           <td>
                             <span className={`badge bg-${
                               order.status === 'delivered' ? 'success' :

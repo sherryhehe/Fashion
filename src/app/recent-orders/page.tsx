@@ -31,7 +31,7 @@ export default function RecentOrders() {
     {
       key: 'total',
       label: 'Total',
-      render: (value: number) => `$${value?.toFixed(2) || '0.00'}`
+      render: (value: number) => formatCurrency(value)
     },
     {
       key: 'status',

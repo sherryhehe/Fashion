@@ -2,6 +2,7 @@
 
 import Layout from '@/components/layout/Layout';
 import { getProductImageUrl } from '@/utils/imageHelper';
+import { formatCurrency } from '@/utils/currencyHelper';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { productsApi } from '@/lib/api';
@@ -138,7 +139,7 @@ export default function ProductGrid() {
                                 </span>
                               </h5>
                               <p className="text-muted fs-13">{product.category}</p>
-                              <h4 className="text-dark mt-2">${product.price?.toFixed(2)}</h4>
+                              <h4 className="text-dark mt-2">{formatCurrency(product.price)}</h4>
                               <div className="mt-3">
                                 <span className={`badge ${product.status === 'active' ? 'bg-success' : 'bg-secondary'} me-2`}>
                                   {product.status}

@@ -2,6 +2,7 @@
 
 import Layout from '@/components/layout/Layout';
 import Link from 'next/link';
+import { formatCurrency } from '@/utils/currencyHelper';
 
 export default function CustomerDetail() {
   const customer = {
@@ -169,7 +170,7 @@ export default function CustomerDetail() {
                           <td><Link href="/order-detail" className="text-primary">{order.id}</Link></td>
                           <td>{order.date}</td>
                           <td><span className="badge bg-primary">{order.items}</span></td>
-                          <td>${order.total.toFixed(2)}</td>
+                          <td>{formatCurrency(order.total)}</td>
                           <td>
                             <span className={`badge ${order.status === 'Delivered' ? 'bg-success' : order.status === 'Processing' ? 'bg-info' : 'bg-warning'}`}>
                               {order.status}
@@ -232,7 +233,7 @@ export default function CustomerDetail() {
                     </div>
                   </div>
                   <div className="col-6">
-                    <h4 className="text-success mb-1">${customer.totalSpent.toFixed(2)}</h4>
+                    <h4 className="text-success mb-1">{formatCurrency(customer.totalSpent)}</h4>
                     <p className="text-muted mb-0">Total Spent</p>
                   </div>
                 </div>
@@ -240,7 +241,7 @@ export default function CustomerDetail() {
                 <div className="row text-center">
                   <div className="col-6">
                     <div className="border-end">
-                      <h4 className="text-info mb-1">$91.49</h4>
+                      <h4 className="text-info mb-1">{formatCurrency(91.49)}</h4>
                       <p className="text-muted mb-0">Avg Order</p>
                     </div>
                   </div>
