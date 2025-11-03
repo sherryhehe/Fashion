@@ -12,6 +12,13 @@ export default function AuthCheck({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const checkAuth = () => {
       try {
+        // Check if we're in the browser (client-side)
+        if (typeof window === 'undefined') {
+          setIsChecking(false);
+          setShouldRender(true);
+          return;
+        }
+
         const token = localStorage.getItem('token');
         // Normalize pathname by removing trailing slash
         const normalizedPath = pathname.endsWith('/') && pathname !== '/' 
@@ -43,7 +50,9 @@ export default function AuthCheck({ children }: { children: React.ReactNode }) {
       }
     };
 
-    checkAuth();
+    // Small delay to ensure client-side hydration is complete
+    const timer = setTimeout(checkAuth, 100);
+    return () => clearTimeout(timer);
   }, [router, pathname]);
 
   // Show loading screen while checking authentication
