@@ -5,6 +5,7 @@ import "@/styles/globals.css";
 import ThemeProvider from "@/components/ThemeProvider";
 import AuthCheck from "@/components/AuthCheck";
 import QueryProvider from "@/providers/QueryProvider";
+import { NotificationProvider } from "@/contexts/NotificationContext";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -37,9 +38,11 @@ export default function RootLayout({
             <body className="antialiased">
               <QueryProvider>
                 <ThemeProvider>
-                  <AuthCheck>
-                    {children}
-                  </AuthCheck>
+                  <NotificationProvider>
+                    <AuthCheck>
+                      {children}
+                    </AuthCheck>
+                  </NotificationProvider>
                 </ThemeProvider>
               </QueryProvider>
         

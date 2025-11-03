@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { bannersApi, type Banner } from '@/lib/api/banners';
 import { useUpdateBanner } from '@/hooks/useApi';
+import { getImageUrl } from '@/utils/imageHelper';
 
 export default function BannerEdit() {
   const router = useRouter();
@@ -253,7 +254,7 @@ export default function BannerEdit() {
                         <div className="text-center">
                           <p className="text-muted mb-2"><small>Current Image:</small></p>
                           <img 
-                            src={existingImage} 
+                            src={getImageUrl(existingImage, '/assets/images/products/product-1.png')} 
                             alt="Current banner" 
                             className="img-fluid mb-3 rounded"
                             style={{ maxHeight: '300px', maxWidth: '100%' }}

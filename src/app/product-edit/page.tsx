@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { productsApi, categoriesApi } from '@/lib/api';
 import { useBrands } from '@/hooks/useApi';
+import { getProductImageUrl } from '@/utils/imageHelper';
 
 export default function ProductEdit() {
   const router = useRouter();
@@ -380,12 +381,8 @@ export default function ProductEdit() {
                             <small className="text-muted d-block mb-2">Current Images:</small>
                             <div className="row g-2">
                               {existingImages.map((imageUrl, index) => {
-                                const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:8000';
-                                const fullImageUrl = imageUrl.startsWith('http') 
-                                  ? imageUrl 
-                                  : imageUrl.startsWith('/uploads/') 
-                                    ? `${API_URL}${imageUrl}` 
-                                    : '/assets/images/products/product-1.png';
+                                const placeholderImage = '/assets/images/products/product-1.png';
+                                const fullImageUrl = getProductImageUrl([imageUrl], 0, placeholderImage);
                                 
                                 return (
                                   <div key={`existing-${index}`} className="col-md-3 col-sm-4 col-6">

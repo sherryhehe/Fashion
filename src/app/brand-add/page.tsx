@@ -5,12 +5,18 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useCreateBrand } from '@/hooks/useApi';
+import { useNotificationContext } from '@/contexts/NotificationContext';
 
 export default function BrandAdd() {
   console.log('🏢 Brand Add Page Loaded');
   
   const router = useRouter();
   const createBrand = useCreateBrand();
+  const { addNotification } = useNotificationContext();
+  
+  const [loading, setLoading] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
   
   const [brand, setBrand] = useState({
     name: '',
@@ -103,60 +109,102 @@ export default function BrandAdd() {
     }));
   };
 
+  // Helper function to upload image with timeout and error handling
+  const uploadImage = async (file: File): Promise<string> => {
+    const uploadFormData = new FormData();
+    uploadFormData.append('images', file);
+    
+    const token = localStorage.getItem('token');
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.buyshopo.com/api';
+    
+    // Create timeout controller
+    const timeoutController = new AbortController();
+    const timeoutId = setTimeout(() => timeoutController.abort(), 30000); // 30 second timeout
+    
+    try {
+      const uploadResponse = await fetch(`${apiUrl}/upload/images`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: uploadFormData,
+        signal: timeoutController.signal,
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!uploadResponse.ok) {
+        let errorMessage = `Upload failed with status ${uploadResponse.status}`;
+        try {
+          const errorData = await uploadResponse.json();
+          errorMessage = errorData.error || errorData.message || errorMessage;
+        } catch {
+          // If response is not JSON, use default message
+        }
+        throw new Error(errorMessage);
+      }
+      
+      const uploadResult = await uploadResponse.json();
+      if (!uploadResult.success || !uploadResult.data?.urls?.[0]) {
+        throw new Error('Invalid response from upload endpoint');
+      }
+      
+      return uploadResult.data.urls[0];
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError' || timeoutController.signal.aborted) {
+        throw new Error('Upload timeout - please try again');
+      }
+      if (error.message?.includes('CORS') || error.message?.includes('Failed to fetch')) {
+        throw new Error('Network error: Please check your connection and try again');
+      }
+      throw error;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     console.log('🚀 FORM SUBMITTED - handleSubmit called');
     e.preventDefault();
 
+    if (loading) return; // Prevent double submission
+
+    setLoading(true);
+    let logoUrl = '';
+    let bannerUrl = '';
+
     try {
-      let logoUrl = '';
-      let bannerUrl = '';
-      
       // Upload logo if provided
       if (brand.profilePicture) {
+        setUploadingLogo(true);
         console.log('📤 UPLOADING LOGO...');
-        const uploadFormData = new FormData();
-        uploadFormData.append('images', brand.profilePicture);
-        
-        const token = localStorage.getItem('token');
-        const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/upload/images`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-          body: uploadFormData,
-        });
-        
-        if (!uploadResponse.ok) {
-          throw new Error('Failed to upload logo');
+        try {
+          logoUrl = await uploadImage(brand.profilePicture);
+          console.log('✅ LOGO UPLOADED:', logoUrl);
+        } catch (error: any) {
+          setUploadingLogo(false);
+          addNotification('error', `Failed to upload logo: ${error.message}`);
+          setLoading(false);
+          return;
+        } finally {
+          setUploadingLogo(false);
         }
-        
-        const uploadResult = await uploadResponse.json();
-        logoUrl = uploadResult.data.urls[0];
-        console.log('✅ LOGO UPLOADED:', logoUrl);
       }
 
       // Upload banner if provided
       if (brand.banner) {
+        setUploadingBanner(true);
         console.log('📤 UPLOADING BANNER...');
-        const uploadFormData = new FormData();
-        uploadFormData.append('images', brand.banner);
-        
-        const token = localStorage.getItem('token');
-        const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/upload/images`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-          body: uploadFormData,
-        });
-        
-        if (!uploadResponse.ok) {
-          throw new Error('Failed to upload banner');
+        try {
+          bannerUrl = await uploadImage(brand.banner);
+          console.log('✅ BANNER UPLOADED:', bannerUrl);
+        } catch (error: any) {
+          setUploadingBanner(false);
+          addNotification('error', `Failed to upload banner: ${error.message}`);
+          setLoading(false);
+          return;
+        } finally {
+          setUploadingBanner(false);
         }
-        
-        const uploadResult = await uploadResponse.json();
-        bannerUrl = uploadResult.data.urls[0];
-        console.log('✅ BANNER UPLOADED:', bannerUrl);
       }
 
       // Generate slug from name
@@ -192,6 +240,7 @@ export default function BrandAdd() {
       console.log('✅ BRAND CREATED SUCCESSFULLY');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       
+      addNotification('success', 'Brand created successfully!');
       router.push('/brand-list');
     } catch (error: any) {
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -200,11 +249,21 @@ export default function BrandAdd() {
       console.error('Error:', error);
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-      if (error.status === 401) {
+      const errorMessage = error?.message || error?.error || 'Failed to create brand. Please try again.';
+      addNotification('error', errorMessage);
+
+      if (error?.status === 401 || error?.response?.status === 401) {
         console.warn('🔐 Authentication failed - redirecting to login');
+        addNotification('warning', 'Session expired. Please login again.');
         localStorage.removeItem('token');
-        router.push('/login');
+        setTimeout(() => {
+          router.push('/login');
+        }, 2000);
       }
+    } finally {
+      setLoading(false);
+      setUploadingLogo(false);
+      setUploadingBanner(false);
     }
   };
 
@@ -444,11 +503,48 @@ export default function BrandAdd() {
                     ></textarea>
                   </div>
 
+                  {/* Loading/Upload Status */}
+                  {(loading || uploadingLogo || uploadingBanner) && (
+                    <div className="alert alert-info mt-3">
+                      <div className="d-flex align-items-center">
+                        <div className="spinner-border spinner-border-sm me-2" role="status">
+                          <span className="visually-hidden">Loading...</span>
+                        </div>
+                        <div>
+                          {uploadingLogo && <div>Uploading logo...</div>}
+                          {uploadingBanner && <div>Uploading banner...</div>}
+                          {loading && !uploadingLogo && !uploadingBanner && <div>Creating brand...</div>}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="d-flex gap-2 mt-4">
-                    <button type="submit" className="btn btn-primary">
-                      <i className="bx bx-plus me-1"></i>Create Brand
+                    <button 
+                      type="submit" 
+                      className="btn btn-primary"
+                      disabled={loading || uploadingLogo || uploadingBanner}
+                    >
+                      {loading ? (
+                        <>
+                          <span className="spinner-border spinner-border-sm me-1" role="status"></span>
+                          {uploadingLogo ? 'Uploading Logo...' : uploadingBanner ? 'Uploading Banner...' : 'Creating...'}
+                        </>
+                      ) : (
+                        <>
+                          <i className="bx bx-plus me-1"></i>Create Brand
+                        </>
+                      )}
                     </button>
-                    <Link href="/brand-list" className="btn btn-secondary">
+                    <Link 
+                      href="/brand-list" 
+                      className="btn btn-secondary"
+                      onClick={(e) => {
+                        if (loading || uploadingLogo || uploadingBanner) {
+                          e.preventDefault();
+                        }
+                      }}
+                    >
                       <i className="bx bx-x me-1"></i>Cancel
                     </Link>
                   </div>

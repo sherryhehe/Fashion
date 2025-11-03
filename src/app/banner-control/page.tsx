@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { bannersApi, type Banner } from '@/lib/api/banners';
 import { useDeleteBanner } from '@/hooks/useApi';
+import { getImageUrl } from '@/utils/imageHelper';
 
 export default function BannerControl() {
 	const router = useRouter();
@@ -194,17 +195,8 @@ export default function BannerControl() {
 												<tr><td colSpan={7}>No banners found.</td></tr>
 											)}
 											{!loading && !error && banners.map((b) => {
-												const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:8000';
 												const placeholderImage = '/assets/images/products/product-1.png';
-												
-												let imageUrl = placeholderImage;
-												if (b.imageUrl) {
-													if (b.imageUrl.startsWith('http')) {
-														imageUrl = b.imageUrl;
-													} else if (b.imageUrl.startsWith('/uploads/')) {
-														imageUrl = `${API_URL}${b.imageUrl}`;
-													}
-												}
+												const imageUrl = getImageUrl(b.imageUrl, placeholderImage);
 												
 												return (
 												<tr 

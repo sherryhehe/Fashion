@@ -1,6 +1,7 @@
 'use client';
 
 import Layout from '@/components/layout/Layout';
+import { getImageUrl } from '@/utils/imageHelper';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
@@ -36,19 +37,7 @@ export default function BannerDetails() {
     }
   };
 
-  const getImageUrl = () => {
-    if (!banner?.imageUrl) return '/assets/images/products/product-1.png';
-    
-    const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:8000';
-    
-    if (banner.imageUrl.startsWith('http')) {
-      return banner.imageUrl;
-    } else if (banner.imageUrl.startsWith('/uploads/')) {
-      return `${API_URL}${banner.imageUrl}`;
-    }
-    
-    return banner.imageUrl;
-  };
+  const placeholderImage = '/assets/images/products/product-1.png';
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'Not set';
@@ -91,7 +80,7 @@ export default function BannerDetails() {
     );
   }
 
-  const imageUrl = getImageUrl();
+  const imageUrl = getImageUrl(banner?.imageUrl, placeholderImage);
 
   return (
     <Layout pageTitle="Banner Details">

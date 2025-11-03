@@ -5,12 +5,18 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useCreateCategory } from '@/hooks/useApi';
+import { useNotificationContext } from '@/contexts/NotificationContext';
+import { uploadImage } from '@/utils/uploadHelper';
 
 export default function CategoryAdd() {
   console.log('🎨 Category Add Page Loaded');
   
   const router = useRouter();
   const createCategory = useCreateCategory();
+  const { addNotification } = useNotificationContext();
+  
+  const [loading, setLoading] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   
   const [formData, setFormData] = useState({
     categoryName: '',
@@ -60,31 +66,27 @@ export default function CategoryAdd() {
     console.log('🚀 FORM SUBMITTED - handleSubmit called');
     e.preventDefault();
 
+    if (loading) return; // Prevent double submission
+
+    setLoading(true);
+    let imageUrl = '';
+
     try {
-      let imageUrl = '';
-      
       // Upload image if provided
       if (imageFile) {
+        setUploadingImage(true);
         console.log('📤 UPLOADING IMAGE...');
-        const uploadFormData = new FormData();
-        uploadFormData.append('image', imageFile);
-        
-        const token = localStorage.getItem('token');
-        const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/upload/image`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-          body: uploadFormData,
-        });
-        
-        if (!uploadResponse.ok) {
-          throw new Error('Failed to upload image');
+        try {
+          imageUrl = await uploadImage(imageFile);
+          console.log('✅ IMAGE UPLOADED:', imageUrl);
+        } catch (error: any) {
+          setUploadingImage(false);
+          addNotification('error', `Failed to upload image: ${error.message}`);
+          setLoading(false);
+          return;
+        } finally {
+          setUploadingImage(false);
         }
-        
-        const uploadResult = await uploadResponse.json();
-        imageUrl = uploadResult.data.url;
-        console.log('✅ IMAGE UPLOADED:', imageUrl);
       }
 
       const categoryData = {
@@ -109,6 +111,7 @@ export default function CategoryAdd() {
       console.log('✅ CATEGORY CREATED SUCCESSFULLY');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       
+      addNotification('success', 'Category created successfully!');
       router.push('/category-list');
     } catch (error: any) {
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -117,6 +120,20 @@ export default function CategoryAdd() {
       console.error('Error:', error);
       console.error('Error Message:', error.message);
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+      const errorMessage = error?.message || error?.error || 'Failed to create category. Please try again.';
+      addNotification('error', errorMessage);
+
+      if (error?.status === 401 || error?.response?.status === 401) {
+        addNotification('warning', 'Session expired. Please login again.');
+        localStorage.removeItem('token');
+        setTimeout(() => {
+          router.push('/login');
+        }, 2000);
+      }
+    } finally {
+      setLoading(false);
+      setUploadingImage(false);
     }
   };
 
@@ -255,12 +272,31 @@ export default function CategoryAdd() {
                       ></textarea>
                     </div>
                   </div>
+                  {/* Loading/Upload Status */}
+                  {(loading || uploadingImage || createCategory.isPending) && (
+                    <div className="alert alert-info mb-3">
+                      <div className="d-flex align-items-center">
+                        <div className="spinner-border spinner-border-sm me-2" role="status">
+                          <span className="visually-hidden">Loading...</span>
+                        </div>
+                        <div>
+                          {uploadingImage && <div>Uploading image...</div>}
+                          {loading && !uploadingImage && <div>Creating category...</div>}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="d-flex gap-2">
-                    <button type="submit" className="btn btn-primary" disabled={createCategory.isPending}>
-                      {createCategory.isPending ? (
+                    <button 
+                      type="submit" 
+                      className="btn btn-primary" 
+                      disabled={loading || uploadingImage || createCategory.isPending}
+                    >
+                      {(loading || uploadingImage || createCategory.isPending) ? (
                         <>
                           <span className="spinner-border spinner-border-sm me-2"></span>
-                          Saving...
+                          {uploadingImage ? 'Uploading...' : 'Creating...'}
                         </>
                       ) : (
                         <>

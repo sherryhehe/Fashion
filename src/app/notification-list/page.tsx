@@ -1,13 +1,13 @@
 'use client';
 
 import { Layout, InteractiveTable, InteractiveButton } from '@/components';
-import { useNotification } from '@/hooks/useInteractive';
+import { useNotificationContext } from '@/contexts/NotificationContext';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { notificationsApi } from '@/lib/api';
 
 export default function NotificationList() {
-  const { addNotification } = useNotification();
+  const { addNotification } = useNotificationContext();
   const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -26,9 +26,9 @@ export default function NotificationList() {
 
       const response = await notificationsApi.getAll(params);
       setNotifications(response.data || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch notifications:', error);
-      addNotification('Failed to load notifications', 'error');
+      addNotification('error', error?.message || 'Failed to load notifications');
       setNotifications([]);
     } finally {
       setLoading(false);
@@ -40,10 +40,10 @@ export default function NotificationList() {
 
     try {
       await notificationsApi.delete(id);
-      addNotification('Notification deleted successfully', 'success');
+      addNotification('success', 'Notification deleted successfully');
       fetchNotifications();
-    } catch (error) {
-      addNotification('Failed to delete notification', 'error');
+    } catch (error: any) {
+      addNotification('error', error?.message || 'Failed to delete notification');
     }
   };
 

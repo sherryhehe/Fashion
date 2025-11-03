@@ -1,14 +1,14 @@
 'use client';
 
 import { Layout, InteractiveTable, InteractiveButton } from '@/components';
-import { useNotification } from '@/hooks/useInteractive';
+import { useNotificationContext } from '@/contexts/NotificationContext';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { stylesApi } from '@/lib/api';
 import { getStyleImageUrl } from '@/utils/imageHelper';
 
 export default function StylesList() {
-  const { addNotification } = useNotification();
+  const { addNotification } = useNotificationContext();
   const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [styles, setStyles] = useState<any[]>([]);
@@ -27,9 +27,9 @@ export default function StylesList() {
 
       const response = await stylesApi.getAll(params);
       setStyles(response.data || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch styles:', error);
-      addNotification('Failed to load styles', 'error');
+      addNotification('error', error?.message || 'Failed to load styles');
       setStyles([]);
     } finally {
       setLoading(false);
@@ -41,10 +41,10 @@ export default function StylesList() {
 
     try {
       await stylesApi.delete(id);
-      addNotification('Style deleted successfully', 'success');
+      addNotification('success', 'Style deleted successfully');
       fetchStyles(); // Refresh list
-    } catch (error) {
-      addNotification('Failed to delete style', 'error');
+    } catch (error: any) {
+      addNotification('error', error?.message || 'Failed to delete style');
     }
   };
   const columns = [

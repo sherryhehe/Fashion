@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { useProduct } from '@/hooks/useApi';
 import { productsApi } from '@/lib/api';
+import { getProductImageUrl } from '@/utils/imageHelper';
 
 export default function ProductDetails() {
   const searchParams = useSearchParams();
@@ -42,24 +43,9 @@ export default function ProductDetails() {
   }
 
   // Get main image and thumbnail images - use uploaded images or placeholder
-  const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:8000';
   const placeholderImage = '/assets/images/products/product-1.png';
   
-  const getImageUrl = (imagePath: string) => {
-    if (!imagePath) return placeholderImage;
-    
-    if (imagePath.startsWith('http')) {
-      return imagePath;
-    } else if (imagePath.startsWith('/uploads/')) {
-      return `${API_URL}${imagePath}`;
-    } else {
-      return placeholderImage;
-    }
-  };
-  
-  const mainImage = Array.isArray(product.images) && product.images.length > 0 
-    ? getImageUrl(product.images[0]) 
-    : placeholderImage;
+  const mainImage = getProductImageUrl(product.images, 0, placeholderImage);
 
   // Toggle featured status
   const handleToggleFeatured = async () => {
@@ -157,7 +143,7 @@ export default function ProductDetails() {
                         {product.images.slice(0, 4).map((img: string, idx: number) => (
                           <div key={idx} className="col-3">
                             <img
-                              src={getImageUrl(img)}
+                              src={getProductImageUrl(product.images, idx, placeholderImage)}
                               alt={`${product.name} ${idx + 1}`}
                               className="img-fluid rounded border"
                               style={{ width: '100%', height: '80px', objectFit: 'cover', cursor: 'pointer' }}

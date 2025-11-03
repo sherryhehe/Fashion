@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { categoriesApi } from '@/lib/api';
+import { getCategoryImageUrl } from '@/utils/imageHelper';
 
 export default function CategoryEdit() {
   const router = useRouter();
@@ -251,7 +252,7 @@ export default function CategoryEdit() {
                             <small className="text-muted d-block mb-2">Current Image:</small>
                             <div className="position-relative d-inline-block">
                               <img 
-                                src={existingImage.startsWith('http') ? existingImage : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:8000'}${existingImage}`}
+                                src={getCategoryImageUrl(existingImage, '/assets/images/products/product-1.png')}
                                 alt="Current Category" 
                                 className="img-fluid rounded border" 
                                 style={{ width: '150px', height: '150px', objectFit: 'cover' }}

@@ -3,6 +3,7 @@
 import { ReactNode } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import { NotificationSystem } from '@/components/organisms';
 import { SidebarProvider } from '@/contexts/SidebarContext';
 
 interface LayoutProps {
@@ -20,6 +21,7 @@ export default function Layout({ children, pageTitle }: LayoutProps) {
           {children}
         </div>
       </div>
+      <NotificationSystem />
     </SidebarProvider>
   );
 }

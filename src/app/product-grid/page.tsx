@@ -1,6 +1,7 @@
 'use client';
 
 import Layout from '@/components/layout/Layout';
+import { getProductImageUrl } from '@/utils/imageHelper';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { productsApi } from '@/lib/api';
@@ -108,25 +109,8 @@ export default function ProductGrid() {
               ) : (
                 <div className="row">
                   {filteredProducts.map((product) => {
-                    const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:8000';
                     const placeholderImage = '/assets/images/products/product-1.png';
-                    
-                    let imageUrl = placeholderImage;
-                    
-                    if (Array.isArray(product.images) && product.images.length > 0) {
-                      const firstImage = product.images[0];
-                      
-                      if (firstImage.startsWith('http')) {
-                        // Full URL provided
-                        imageUrl = firstImage;
-                      } else if (firstImage.startsWith('/uploads/')) {
-                        // Uploaded image path - prepend API URL
-                        imageUrl = `${API_URL}${firstImage}`;
-                      } else {
-                        // Unknown format - use placeholder
-                        imageUrl = placeholderImage;
-                      }
-                    }
+                    const imageUrl = getProductImageUrl(product.images, 0, placeholderImage);
                     
                     return (
                       <div key={product._id || product.id} className="col-md-6 col-xl-3">

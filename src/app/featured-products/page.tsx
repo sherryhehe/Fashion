@@ -1,13 +1,14 @@
 'use client';
 
 import { Layout, InteractiveTable, InteractiveButton } from '@/components';
-import { useNotification } from '@/hooks/useInteractive';
+import { useNotificationContext } from '@/contexts/NotificationContext';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { productsApi } from '@/lib/api';
+import { getProductImageUrl } from '@/utils/imageHelper';
 
 export default function FeaturedProducts() {
-  const { addNotification } = useNotification();
+  const { addNotification } = useNotificationContext();
   const [statusFilter, setStatusFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [products, setProducts] = useState<any[]>([]);
@@ -27,9 +28,9 @@ export default function FeaturedProducts() {
 
       const response = await productsApi.getAll(params);
       setProducts(response.data || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch featured products:', error);
-      addNotification('Failed to load featured products', 'error');
+      addNotification('error', error?.message || 'Failed to load featured products');
       setProducts([]);
     } finally {
       setLoading(false);
@@ -41,10 +42,10 @@ export default function FeaturedProducts() {
 
     try {
       await productsApi.delete(id);
-      addNotification('Product deleted successfully', 'success');
+      addNotification('success', 'Product deleted successfully');
       fetchFeaturedProducts(); // Refresh list
-    } catch (error) {
-      addNotification('Failed to delete product', 'error');
+    } catch (error: any) {
+      addNotification('error', error?.message || 'Failed to delete product');
     }
   };
 
@@ -53,25 +54,8 @@ export default function FeaturedProducts() {
       key: 'images',
       label: 'Image',
       render: (value: string[], row: any) => {
-        const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:8000';
         const placeholderImage = '/assets/images/products/product-1.png';
-        
-        let imageUrl = placeholderImage;
-        
-        if (Array.isArray(value) && value.length > 0) {
-          const firstImage = value[0];
-          
-          if (firstImage.startsWith('http')) {
-            // Full URL provided
-            imageUrl = firstImage;
-          } else if (firstImage.startsWith('/uploads/')) {
-            // Uploaded image path - prepend API URL
-            imageUrl = `${API_URL}${firstImage}`;
-          } else {
-            // Unknown format - use placeholder
-            imageUrl = placeholderImage;
-          }
-        }
+        const imageUrl = getProductImageUrl(value, 0, placeholderImage);
         
         return (
           <img 

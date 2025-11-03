@@ -1,10 +1,10 @@
 'use client';
 
 import React from 'react';
-import { useNotification } from '@/hooks/useInteractive';
+import { useNotificationContext } from '@/contexts/NotificationContext';
 
 export default function NotificationSystem() {
-  const { notifications, removeNotification } = useNotification();
+  const { notifications, removeNotification } = useNotificationContext();
 
   const getNotificationClass = (type: string) => {
     const classes = {

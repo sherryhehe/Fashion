@@ -1,7 +1,7 @@
 'use client';
 
 import { Layout, InteractiveTable, InteractiveButton } from '@/components';
-import { useNotification } from '@/hooks/useInteractive';
+import { useNotificationContext } from '@/contexts/NotificationContext';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -9,7 +9,7 @@ import { productsApi } from '@/lib/api';
 import { getProductImageUrl } from '@/utils/imageHelper';
 
 export default function ProductList() {
-  const { addNotification } = useNotification();
+  const { addNotification } = useNotificationContext();
   const searchParams = useSearchParams();
   const urlSearchQuery = searchParams.get('search') || '';
   
@@ -61,9 +61,9 @@ export default function ProductList() {
       const fetchedProducts = response.data || [];
       setProducts(fetchedProducts);
       setFilteredProducts(fetchedProducts);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch products:', error);
-      addNotification('Failed to load products', 'error');
+      addNotification('error', error?.message || 'Failed to load products');
       setProducts([]);
       setFilteredProducts([]);
     } finally {
@@ -76,10 +76,10 @@ export default function ProductList() {
 
     try {
       await productsApi.delete(id);
-      addNotification('Product deleted successfully', 'success');
+      addNotification('success', 'Product deleted successfully');
       fetchProducts(); // Refresh list
-    } catch (error) {
-      addNotification('Failed to delete product', 'error');
+    } catch (error: any) {
+      addNotification('error', error?.message || 'Failed to delete product');
     }
   };
 

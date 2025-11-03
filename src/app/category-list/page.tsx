@@ -1,13 +1,14 @@
 'use client';
 
 import { Layout, InteractiveTable, InteractiveButton } from '@/components';
-import { useNotification } from '@/hooks/useInteractive';
+import { useNotificationContext } from '@/contexts/NotificationContext';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { categoriesApi } from '@/lib/api';
+import { getCategoryImageUrl } from '@/utils/imageHelper';
 
 export default function CategoryList() {
-  const { addNotification } = useNotification();
+  const { addNotification } = useNotificationContext();
   const [statusFilter, setStatusFilter] = useState('');
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,9 +29,9 @@ export default function CategoryList() {
       }
       
       setCategories(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch categories:', error);
-      addNotification('Failed to load categories', 'error');
+      addNotification('error', error?.message || 'Failed to load categories');
       setCategories([]);
     } finally {
       setLoading(false);
@@ -42,10 +43,10 @@ export default function CategoryList() {
 
     try {
       await categoriesApi.delete(id);
-      addNotification('Category deleted successfully', 'success');
+      addNotification('success', 'Category deleted successfully');
       fetchCategories(); // Refresh list
-    } catch (error) {
-      addNotification('Failed to delete category', 'error');
+    } catch (error: any) {
+      addNotification('error', error?.message || 'Failed to delete category');
     }
   };
 
@@ -54,18 +55,8 @@ export default function CategoryList() {
       key: 'image',
       label: 'Image',
       render: (value: string, row: any) => {
-        const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:8000';
         const placeholderImage = '/assets/images/products/product-1.png';
-        
-        let imageUrl = placeholderImage;
-        
-        if (value) {
-          if (value.startsWith('http')) {
-            imageUrl = value;
-          } else if (value.startsWith('/uploads/')) {
-            imageUrl = `${API_URL}${value}`;
-          }
-        }
+        const imageUrl = getCategoryImageUrl(value, placeholderImage);
         
         return (
           <img 

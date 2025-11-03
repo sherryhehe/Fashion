@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { brandsApi } from '@/lib/api';
+import { getBrandLogoUrl, getBrandBannerUrl } from '@/utils/imageHelper';
 
 export default function BrandEdit() {
   const router = useRouter();
@@ -337,7 +338,7 @@ export default function BrandEdit() {
                       {existingLogo && !newLogoPreview && (
                         <div className="text-center">
                           <img 
-                            src={existingLogo.startsWith('http') ? existingLogo : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:8000'}${existingLogo}`}
+                            src={getBrandLogoUrl(existingLogo, '/assets/images/products/product-1.png')}
                             alt="Profile preview" 
                             className="img-fluid mb-3 rounded-circle d-block mx-auto"
                             style={{ width: '150px', height: '150px', objectFit: 'cover' }}
@@ -449,7 +450,7 @@ export default function BrandEdit() {
                       ) : existingBanner ? (
                         <div className="text-center">
                           <img 
-                            src={existingBanner.startsWith('http') ? existingBanner : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:8000'}${existingBanner}`} 
+                            src={getBrandBannerUrl(existingBanner) || '/assets/images/products/product-1.png'} 
                             alt="Banner preview" 
                             className="img-fluid mb-3 rounded d-block mx-auto"
                             style={{ maxHeight: '200px', maxWidth: '100%' }}

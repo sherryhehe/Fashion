@@ -1,6 +1,7 @@
 'use client';
 
 import Layout from '@/components/layout/Layout';
+import { getBrandLogoUrl } from '@/utils/imageHelper';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { brandsApi } from '@/lib/api';
@@ -50,17 +51,8 @@ export default function FeaturedBrands() {
 
               <div className="row">
                 {brands.map((brand) => {
-                  const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:8000';
                   const placeholderImage = '/assets/images/products/product-1.png';
-
-                  let imageUrl = placeholderImage;
-                  if (brand.logo) {
-                    if (brand.logo.startsWith('http')) {
-                      imageUrl = brand.logo;
-                    } else if (brand.logo.startsWith('/uploads/')) {
-                      imageUrl = `${API_URL}${brand.logo}`;
-                    }
-                  }
+                  const imageUrl = getBrandLogoUrl(brand.logo, placeholderImage);
 
                   return (
                     <div className="col-md-3 mb-3" key={brand._id}>

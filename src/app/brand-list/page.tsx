@@ -1,13 +1,14 @@
 'use client';
 
 import { Layout, InteractiveTable, InteractiveButton } from '@/components';
-import { useNotification } from '@/hooks/useInteractive';
+import { useNotificationContext } from '@/contexts/NotificationContext';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { brandsApi } from '@/lib/api';
+import { getBrandLogoUrl } from '@/utils/imageHelper';
 
 export default function BrandList() {
-  const { addNotification } = useNotification();
+  const { addNotification } = useNotificationContext();
   const [statusFilter, setStatusFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [brands, setBrands] = useState<any[]>([]);
@@ -26,9 +27,9 @@ export default function BrandList() {
 
       const response = await brandsApi.getAll(params);
       setBrands(response.data || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch brands:', error);
-      addNotification('error', 'Failed to load brands');
+      addNotification('error', error?.message || 'Failed to load brands');
       setBrands([]);
     } finally {
       setLoading(false);
@@ -42,8 +43,8 @@ export default function BrandList() {
       await brandsApi.delete(id);
       addNotification('success', 'Brand deleted successfully');
       fetchBrands(); // Refresh list
-    } catch (error) {
-      addNotification('error', 'Failed to delete brand');
+    } catch (error: any) {
+      addNotification('error', error?.message || 'Failed to delete brand');
     }
   };
 
@@ -53,8 +54,8 @@ export default function BrandList() {
       await brandsApi.setVerified(brand._id || brand.id, newVerified);
       addNotification('success', `Brand ${newVerified ? 'verified' : 'unverified'} successfully`);
       fetchBrands();
-    } catch (error) {
-      addNotification('error', 'Failed to update verification status');
+    } catch (error: any) {
+      addNotification('error', error?.message || 'Failed to update verification status');
     }
   };
 
@@ -63,18 +64,8 @@ export default function BrandList() {
       key: 'logo',
       label: 'Logo',
       render: (value: string, row: any) => {
-        const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:8000';
         const placeholderImage = '/assets/images/products/product-1.png';
-        
-        let imageUrl = placeholderImage;
-        
-        if (value) {
-          if (value.startsWith('http')) {
-            imageUrl = value;
-          } else if (value.startsWith('/uploads/')) {
-            imageUrl = `${API_URL}${value}`;
-          }
-        }
+        const imageUrl = getBrandLogoUrl(value, placeholderImage);
         
         return (
           <img 

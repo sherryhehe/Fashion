@@ -166,96 +166,147 @@ export default function BrandDetails() {
         </div>
       </div>
 
-      {/* Brand Banner and Profile Section - Full Width */}
-      <div className="position-relative mb-4" style={{ width: '100vw', marginLeft: '50%', transform: 'translateX(-50%)' }}>
-        {brandBanner ? (
-          <div 
-            className="position-relative"
-            style={{ 
-              height: '400px',
-              width: '100%',
-              backgroundImage: `url(${brandBanner})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              backgroundRepeat: 'no-repeat',
-              overflow: 'hidden'
-            }}
-          >
+      {/* Redesigned Brand Header Section */}
+      <div className="container-fluid mb-4">
+        <div className="row">
+          <div className="col-12 p-0">
+            {/* Hero Banner Section */}
             <div 
-              className="position-absolute w-100 h-100"
+              className="position-relative overflow-hidden rounded-4 shadow-lg"
               style={{ 
-                background: 'linear-gradient(to bottom, rgba(0,0,0,0.4), rgba(0,0,0,0.7))'
+                minHeight: '450px',
+                background: brandBanner 
+                  ? `linear-gradient(135deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.5) 100%), url(${brandBanner})`
+                  : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat',
               }}
-            ></div>
-            <div className="position-absolute top-50 start-50 w-100 text-center text-white" style={{ transform: 'translate(-50%, -50%)', left: '50%' }}>
-              <img 
-                src={getBrandLogo()} 
-                alt="Brand Logo" 
-                className="rounded-circle mb-3 border-4 border-white" 
-                width="140" 
-                height="140"
-                style={{ objectFit: 'cover', display: 'block', margin: '0 auto' }}
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = placeholderImage;
+            >
+              {/* Decorative Overlay */}
+              <div 
+                className="position-absolute top-0 start-0 w-100 h-100"
+                style={{
+                  background: 'radial-gradient(circle at 30% 20%, rgba(255,255,255,0.1) 0%, transparent 50%)',
                 }}
-              />
-              <h2 className="mb-2 text-white fw-bold">{brand.name}</h2>
-              <p className="text-white-50 mb-3 fs-5">{brand.email}</p>
-              
-              <div className="d-flex justify-content-center gap-2">
-                <span className={`badge fs-6 ${brand.status === 'active' ? 'bg-success' : brand.status === 'pending' ? 'bg-warning' : 'bg-secondary'}`}>
-                  {brand.status}
-                </span>
-                {brand.verified && (
-                  <span className="badge bg-success fs-6">
-                    <i className="mdi mdi-check-circle me-1"></i>Verified
-                  </span>
-                )}
-                {brand.featured && (
-                  <span className="badge bg-warning fs-6">
-                    <i className="mdi mdi-star me-1"></i>Featured
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="container-fluid">
-            <div className="card">
-              <div className="card-body text-center py-5">
-                <img 
-                  src={getBrandLogo()} 
-                  alt="Brand Logo" 
-                  className="rounded-circle mb-3" 
-                  width="150" 
-                  height="150"
-                  style={{ objectFit: 'cover', display: 'block', margin: '0 auto' }}
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = placeholderImage;
-                  }}
-                />
-                <h3 className="mb-1">{brand.name}</h3>
-                <p className="text-muted mb-3">{brand.email}</p>
-                
-                <div className="d-flex justify-content-center gap-2 mb-3">
-                  <span className={`badge ${brand.status === 'active' ? 'bg-success' : brand.status === 'pending' ? 'bg-warning' : 'bg-secondary'} fs-12`}>
-                    {brand.status}
-                  </span>
-                  {brand.verified && (
-                    <span className="badge bg-success fs-12">
-                      <i className="mdi mdi-check-circle me-1"></i>Verified
-                    </span>
-                  )}
-                  {brand.featured && (
-                    <span className="badge bg-warning fs-12">
-                      <i className="mdi mdi-star me-1"></i>Featured
-                    </span>
-                  )}
+              ></div>
+
+              {/* Content Container */}
+              <div className="container-fluid">
+                <div className="row align-items-center justify-content-center" style={{ minHeight: '450px' }}>
+                  <div className="col-lg-6 col-md-8 text-center position-relative" style={{ zIndex: 2 }}>
+                    {/* Logo Section */}
+                    <div className="mb-4">
+                      <div 
+                        className="d-inline-block position-relative"
+                        style={{
+                          padding: '8px',
+                          background: 'rgba(255, 255, 255, 0.95)',
+                          borderRadius: '24px',
+                          boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+                          backdropFilter: 'blur(10px)',
+                        }}
+                      >
+                        <img 
+                          src={getBrandLogo()} 
+                          alt="Brand Logo" 
+                          className="rounded-circle" 
+                          width="160" 
+                          height="160"
+                          style={{ 
+                            objectFit: 'cover',
+                            display: 'block',
+                            border: '4px solid white',
+                          }}
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = placeholderImage;
+                          }}
+                        />
+                        {/* Verified Badge Overlay */}
+                        {brand.verified && (
+                          <div 
+                            className="position-absolute bottom-0 end-0"
+                            style={{
+                              background: '#10b981',
+                              borderRadius: '50%',
+                              width: '48px',
+                              height: '48px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              border: '4px solid white',
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                            }}
+                          >
+                            <i className="mdi mdi-check text-white fs-5"></i>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Brand Info */}
+                    <div className="text-white">
+                      <h1 className="display-5 fw-bold mb-3 text-white" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
+                        {brand.name}
+                      </h1>
+                      <p className="fs-5 mb-4 text-white-50" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>
+                        <i className="mdi mdi-email-outline me-2"></i>
+                        {brand.email}
+                      </p>
+                      
+                      {/* Status Badges */}
+                      <div className="d-flex flex-wrap justify-content-center gap-2 mb-4">
+                        <span 
+                          className={`badge fs-6 px-3 py-2 ${
+                            brand.status === 'active' ? 'bg-success' : 
+                            brand.status === 'pending' ? 'bg-warning text-dark' : 
+                            'bg-secondary'
+                          }`}
+                          style={{ borderRadius: '12px' }}
+                        >
+                          <i className={`mdi ${
+                            brand.status === 'active' ? 'mdi-check-circle' :
+                            brand.status === 'pending' ? 'mdi-clock-outline' :
+                            'mdi-cancel'
+                          } me-1`}></i>
+                          {brand.status?.toUpperCase() || 'INACTIVE'}
+                        </span>
+                        {brand.verified && (
+                          <span 
+                            className="badge bg-success fs-6 px-3 py-2"
+                            style={{ borderRadius: '12px' }}
+                          >
+                            <i className="mdi mdi-check-circle me-1"></i>
+                            Verified
+                          </span>
+                        )}
+                        {brand.featured && (
+                          <span 
+                            className="badge bg-warning text-dark fs-6 px-3 py-2"
+                            style={{ borderRadius: '12px' }}
+                          >
+                            <i className="mdi mdi-star me-1"></i>
+                            Featured
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
                 </div>
               </div>
+
+              {/* Bottom Gradient Fade */}
+              <div 
+                className="position-absolute bottom-0 start-0 w-100"
+                style={{
+                  height: '120px',
+                  background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.3))',
+                }}
+              ></div>
             </div>
           </div>
-        )}
+        </div>
       </div>
 
       <div className="container-fluid">
