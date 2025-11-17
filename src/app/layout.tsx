@@ -1,124 +1,174 @@
 import type { Metadata } from "next";
-import type { ReactNode } from "react";
+import Script from "next/script";
+import { Inter } from "next/font/google";
+import "@/styles/globals.css";
+import ThemeProvider from "@/components/ThemeProvider";
+import AuthCheck from "@/components/AuthCheck";
+import QueryProvider from "@/providers/QueryProvider";
+import { NotificationProvider } from "@/contexts/NotificationContext";
 
-const maintenanceStyles = `
-  :root {
-    color-scheme: light dark;
-    --bg-start: #0f172a;
-    --bg-end: #1e293b;
-    --card-bg: rgba(15, 23, 42, 0.78);
-    --text-primary: #f8fafc;
-    --text-secondary: #cbd5f5;
-    --accent: #38bdf8;
-    --blur: 22px;
-  }
-  body {
-    margin: 0;
-    min-height: 100vh;
-    font-family: "Inter", "Segoe UI", system-ui, sans-serif;
-    display: grid;
-    place-items: center;
-    background: radial-gradient(circle at top, var(--bg-start), var(--bg-end));
-    color: var(--text-primary);
-    padding: 24px;
-  }
-  .card {
-    max-width: 480px;
-    width: 100%;
-    background: var(--card-bg);
-    border: 1px solid rgba(148, 163, 184, 0.2);
-    border-radius: 20px;
-    padding: 40px;
-    backdrop-filter: blur(var(--blur));
-    text-align: center;
-    box-shadow: 0 20px 40px rgba(15, 23, 42, 0.45);
-  }
-  .card h1 {
-    font-size: clamp(1.75rem, 4vw, 2.5rem);
-    margin-bottom: 16px;
-    letter-spacing: 0.02em;
-  }
-  .card p {
-    margin: 0;
-    font-size: 1rem;
-    line-height: 1.6;
-    color: var(--text-secondary);
-  }
-  .cta {
-    margin-top: 32px;
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    padding: 14px 22px;
-    border-radius: 999px;
-    background: rgba(56, 189, 248, 0.12);
-    color: var(--accent);
-    text-decoration: none;
-    font-weight: 600;
-    transition: background 0.25s ease, transform 0.25s ease;
-  }
-  .cta:hover {
-    background: rgba(56, 189, 248, 0.2);
-    transform: translateY(-2px);
-  }
-  .cta span {
-    font-size: 0.95rem;
-    letter-spacing: 0.01em;
-  }
-  .cta svg {
-    width: 18px;
-    height: 18px;
-    fill: currentColor;
-  }
-  @media (max-width: 480px) {
-    .card {
-      padding: 32px 24px;
-    }
-  }
-`;
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Shopo Admin",
-  description: "Maintenance notice",
+  title: "Shopo Admin Dashboard",
+  description: "A fully responsive premium admin dashboard template",
+  keywords: ["admin", "dashboard", "ecommerce", "management"],
+  authors: [{ name: "Shopo Team" }],
+  viewport: "width=device-width, initial-scale=1",
 };
 
 export default function RootLayout({
-  children: _children,
+  children,
 }: Readonly<{
-  children: ReactNode;
+  children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className={inter.className}>
       <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link rel="shortcut icon" href="/favicon.ico" />
-        <style dangerouslySetInnerHTML={{ __html: maintenanceStyles }} />
+        <link rel="shortcut icon" href="/assets/images/favicon.ico" />
+        {/* Vendor css (Require in all Page) */}
+        <link href="/assets/css/vendor.min.css" rel="stylesheet" type="text/css" />
+        {/* Icons css (Require in all Page) */}
+        <link href="/assets/css/icons.min.css" rel="stylesheet" type="text/css" />
+        {/* App css (Require in all Page) */}
+        <link href="/assets/css/app.min.css" rel="stylesheet" type="text/css" />
+        {/* Button Interactions css (Enhanced UX) */}
+        <link href="/assets/css/button-interactions.css" rel="stylesheet" type="text/css" />
       </head>
-      <body>
-        <main className="card" role="alert">
-          <h1>Oops! We Hit a Snag</h1>
-          <p>
-            There’s a technical issue with the project at the moment. Our team is on it,
-            but if you need immediate assistance, please reach out to Usama directly.
-          </p>
-          <p style={{ marginTop: 16, fontSize: "0.95rem", color: "var(--text-secondary)" }}>
-            Portfolio:{" "}
-            <a
-              href="https://awesomaa1.webflow.io"
-              style={{ color: "var(--accent)", textDecoration: "none" }}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              awesomaa1.webflow.io
-            </a>
-          </p>
-          <a className="cta" href="tel:+923044478088">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 3c-5.523 0-10 4.477-10 10 0 5.06 3.767 9.246 8.642 9.878v-6.986H8.28v-2.892h2.362V9.63c0-2.332 1.471-3.602 3.54-3.602 1.005 0 1.869.075 2.121.108v2.46h-1.46c-1.147 0-1.366.545-1.366 1.343v1.763h2.731l-.356 2.892h-2.375v6.986C18.233 22.246 22 18.06 22 13c0-5.523-4.477-10-10-10Z" />
-            </svg>
-            <span>Call Usama · +92 304-4478088</span>
-          </a>
-        </main>
+            <body className="antialiased">
+              <QueryProvider>
+                <ThemeProvider>
+                  <NotificationProvider>
+                    <AuthCheck>
+                      {children}
+                    </AuthCheck>
+                  </NotificationProvider>
+                </ThemeProvider>
+              </QueryProvider>
+        
+        {/* Theme Settings Offcanvas */}
+        <div className="offcanvas offcanvas-end border-0" tabIndex={-1} id="theme-settings-offcanvas">
+          <div className="d-flex align-items-center bg-primary p-3 offcanvas-header">
+            <h5 className="text-white m-0">Theme Settings</h5>
+            <button type="button" className="btn-close btn-close-white ms-auto" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+          </div>
+          <div className="offcanvas-body p-0">
+            <div data-simplebar className="h-100">
+              <div className="p-3 settings-bar">
+                <div>
+                  <h5 className="mb-3 font-16 fw-semibold">Color Scheme</h5>
+                  <div className="form-check mb-2">
+                    <input className="form-check-input" type="radio" name="data-bs-theme" id="layout-color-light" value="light" />
+                    <label className="form-check-label" htmlFor="layout-color-light">Light</label>
+                  </div>
+                  <div className="form-check mb-2">
+                    <input className="form-check-input" type="radio" name="data-bs-theme" id="layout-color-dark" value="dark" />
+                    <label className="form-check-label" htmlFor="layout-color-dark">Dark</label>
+                  </div>
+                </div>
+                <div>
+                  <h5 className="my-3 font-16 fw-semibold">Topbar Color</h5>
+                  <div className="form-check mb-2">
+                    <input className="form-check-input" type="radio" name="data-topbar-color" id="topbar-color-light" value="light" />
+                    <label className="form-check-label" htmlFor="topbar-color-light">Light</label>
+                  </div>
+                  <div className="form-check mb-2">
+                    <input className="form-check-input" type="radio" name="data-topbar-color" id="topbar-color-dark" value="dark" />
+                    <label className="form-check-label" htmlFor="topbar-color-dark">Dark</label>
+                  </div>
+                </div>
+                <div>
+                  <h5 className="my-3 font-16 fw-semibold">Menu Color</h5>
+                  <div className="form-check mb-2">
+                    <input className="form-check-input" type="radio" name="data-menu-color" id="leftbar-color-light" value="light" />
+                    <label className="form-check-label" htmlFor="leftbar-color-light">Light</label>
+                  </div>
+                  <div className="form-check mb-2">
+                    <input className="form-check-input" type="radio" name="data-menu-color" id="leftbar-color-dark" value="dark" />
+                    <label className="form-check-label" htmlFor="leftbar-color-dark">Dark</label>
+                  </div>
+                </div>
+                <div>
+                  <h5 className="my-3 font-16 fw-semibold">Sidebar Size</h5>
+                  <div className="form-check mb-2">
+                    <input className="form-check-input" type="radio" name="data-menu-size" id="leftbar-size-default" value="default" />
+                    <label className="form-check-label" htmlFor="leftbar-size-default">Default</label>
+                  </div>
+                  <div className="form-check mb-2">
+                    <input className="form-check-input" type="radio" name="data-menu-size" id="leftbar-size-small" value="condensed" />
+                    <label className="form-check-label" htmlFor="leftbar-size-small">Condensed</label>
+                  </div>
+                  <div className="form-check mb-2">
+                    <input className="form-check-input" type="radio" name="data-menu-size" id="leftbar-hidden" value="hidden" />
+                    <label className="form-check-label" htmlFor="leftbar-hidden">Hidden</label>
+                  </div>
+                  <div className="form-check mb-2">
+                    <input className="form-check-input" type="radio" name="data-menu-size" id="leftbar-size-small-hover-active" value="sm-hover-active" />
+                    <label className="form-check-label" htmlFor="leftbar-size-small-hover-active">Small Hover Active</label>
+                  </div>
+                  <div className="form-check mb-2">
+                    <input className="form-check-input" type="radio" name="data-menu-size" id="leftbar-size-small-hover" value="sm-hover" />
+                    <label className="form-check-label" htmlFor="leftbar-size-small-hover">Small Hover</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="offcanvas-footer border-top p-3 text-center">
+            <div className="row">
+              <div className="col">
+                <button type="button" className="btn btn-danger w-100" id="reset-layout">Reset</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        
+        {/* React Override Script - Load FIRST to prevent vanilla JS conflicts */}
+        <Script
+          src="/assets/js/react-override.js"
+          strategy="beforeInteractive"
+        />
+        
+        {/* External Scripts - Loaded after interactive */}
+        <Script
+          src="https://code.iconify.design/3/3.1.1/iconify.min.js"
+          strategy="afterInteractive"
+        />
+        
+        {/* Internal Scripts - Loaded after interactive */}
+        <Script
+          src="/assets/js/vendor.js"
+          strategy="afterInteractive"
+        />
+        <Script
+          src="/assets/js/config.js"
+          strategy="afterInteractive"
+        />
+        <Script
+          src="/assets/js/app.js"
+          strategy="afterInteractive"
+        />
+        <Script
+          src="/assets/js/admin-functionality.js"
+          strategy="afterInteractive"
+        />
+        <Script
+          src="/assets/js/dashboard-interactive.js"
+          strategy="afterInteractive"
+        />
+        <Script
+          src="/assets/js/button-functionality.js"
+          strategy="afterInteractive"
+        />
+               <Script
+                 src="/assets/js/dashboard.js"
+                 strategy="afterInteractive"
+               />
+               <Script
+                 src="/assets/js/layout.js"
+                 strategy="afterInteractive"
+               />
       </body>
     </html>
   );
