@@ -1,0 +1,1324 @@
+# Shopo Fashion E-commerce Platform - Cursor AI Context
+
+## 🎯 PROJECT OVERVIEW
+
+This is a complete full-stack e-commerce platform for fashion products with three main components:
+1. **Admin Panel** (`/admin`) - Next.js 15 + TypeScript + Bootstrap 5
+2. **Mobile App** (`/mobile`) - React Native 0.81 + TypeScript  
+3. **Backend API** (`/backend`) - Node.js + Express + TypeScript
+
+**Current Directory:** `/Users/abdullahjaspal/Documents/Project/Shop Project`
+
+**Project Status:** ✅ Frontend Complete | ✅ Backend Built | 🚧 Integration Phase
+
+---
+
+## 📂 WORKSPACE STRUCTURE
+
+```
+Shop Project/ (YOU ARE HERE)
+├── admin/           # Next.js Admin Dashboard
+│   ├── src/app/                # App Router pages
+│   ├── src/components/         # Atomic design components
+│   │   ├── atoms/              # Button, Input, Card
+│   │   ├── molecules/          # BurgerMenu, TimeFilter
+│   │   ├── organisms/          # InteractiveTable, Modals
+│   │   ├── layout/             # Layout, Header, Sidebar
+│   │   └── ImageCropperModal.tsx  # Image cropper with adjust/crop/rotate
+│   ├── src/lib/api/            # API client (modular structure)
+│   ├── src/types/              # TypeScript definitions
+│   └── src/styles/             # Global styles
+│
+├── mobile/          # React Native Mobile App
+│   ├── src/screens/            # All app screens
+│   ├── src/components/         # Reusable UI components
+│   ├── src/navigation/         # React Navigation setup
+│   └── src/assets/             # Images and icons
+│
+├── backend/         # Node.js Express API
+│   ├── src/
+│   │   ├── controllers/        # Business logic
+│   │   ├── routes/             # API endpoints
+│   │   ├── middleware/         # Auth, upload, errors
+│   │   ├── config/             # Database, app config
+│   │   └── utils/              # Helpers (JWT, responses)
+│   ├── data/db.json            # JSON database
+│   └── uploads/                # Uploaded files
+│
+├── .cursorrules     # This file - AI context
+├── README.md        # Main documentation
+└── START_HERE.md    # Quick start guide
+```
+
+---
+
+## 🏗️ DETAILED ARCHITECTURE
+
+### Admin Panel (`/admin`)
+
+**Framework:** Next.js 15 (App Router, Server Components)  
+**Language:** TypeScript (strict mode enabled)  
+**Styling:** Bootstrap 5 + Custom CSS + Tailwind utilities  
+**State Management:** React Context (SidebarContext)  
+
+**Component Structure (Atomic Design):**
+- **Atoms** (`src/components/atoms/`): Button, Input, Card, InteractiveButton
+- **Molecules** (`src/components/molecules/`): BurgerMenu, TimeFilter, InteractiveDropdown, InteractiveForm
+- **Organisms** (`src/components/organisms/`): InteractiveTable, AddReviewModal, NotificationSystem
+- **Layout** (`src/components/layout/`): Layout, Header, Sidebar
+
+**API Integration:**
+```
+src/lib/api/
+├── client.ts       # Base API client with error handling
+├── products.ts     # Products endpoints
+├── orders.ts       # Orders endpoints
+├── customers.ts    # Customers endpoints
+├── categories.ts   # Categories endpoints
+├── brands.ts       # Brands endpoints
+├── banners.ts      # Banners endpoints (NEW)
+└── index.ts        # Barrel exports
+```
+
+**Key Features:**
+- Server Components by default
+- Client Components marked with 'use client'
+- Type-safe API calls
+- Error boundaries
+- Loading states
+- Dark/Light mode
+- Responsive mobile sidebar
+- Banner Control wired to backend (NEW)
+
+### Mobile App (`/mobile`)
+
+**Framework:** React Native 0.81  
+**Language:** TypeScript  
+**Navigation:** React Navigation v7 (Stack + Bottom Tabs)  
+**Icons:** React Native Vector Icons  
+
+**Screens:**
+```
+src/screens/
+├── OnboardingScreen/      # First launch screen
+├── LoginScreen/           # User login
+├── SignUpScreen/          # User registration
+├── ForgotPasswordScreen/  # Password recovery
+├── HomeScreen/            # Main product browsing
+├── ProductDetailScreen/   # Product details
+├── CartScreen/            # Shopping cart
+├── Checkout/              # Order placement
+├── Orders/                # Order history
+├── SettingsScreen/        # User settings
+├── WishList/              # Saved products
+└── SearchScreen/          # Product search
+```
+
+**Components:**
+- AuthScrollView, SafeView
+- Button, SimpleButton
+- InputField, SimpleInputField
+- SocialButton
+- BottomSheet
+- SearchFilterBar
+- FloatingBottomTab
+
+### Backend API (`/backend`)
+
+**Framework:** Express.js + TypeScript  
+**Database:** JSON files (temporary) - Easy to migrate to PostgreSQL later  
+**Authentication:** JWT with bcrypt password hashing  
+**File Upload:** Multer for image handling  
+
+**API Structure:**
+```
+Controllers (Business Logic):
+- authController.ts      # Register, login, profile
+- productController.ts   # Products CRUD, search, filter
+- categoryController.ts  # Categories CRUD
+- cartController.ts      # Cart operations
+- orderController.ts     # Order management
+- bannerController.ts    # Banners CRUD (NEW)
+
+Routes (Endpoints):
+- authRoutes.ts          # /api/auth/*
+- productRoutes.ts       # /api/products/*
+- categoryRoutes.ts      # /api/categories/*
+- cartRoutes.ts          # /api/cart/*
+- orderRoutes.ts         # /api/orders/*
+- uploadRoutes.ts        # /api/upload/*
+- bannerRoutes.ts        # /api/banners/* (NEW)
+
+Middleware:
+- auth.ts                # JWT verification
+- errorHandler.ts        # Global error handling
+- upload.ts              # File upload config
+```
+
+---
+
+## 🔌 API INTEGRATION
+
+### Connection Details
+
+**Backend Server:**
+- Development: `http://localhost:8000`
+- API Base: `http://localhost:8000/api`
+
+**Admin Panel Connection:**
+- Create file: `admin/.env.local`
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8000/api
+```
+
+**Mobile App Connection:**
+- Create file: `mobile/src/config/api.ts`
+```typescript
+const API_BASE_URL = __DEV__ 
+  ? 'http://192.168.1.100:8000/api'  // Replace with YOUR local IP
+  : 'https://api.production.com';
+
+export default API_BASE_URL;
+```
+
+**Find your local IP:**
+```bash
+ifconfig | grep "inet " | grep -v 127.0.0.1
+# Output example: inet 192.168.1.100
+```
+
+### Authentication Flow
+
+1. **User logs in** → Receives JWT token
+2. **Token stored** in localStorage (web) or AsyncStorage (mobile)
+3. **Token included** in Authorization header: `Bearer <token>`
+4. **Token verified** by backend middleware
+5. **Token expires** in 7 days (configurable in backend/.env)
+
+**Default Admin Account:**
+```
+Email: admin@larkon.com
+Password: admin123
+```
+
+### API Response Format
+
+**Success:**
+```json
+{
+  "success": true,
+  "data": {...},
+  "message": "Optional success message"
+}
+```
+
+**Error:**
+```json
+{
+  "success": false,
+  "error": "Error message"
+}
+```
+
+**Paginated:**
+```json
+{
+  "success": true,
+  "data": [...],
+  "pagination": {
+    "page": 1,
+    "limit": 10,
+    "total": 100,
+    "totalPages": 10
+  }
+}
+```
+
+---
+
+## 💾 DATABASE SCHEMA
+
+### Users
+```typescript
+{
+  id: string;
+  name: string;
+  email: string;
+  password: string;  // bcrypt hashed
+  role: 'admin' | 'customer';
+  avatar?: string;
+  phone?: string;
+  status: 'active' | 'inactive';
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+### Products
+```typescript
+{
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  originalPrice?: number;
+  discount?: number;
+  category: string;
+  brand?: string;
+  sku: string;
+  stock: number;
+  images: string[];
+  featured: boolean;
+  status: 'active' | 'inactive' | 'draft';
+  specifications: object;
+  variations: array;
+  rating: number;
+  reviewCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+### Categories
+```typescript
+{
+  id: string;
+  name: string;
+  description?: string;
+  image?: string;
+  parentId?: string;
+  status: 'active' | 'inactive';
+  productCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+### Cart
+```typescript
+{
+  id: string;
+  userId: string;
+  productId: string;
+  quantity: number;
+  size?: string;
+  color?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+### Orders
+```typescript
+{
+  id: string;
+  userId: string;
+  orderNumber: string;
+  items: Array<{
+    productId: string;
+    productName: string;
+    quantity: number;
+    price: number;
+    total: number;
+    size?: string;
+    color?: string;
+  }>;
+  subtotal: number;
+  tax: number;
+  shippingCost: number;
+  total: number;
+  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  paymentMethod: string;
+  paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded';
+  shippingAddress: object;
+  notes?: string;
+  timeline: Array<{
+    status: string;
+    date: string;
+    description: string;
+  }>;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+---
+
+## 🎨 CODING STANDARDS
+
+### TypeScript Guidelines
+
+**DO:**
+```typescript
+// ✅ Proper interfaces
+interface ProductProps {
+  id: string;
+  name: string;
+  price: number;
+}
+
+// ✅ Type-safe API calls
+const response = await productsApi.getAll();
+const products: Product[] = response.data;
+
+// ✅ Proper error handling
+try {
+  const data = await api.getData();
+} catch (error) {
+  if (error instanceof ApiError) {
+    showError(error.message);
+  }
+}
+```
+
+**DON'T:**
+```typescript
+// ❌ Using any
+const data: any = await api.getData();
+
+// ❌ No error handling
+const data = await api.getData();
+
+// ❌ Hard-coded values
+const API_URL = "http://localhost:8000";
+```
+
+### Import Organization
+```typescript
+// 1. React/Next.js/React Native imports
+import { useState, useEffect } from 'react';
+import { View, Text } from 'react-native';
+import Link from 'next/link';
+
+// 2. Third-party libraries
+import { clsx } from 'clsx';
+import axios from 'axios';
+
+// 3. Internal components
+import { Layout, Button } from '@/components';
+import { InteractiveTable } from '@/components/organisms';
+
+// 4. Utilities and API
+import { formatCurrency } from '@/lib/utils';
+import { productsApi } from '@/lib/api';
+
+// 5. Types
+import type { Product, ApiResponse } from '@/types';
+```
+
+### Component Naming
+- **Components:** PascalCase (`ProductCard.tsx`)
+- **Hooks:** camelCase with `use` prefix (`useAuth.ts`)
+- **Utils:** camelCase (`formatCurrency.ts`)
+- **Constants:** UPPER_SNAKE_CASE (`API_BASE_URL`)
+- **Types/Interfaces:** PascalCase (`Product`, `ApiResponse`)
+
+---
+
+## 🚀 DEVELOPMENT WORKFLOW
+
+### Starting the Platform (3 Terminals)
+
+**Terminal 1 - Backend (Start First!):**
+```bash
+cd "/Users/abdullahjaspal/Documents/Project/Shop Project/backend"
+npm install  # First time only
+npm run dev
+```
+✅ Runs on: http://localhost:8000
+
+**Terminal 2 - Admin Panel:**
+```bash
+cd "/Users/abdullahjaspal/Documents/Project/Shop Project/admin"
+
+# Create environment file (first time):
+echo "NEXT_PUBLIC_API_URL=http://localhost:8000/api" > .env.local
+
+npm install  # First time only
+npm run dev
+```
+✅ Runs on: http://localhost:3000
+
+**Terminal 3 - Mobile App:**
+```bash
+cd "/Users/abdullahjaspal/Documents/Project/Shop Project/mobile"
+npm install  # First time only
+npm start
+
+# Then press 'i' for iOS or 'a' for Android
+```
+
+### Testing the Setup
+
+```bash
+# Test backend health
+curl http://localhost:8000/api/health
+
+# Test login
+curl -X POST http://localhost:8000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@larkon.com","password":"admin123"}'
+
+# Test products
+curl http://localhost:8000/api/products
+```
+
+---
+
+## ✅ WHAT'S IMPLEMENTED
+
+### Backend API (100% Complete)
+- ✅ JWT Authentication (no email required)
+- ✅ User Management (register, login, profile, password change)
+- ✅ Products CRUD (create, read, update, delete)
+- ✅ Product Search & Filtering
+- ✅ Categories CRUD
+- ✅ Shopping Cart (add, update, remove, clear)
+- ✅ Orders (create, view, update status, cancel)
+- ✅ File Upload (single/multiple images)
+- ✅ Role-Based Access Control (admin/customer)
+- ✅ Error Handling & Validation
+- ✅ CORS Configuration
+- ✅ Sample Data (auto-loaded on startup)
+- ✅ Banners CRUD (NEW)
+
+### Admin Panel (100% Complete)
+- ✅ Dashboard with real-time analytics
+- ✅ Product Management (list, grid, add, edit, delete, details)
+- ✅ Order Management (list, details, status updates)
+- ✅ Customer Management (list, details)
+- ✅ Categories & Brands Management
+- ✅ Styles Management
+- ✅ Notification System
+- ✅ Responsive Mobile Design
+- ✅ Dark/Light Mode Toggle
+- ✅ Advanced Search & Filtering
+- ✅ Interactive Tables with Pagination
+- ✅ Charts & Analytics (ApexCharts)
+- ✅ File Upload Interface
+- ✅ Banner Control page wired to backend (NEW)
+- ✅ Image Cropper with adjust/crop/rotate before upload (NEW)
+- ❌ Reviews page removed (route and sidebar) (NEW)
+
+### Mobile App (100% Complete)
+- ✅ Onboarding Screen
+- ✅ Authentication Screens (Login, Signup, Forgot Password)
+- ✅ Home Screen with Product Grid
+- ✅ Product Details Screen
+- ✅ Category Browsing
+- ✅ Search & Filters
+- ✅ Shopping Cart
+- ✅ Checkout Flow
+- ✅ User Profile
+- ✅ Order History
+- ✅ Wishlist
+- ✅ Settings
+- ✅ Bottom Tab Navigation
+- ✅ Beautiful UI/UX
+
+---
+
+## ❌ NOT IMPLEMENTED (Intentionally Skipped)
+
+- ❌ Payment Integration (Stripe, PayPal)
+- ❌ Email Notifications
+- ❌ SMS Notifications
+- ❌ Real Database (PostgreSQL/MongoDB)
+- ❌ OAuth Social Login
+- ❌ Push Notifications
+- ❌ Password Reset Emails
+- ❌ CDN for Images
+- ❌ Rate Limiting
+- ❌ Redis Caching
+
+**Reason:** Quick MVP development. These can be added later!
+
+---
+
+## 🔧 COMMON TASKS
+
+### Task 1: Add New API Endpoint
+
+**Step 1:** Create controller (`backend/src/controllers/wishlistController.ts`)
+```typescript
+import { Request, Response } from 'express';
+import { db } from '../config/database';
+import { successResponse, errorResponse } from '../utils/responseHelper';
+import { AuthRequest } from '../middleware/auth';
+
+export const getWishlist = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const wishlist = db.find('wishlist', { userId: req.user!.id });
+    successResponse(res, wishlist);
+  } catch (error) {
+    errorResponse(res, 'Failed to get wishlist', 500);
+  }
+};
+
+export const addToWishlist = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { productId } = req.body;
+    const item = db.insert('wishlist', {
+      userId: req.user!.id,
+      productId
+    });
+    successResponse(res, item, 'Added to wishlist', 201);
+  } catch (error) {
+    errorResponse(res, 'Failed to add to wishlist', 500);
+  }
+};
+```
+
+**Step 2:** Create routes (`backend/src/routes/wishlistRoutes.ts`)
+```typescript
+import express from 'express';
+import * as wishlistController from '../controllers/wishlistController';
+import { authenticate } from '../middleware/auth';
+
+const router = express.Router();
+router.use(authenticate);
+
+router.get('/', wishlistController.getWishlist);
+router.post('/', wishlistController.addToWishlist);
+
+export default router;
+```
+
+**Step 3:** Add to main app (`backend/src/app.ts`)
+```typescript
+import wishlistRoutes from './routes/wishlistRoutes';
+app.use('/api/wishlist', wishlistRoutes);
+```
+
+### Task 2: Add New Page (Admin)
+
+**Create** `admin/src/app/wishlist/page.tsx`:
+```typescript
+'use client';
+
+import { Layout, InteractiveTable } from '@/components';
+import { useState, useEffect } from 'react';
+import { wishlistApi } from '@/lib/api';  // Create this first
+
+export default function WishlistPage() {
+  const [wishlist, setWishlist] = useState([]);
+
+  useEffect(() => {
+    const fetchWishlist = async () => {
+      const response = await wishlistApi.getAll();
+      setWishlist(response.data);
+    };
+    fetchWishlist();
+  }, []);
+
+  return (
+    <Layout pageTitle="Wishlist">
+      <InteractiveTable data={wishlist} columns={columns} />
+    </Layout>
+  );
+}
+```
+
+### Task 3: Add New Screen (Mobile)
+
+**Create** `mobile/src/screens/WishlistScreen/index.tsx`:
+```typescript
+import React from 'react';
+import { View, FlatList, Text } from 'react-native';
+import { SafeView } from '@/components';
+import styles from './styles';
+
+export default function WishlistScreen() {
+  const [wishlist, setWishlist] = useState([]);
+
+  return (
+    <SafeView>
+      <FlatList
+        data={wishlist}
+        renderItem={({item}) => <ProductCard product={item} />}
+        keyExtractor={(item) => item.id}
+      />
+    </SafeView>
+  );
+}
+```
+
+---
+
+## 🐛 DEBUGGING TIPS
+
+### Backend Issues
+
+**"Port already in use":**
+```bash
+lsof -ti:8000 | xargs kill -9
+```
+
+**"Database not saving":**
+- Check `backend/data/db.json` exists
+- Verify file permissions: `ls -la backend/data/`
+- Try deleting and restarting: `rm backend/data/db.json && npm run dev`
+
+**"JWT verification failed":**
+- Check JWT_SECRET in `backend/.env`
+- Verify token format: `Authorization: Bearer <token>`
+- Token might be expired (7 days default)
+
+### Admin Panel Issues
+
+**"Cannot connect to API":**
+- Ensure backend is running: `curl http://localhost:8000/api/health`
+- Check `.env.local` exists with `NEXT_PUBLIC_API_URL`
+- Restart Next.js dev server
+- Check browser Network tab for actual errors
+
+**"TypeScript errors":**
+- Make sure types match backend responses
+- Check `src/types/index.ts` definitions
+- Run `npm run lint` to see all errors
+- ESLint ignores `public/**` vendor assets; warnings do not block builds (UPDATED)
+
+### Mobile App Issues
+
+**"Network request failed":**
+- Backend must be running
+- Use local IP address (find with `ifconfig`)
+- Phone and computer on same WiFi
+- Check API URL in `src/config/api.ts`
+
+**"Metro bundler errors":**
+```bash
+cd mobile
+npm start -- --reset-cache
+```
+
+---
+
+## 📝 AI ASSISTANT GUIDELINES
+
+When the developer asks for help:
+
+### Understand Context First
+- Check which project they're working on (admin/mobile/backend)
+- Look at existing patterns in that project
+- Consider impact on other projects
+
+### Provide Complete Solutions
+- Give full file paths
+- Include all necessary imports
+- Add error handling
+- Provide TypeScript types
+- Explain what the code does
+
+### Follow Project Patterns
+- Use existing utility functions
+- Match coding style
+- Follow atomic design (for admin components)
+- Use established error handling patterns
+- Maintain TypeScript strict mode compliance
+
+### Example Good Response:
+
+```typescript
+// Add wishlist feature to products page
+// File: admin/src/app/product-list/page.tsx
+
+// 1. First, create API endpoint in backend
+// File: backend/src/controllers/wishlistController.ts
+export const addToWishlist = async (req: AuthRequest, res: Response) => {
+  try {
+    const { productId } = req.body;
+    const item = db.insert('wishlist', {
+      userId: req.user!.id,
+      productId
+    });
+    successResponse(res, item, 'Added to wishlist', 201);
+  } catch (error) {
+    errorResponse(res, 'Failed to add to wishlist', 500);
+  }
+};
+
+// 2. Add route in backend
+// File: backend/src/routes/wishlistRoutes.ts
+router.post('/', authenticate, wishlistController.addToWishlist);
+
+// 3. Add API client method in admin
+// File: admin/src/lib/api/wishlist.ts
+export const wishlistApi = {
+  add: (productId: string) => apiClient.post('/wishlist', { productId })
+};
+
+// 4. Use in component
+const handleAddToWishlist = async (productId: string) => {
+  try {
+    await wishlistApi.add(productId);
+    showNotification('Added to wishlist!', 'success');
+  } catch (error) {
+    showNotification('Failed to add to wishlist', 'error');
+  }
+};
+```
+
+---
+
+## 🚀 QUICK REFERENCE
+
+### Ports
+- Backend: `8000`
+- Admin: `3000`
+- Mobile: Metro Bundler
+
+### Default Credentials
+```
+Email: admin@larkon.com
+Password: admin123
+```
+
+### Key Commands
+```bash
+# Backend
+npm run dev          # Start dev server
+npm run build        # Build TypeScript
+
+# Admin
+npm run dev          # Start Next.js dev
+npm run build        # Build for production
+npm run lint         # Run ESLint
+
+# Mobile
+npm start            # Start Metro
+npm run ios          # Run on iOS
+npm run android      # Run on Android
+```
+
+### Important Files
+- Backend DB: `backend/data/db.json`
+- API Client: `admin/src/lib/api/client.ts`
+- Types: `admin/src/types/index.ts`
+- Auth Middleware: `backend/src/middleware/auth.ts`
+- Mobile API Config: `mobile/src/config/api.ts`
+
+---
+
+## 📚 DOCUMENTATION
+
+- **START_HERE.md** - Quick start guide
+- **README.md** - Complete overview
+- **backend/README.md** - API documentation
+- **backend/QUICK_START.md** - API quick reference
+- **admin/** - Well-documented code
+- **mobile/README.md** - Mobile app guide
+
+---
+
+## 🎯 CURRENT STATUS
+
+**Phase:** Integration & Testing
+
+**Completed:**
+- ✅ Admin panel frontend
+- ✅ Mobile app UI
+- ✅ Backend API
+- ✅ Sample data
+- ✅ Documentation
+
+**Next Steps:**
+1. Test admin panel with backend
+2. Test mobile app with backend
+3. Fix integration issues
+4. Add real database (PostgreSQL)
+5. Add payment gateway
+6. Deploy
+
+---
+
+## 💡 TIPS FOR CURSOR AI
+
+**When you reopen this workspace:**
+
+1. Cursor will automatically read this `.cursorrules` file
+2. It will understand all three projects
+3. You can ask questions like:
+   - "How do I add a new product?"
+   - "Connect the mobile app to backend"
+   - "Create a new API endpoint for brands"
+   - "Fix the authentication error"
+   - "Add banners and wire admin page" (NEW)
+
+4. Cursor will give you context-aware answers!
+
+---
+
+**Last Updated:** November 10, 2025  
+**Version:** 1.2.0  
+**Ready:** ✅ Yes - Start developing!
+
+**Latest Deployment:**
+- ✅ Image Cropper with adjust/crop/rotate functionality (Nov 10, 2025)
+- ✅ Dynamic styles dropdown in product add/edit pages
+- ✅ react-easy-crop library integrated
+
+---
+
+## 🛠️ Deployment & Infra Notes (Live)
+
+### Current DNS (production)
+- Root domain: `buyshopo.com` → `145.79.210.80` (Hostinger VPS - old)
+- IPv6 for root: `2a02:4780:11:2054:0:ae8:3295:2`
+- Subdomains:
+  - `api.buyshopo.com` → `31.97.232.219`
+  - `admin.buyshopo.com` → `31.97.232.219`
+
+### SSH Access Status
+- Attempts to `ssh root@145.79.210.80` and `ssh u182989461@145.79.210.80` on port 22 are timing out from macOS (Darwin 24.5.0).
+- Likely causes: SSH port changed, firewall blocked (UFW/iptables/Fail2Ban), or sshd down.
+- hPanel access currently unavailable; use DNS/IP-based discovery until hPanel is regained.
+
+### Local troubleshooting (macOS)
+- Install port scanner (nmap):
+```bash
+brew install nmap
+nmap -Pn -p 22,2200,2222,8022,50022 145.79.210.80
+nmap -6 -Pn -p 22,2222 2a02:4780:11:2054:0:ae8:3295:2
+```
+- If Homebrew not installed:
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+- Without nmap, quick TCP checks with netcat (nc):
+```bash
+nc -zv 145.79.210.80 22 2200 2222 8022 50022
+```
+- Verbose SSH to see failure mode:
+```bash
+ssh -vvv root@145.79.210.80
+```
+
+### When hPanel access is restored (via Browser Console)
+1) Verify sshd and port:
+```bash
+sudo systemctl status ssh || sudo systemctl status sshd
+sudo grep -i '^Port ' /etc/ssh/sshd_config
+ss -tulpn | grep -i ssh
+```
+2) Open firewall for the configured SSH port (examples):
+```bash
+sudo ufw allow 22/tcp
+sudo ufw allow 2222/tcp
+sudo ufw reload
+```
+3) Check Fail2Ban and unban if needed:
+```bash
+sudo fail2ban-client status
+sudo fail2ban-client status sshd
+sudo fail2ban-client unban <YOUR_PUBLIC_IP>
+```
+4) Restart SSH service:
+```bash
+sudo systemctl restart ssh || sudo systemctl restart sshd
+```
+
+### Zero-downtime pull & reload (once SSH works)
+```bash
+cd /var/www/ShopProject
+git fetch --all && git checkout production && git pull origin production
+cd backend && npm ci && npm run build && pm2 reload shop-backend
+cd ../admin && npm ci && npm run build && pm2 reload shop-admin
+pm2 save
+```
+
+Note: Keep `backend/uploads/` persistent and ensure write permissions for the PM2 user.
+
+### Latest connectivity test (Oct 30, 2025)
+Commands run from macOS:
+```bash
+dig +short A buyshopo.com            # 145.79.210.80
+dig +short AAAA buyshopo.com         # 2a02:4780:11:2054:0:ae8:3295:2
+dig +short A api.buyshopo.com        # 31.97.232.219
+dig +short A admin.buyshopo.com      # 31.97.232.219
+
+nmap -Pn -p 22,2200,2222,8022,50022 145.79.210.80
+# Results: 22 filtered, 2200 closed, 2222 closed, 8022 filtered, 50022 filtered
+
+nmap -6 -Pn -p 22,2222 2a02:4780:11:2054:0:ae8:3295:2
+# Results: 22 filtered, 2222 filtered
+```
+Interpretation:
+- Old VPS at `145.79.210.80` is up but SSH is blocked by firewall/SSHD (ports filtered/closed). Requires hPanel console to fix firewall or sshd.
+- Subdomains `api/admin.buyshopo.com` point to `31.97.232.219` (separate host). Redeploys can target this IP via CI or provider access while VPS access is restored.
+
+Operational next steps:
+- Regain Hostinger hPanel to open SSH port or restart sshd.
+- If urgent: deploy backend/admin to a new environment and switch subdomains’ A records, keeping `uploads/` migration in mind.
+
+### HTTP probe results (Oct 30, 2025)
+```bash
+curl -I http://145.79.210.80
+# HTTP/1.1 403 Forbidden
+# Server: LiteSpeed
+# platform: hostinger
+# panel: hpanel
+
+curl -I http://buyshopo.com
+# HTTP/1.1 301 Moved Permanently → https://buyshopo.com/
+# Server: LiteSpeed
+# platform: hostinger
+# panel: hpanel
+```
+Implication:
+- The IP responds via Hostinger LiteSpeed (web stack active), but SSH remains unreachable. Browser console via hPanel is required to adjust SSH/firewall.
+
+---
+
+## ✅ Repo alignment notes (Oct 30, 2025)
+
+- Admin API layer
+  - `admin/src/lib/api/client.ts` exists and uses `process.env.NEXT_PUBLIC_API_URL`.
+  - `admin/src/lib/api/index.ts` currently exports `apiClient` and `products` only. Other modules (e.g., `orders.ts`, `customers.ts`, `categories.ts`, `styles.ts`, `brands.ts`, `banners.ts`) exist but are not barrel-exported. Action: export these to match docs.
+  - `setAuthToken` method in `client.ts` is a stub while per-request token is read from `localStorage` inside `request()`. OK but document this quirk.
+
+- Backend wiring
+  - The app uses MongoDB route variants via `backend/src/app-mongodb.ts` (e.g., `productRoutes.mongodb.ts`, `categoryRoutes.mongodb.ts`, etc.). The JSON-file mode is present but not wired by default. Update docs to reflect MongoDB as the active variant.
+  - `reviewRoutes.mongodb.ts` exists and is imported in the MongoDB app. Admin’s Reviews page is removed; backend reviews routes can remain without contradiction, but note the admin UI intentionally hides them.
+
+- Mobile config
+  - `mobile/src/config/api.ts` production URL is `https://api.buyshopo.com/api` (good). Dev uses `LOCAL_IP` placeholder.
+  - `mobile/src/utils/imageHelper.ts` uses `https://api.production.com` for production image base. Action: change to `https://api.buyshopo.com` for consistency.
+
+- DNS and deployment
+  - Root `buyshopo.com` → `145.79.210.80` (LiteSpeed/Hostinger), SSH filtered.
+  - `api.buyshopo.com` and `admin.buyshopo.com` → `31.97.232.219` (separate host). Keep subdomain deploys targeting this IP until VPS SSH is restored.
+
+### hPanel access regained (Oct 30, 2025)
+Status: ✅ Client granted manager access. Ready to deploy production branch.
+
+---
+
+## 🚀 PRODUCTION DEPLOYMENT (Live System)
+
+### Current Production Status
+✅ **Backend:** Running on `https://api.buyshopo.com`
+✅ **Admin Panel:** Running on `https://admin.buyshopo.com`
+✅ **VPS:** Ubuntu 24.04.3 LTS at `31.97.232.219`
+✅ **Database:** MongoDB (live)
+✅ **SSL:** Valid certificates for all subdomains
+✅ **Process Manager:** PM2 (shop-backend, shop-admin)
+✅ **Web Server:** Nginx (reverse proxy)
+
+### Production Credentials
+**VPS SSH:**
+- Host: `31.97.232.219`
+- User: `root`
+- Password: `8wANN666BG6xXa2@`
+
+**Admin Login:**
+- URL: `https://admin.buyshopo.com`
+- Email: `admin@shopo.com`
+- Password: `admin123`
+
+**MongoDB:**
+- Managed via environment variables on VPS
+- Connection string in `/var/www/ShopProject/backend/.env`
+
+### Deployment Scripts (Local Machine)
+Located in project root. Use these to deploy changes:
+
+```bash
+# Deploy backend only (API changes)
+./deploy-backend.sh
+
+# Deploy admin only (frontend changes)
+./deploy-admin-production.sh
+
+# Deploy both at once
+./deploy-all.sh
+
+# Check if services are running
+./check-status.sh
+
+# SSH to VPS
+./ssh-connect.sh
+```
+
+**Password when prompted:** `8wANN666BG6xXa2@`
+
+### VPS Directory Structure
+```
+/var/www/ShopProject/
+├── backend/
+│   ├── src/                    # TypeScript source
+│   ├── dist/                   # Built JS (production)
+│   ├── uploads/                # User uploads (persistent)
+│   ├── .env                    # Production env vars
+│   ├── package.json
+│   └── node_modules/
+│
+└── admin/
+    ├── src/                    # Next.js source
+    ├── .next/                  # Built Next.js (production)
+    ├── public/                 # Static assets
+    ├── package.json
+    └── node_modules/
+```
+
+### PM2 Configuration (on VPS)
+```bash
+# Backend process
+pm2 start dist/index-mongodb.js --name shop-backend --cwd /var/www/ShopProject/backend
+
+# Admin process
+pm2 start npm --name shop-admin --cwd /var/www/ShopProject/admin -- start
+
+# Save configuration
+pm2 save
+
+# Startup script (auto-restart on reboot)
+pm2 startup
+```
+
+### Nginx Configuration (on VPS)
+```nginx
+# API subdomain (port 8000)
+server {
+    server_name api.buyshopo.com;
+    location / {
+        proxy_pass http://localhost:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+
+# Admin subdomain (port 3000)
+server {
+    server_name admin.buyshopo.com;
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+
+### Deployment Workflow
+
+**When user says "push to live" or "deploy to production":**
+
+1. **FIRST:** Review and update this `.cursorrules` file:
+   - Scan `admin/`, `backend/`, `mobile/` for any architectural changes
+   - Update API endpoints if new routes were added
+   - Update environment variables if new ones are needed
+   - Update database schema if models changed
+   - Update dependencies if package.json changed
+
+2. **THEN:** Suggest the appropriate deployment script:
+   ```bash
+   # Backend changes (API, controllers, routes, models)
+   ./deploy-backend.sh
+   
+   # Admin changes (UI, components, pages, styles)
+   ./deploy-admin-production.sh
+   
+   # Both changed
+   ./deploy-all.sh
+   ```
+
+3. **VERIFY:** After deployment:
+   ```bash
+   ./check-status.sh
+   ```
+   - Check PM2 status
+   - Check API health: `https://api.buyshopo.com/api/health`
+   - Check admin: `https://admin.buyshopo.com`
+   - Check logs for errors
+
+### What Each Deployment Script Does
+
+**`deploy-backend.sh`:**
+1. Builds backend locally (`npm run build`)
+2. SCPs `dist/` folder to VPS
+3. SCPs `package.json` and `package-lock.json`
+4. Runs `npm ci --production` on VPS
+5. Reloads PM2 process: `pm2 reload shop-backend`
+6. Shows logs
+
+**`deploy-admin-production.sh`:**
+1. Builds admin locally with production env (`NEXT_PUBLIC_API_URL=https://api.buyshopo.com/api`)
+2. SCPs `.next/` folder to VPS
+3. SCPs `package.json`, `public/`, and `next.config.ts`
+4. Runs `npm ci --production` on VPS
+5. Restarts PM2 process: `pm2 restart shop-admin`
+6. Shows logs
+
+**`deploy-all.sh`:**
+- Runs both scripts above sequentially
+
+### Important Notes
+
+**Environment Variables:**
+- Backend `.env` is on VPS only (never in git)
+- Admin uses `NEXT_PUBLIC_API_URL` at build time
+- Always build admin locally with production URL before uploading
+
+**File Uploads:**
+- Located at `/var/www/ShopProject/backend/uploads/`
+- Persistent across deployments
+- Served via Express static middleware
+- Full URL: `https://api.buyshopo.com/uploads/filename.jpg`
+
+**Zero Downtime:**
+- `pm2 reload` for backend (zero downtime)
+- `pm2 restart` for admin (brief downtime, Next.js requires full restart)
+
+**Logs:**
+```bash
+# On VPS
+pm2 logs shop-backend --lines 50
+pm2 logs shop-admin --lines 50
+pm2 logs --lines 100
+
+# Or from local machine via SSH
+ssh root@31.97.232.219 "pm2 logs --lines 50 --nostream"
+```
+
+### Troubleshooting Production
+
+**Backend not responding:**
+```bash
+./ssh-connect.sh
+pm2 restart shop-backend
+pm2 logs shop-backend --lines 50
+```
+
+**Admin showing old code:**
+1. Hard refresh browser: `Cmd+Shift+R` (Mac) or `Ctrl+Shift+R` (Windows)
+2. Check build was uploaded correctly
+3. Check PM2 status: `pm2 list`
+4. Restart: `pm2 restart shop-admin`
+
+**Database issues:**
+```bash
+./ssh-connect.sh
+cat /var/www/ShopProject/backend/.env | grep MONGODB_URI
+# Verify MongoDB connection string is correct
+```
+
+**SSL certificate issues:**
+```bash
+./ssh-connect.sh
+certbot renew --dry-run
+systemctl reload nginx
+```
+
+### Pre-Deployment Checklist
+
+Before running deployment scripts, ensure:
+- ✅ Code tested locally
+- ✅ Local backend runs: `cd backend && npm run dev`
+- ✅ Local admin runs: `cd admin && npm run dev`
+- ✅ No TypeScript errors: `npm run build`
+- ✅ Environment variables are production-ready
+- ✅ No console errors in browser
+- ✅ API endpoints return expected data
+- ✅ `.cursorrules` updated if needed
+
+### Monitoring Production
+
+**Health Checks:**
+- API: `https://api.buyshopo.com/api/health`
+- Admin: `https://admin.buyshopo.com` (should load)
+
+**PM2 Dashboard (on VPS):**
+```bash
+pm2 list          # List all processes
+pm2 info shop-backend
+pm2 info shop-admin
+pm2 monit         # Real-time monitoring
+```
+
+**Server Resources:**
+```bash
+htop              # CPU/RAM usage
+df -h             # Disk space
+systemctl status nginx
+```
+
+---
+
+## 🤖 AI ASSISTANT DEPLOYMENT PROTOCOL
+
+**When user requests deployment ("push to live", "deploy", "production", etc.):**
+
+### Step 1: Review and Update .cursorrules
+1. Scan `admin/src/`, `backend/src/`, `mobile/src/` for changes
+2. Check if new API endpoints were added → update API docs
+3. Check if new environment variables needed → document them
+4. Check if database schema changed → update schema docs
+5. Check if new dependencies added → note any production implications
+6. Update "Last Updated" timestamp
+7. Commit these changes to `.cursorrules`
+
+### Step 2: Pre-deployment Validation
+Ask user to confirm:
+- ✅ "Have you tested the changes locally?"
+- ✅ "Do local builds complete without errors?"
+- ✅ Show which parts changed (backend/admin/both)
+
+### Step 3: Suggest Deployment Command
+Based on what changed:
+```bash
+# If only backend files changed
+./deploy-backend.sh
+
+# If only admin files changed
+./deploy-admin-production.sh
+
+# If both changed
+./deploy-all.sh
+```
+
+### Step 4: Post-Deployment Verification
+Remind user to:
+1. Run `./check-status.sh` after deployment
+2. Check live URLs:
+   - Admin: https://admin.buyshopo.com
+   - API: https://api.buyshopo.com/api/health
+3. Hard refresh browser to see changes
+4. Check PM2 logs if issues arise
+
+### Step 5: Update .cursorrules Again (if needed)
+If deployment revealed issues or required changes, document them in the "Deployment & Infra Notes" section.
+
+**Example Response:**
+```
+🔍 I'll help you deploy to production!
+
+First, let me review the codebase and update .cursorrules...
+
+[Scans code and updates .cursorrules]
+
+✅ .cursorrules updated!
+
+📦 Changes detected:
+- Backend: Modified product controller
+- Admin: Updated product list page
+
+🚀 To deploy, run:
+./deploy-all.sh
+
+Password: 8wANN666BG6xXa2@
+
+After deployment:
+1. Run: ./check-status.sh
+2. Check: https://admin.buyshopo.com
+3. Verify API: https://api.buyshopo.com/api/health
+4. Hard refresh your browser (Cmd+Shift+R)
+```
+
+---
+

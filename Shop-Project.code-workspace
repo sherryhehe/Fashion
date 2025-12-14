@@ -1,0 +1,232 @@
+{
+  "folders": [
+    {
+      "name": "🏠 Shop Project (Root)",
+      "path": "."
+    },
+    {
+      "name": "🎨 Admin Panel",
+      "path": "./admin"
+    },
+    {
+      "name": "📱 Mobile App",
+      "path": "./mobile"
+    },
+    {
+      "name": "⚙️ Backend API",
+      "path": "./backend"
+    },
+    {
+      "name": "📚 Documentation",
+      "path": "./docs"
+    }
+  ],
+  "settings": {
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit"
+    },
+    "typescript.tsdk": "admin/node_modules/typescript/lib",
+    "typescript.enablePromptUseWorkspaceTsdk": true,
+    "files.exclude": {
+      "**/.git": true,
+      "**/node_modules": true,
+      "**/.DS_Store": true,
+      "**/.next": true,
+      "**/dist": true,
+      "**/build": true,
+      "**/.expo": true,
+      "**/Pods": true,
+      "**/.gradle": true,
+      "**/.cxx": true,
+      "**/android/app/build": true,
+      "**/ios/build": true,
+      "**/*.tsbuildinfo": true
+    },
+    "search.exclude": {
+      "**/node_modules": true,
+      "**/package-lock.json": true,
+      "**/yarn.lock": true,
+      "**/.next": true,
+      "**/dist": true,
+      "**/build": true,
+      "**/Pods": true,
+      "**/.expo": true
+    },
+    "files.watcherExclude": {
+      "**/node_modules/**": true,
+      "**/.next/**": true,
+      "**/dist/**": true,
+      "**/build/**": true,
+      "**/Pods/**": true,
+      "**/.expo/**": true,
+      "**/.gradle/**": true
+    },
+    "eslint.workingDirectories": [
+      "./admin",
+      "./mobile",
+      "./backend"
+    ],
+    "eslint.validate": [
+      "javascript",
+      "javascriptreact",
+      "typescript",
+      "typescriptreact"
+    ],
+    "[typescript]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode",
+      "editor.formatOnSave": true
+    },
+    "[typescriptreact]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode",
+      "editor.formatOnSave": true
+    },
+    "[javascript]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode",
+      "editor.formatOnSave": true
+    },
+    "[json]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "terminal.integrated.cwd": "${workspaceFolder}",
+    "git.ignoreLimitWarning": true
+  },
+  "extensions": {
+    "recommendations": [
+      "dbaeumer.vscode-eslint",
+      "esbenp.prettier-vscode",
+      "bradlc.vscode-tailwindcss",
+      "msjsdiag.vscode-react-native",
+      "ms-vscode.vscode-typescript-next",
+      "formulahendry.auto-rename-tag",
+      "naumovs.color-highlight",
+      "christian-kohler.path-intellisense",
+      "zignd.html-css-class-completion"
+    ]
+  },
+  "launch": {
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "🎨 Debug Admin Panel (Next.js)",
+        "type": "node",
+        "request": "launch",
+        "cwd": "${workspaceFolder}/admin",
+        "runtimeExecutable": "npm",
+        "runtimeArgs": ["run", "dev"],
+        "console": "integratedTerminal",
+        "serverReadyAction": {
+          "pattern": "Local:.*http://localhost:([0-9]+)",
+          "uriFormat": "http://localhost:%s",
+          "action": "openExternally"
+        }
+      },
+      {
+        "name": "⚙️ Debug Backend API",
+        "type": "node",
+        "request": "launch",
+        "cwd": "${workspaceFolder}/backend",
+        "runtimeExecutable": "npm",
+        "runtimeArgs": ["run", "dev"],
+        "console": "integratedTerminal",
+        "restart": true,
+        "protocol": "inspector"
+      },
+      {
+        "name": "📱 Debug Mobile App (React Native)",
+        "type": "reactnative",
+        "request": "launch",
+        "platform": "ios",
+        "cwd": "${workspaceFolder}/mobile"
+      }
+    ]
+  },
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "🚀 Start Backend",
+        "type": "shell",
+        "command": "npm run dev",
+        "options": {
+          "cwd": "${workspaceFolder}/backend"
+        },
+        "problemMatcher": [],
+        "presentation": {
+          "reveal": "always",
+          "panel": "dedicated",
+          "group": "servers"
+        },
+        "runOptions": {
+          "instanceLimit": 1
+        }
+      },
+      {
+        "label": "🎨 Start Admin Panel",
+        "type": "shell",
+        "command": "npm run dev",
+        "options": {
+          "cwd": "${workspaceFolder}/admin"
+        },
+        "problemMatcher": [],
+        "presentation": {
+          "reveal": "always",
+          "panel": "dedicated",
+          "group": "servers"
+        },
+        "runOptions": {
+          "instanceLimit": 1
+        }
+      },
+      {
+        "label": "📱 Start Mobile App",
+        "type": "shell",
+        "command": "npm start",
+        "options": {
+          "cwd": "${workspaceFolder}/mobile"
+        },
+        "problemMatcher": [],
+        "presentation": {
+          "reveal": "always",
+          "panel": "dedicated",
+          "group": "servers"
+        },
+        "runOptions": {
+          "instanceLimit": 1
+        }
+      },
+      {
+        "label": "🚀 Start All Projects",
+        "dependsOn": [
+          "🚀 Start Backend",
+          "🎨 Start Admin Panel",
+          "📱 Start Mobile App"
+        ],
+        "problemMatcher": []
+      },
+      {
+        "label": "📦 Install All Dependencies",
+        "type": "shell",
+        "command": "npm install",
+        "options": {
+          "cwd": "${workspaceFolder}/backend"
+        },
+        "dependsOrder": "sequence",
+        "presentation": {
+          "reveal": "always",
+          "panel": "shared"
+        }
+      },
+      {
+        "label": "🧹 Clean Build Artifacts",
+        "type": "shell",
+        "command": "rm -rf backend/node_modules admin/node_modules admin/.next mobile/node_modules mobile/android/app/build mobile/ios/build",
+        "options": {
+          "cwd": "${workspaceFolder}"
+        },
+        "problemMatcher": []
+      }
+    ]
+  }
+}
+

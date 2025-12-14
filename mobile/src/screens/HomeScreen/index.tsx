@@ -1,0 +1,991 @@
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  Image,
+  TouchableOpacity,
+  TextInput,
+  Dimensions,
+  FlatList,
+} from 'react-native';
+import { CachedImage } from '../../components';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { HomeStackParamList } from '../../navigation/HomeNavigator';
+import { CategoryBg, SafeView, SearchFilterBar, ShimmerCategoryItem, ShimmerProductCard, ShimmerBrandItem, ShimmerHorizontalList, ShimmerGrid } from '../../components';
+import { icons } from '../../assets/icons';
+import images from '../../assets/images';
+import useStyles from './styles';
+
+// API Hooks
+import { useCategories } from '../../hooks/useCategories';
+import { useProducts, useFeaturedProducts, useRecommendedProducts, useRecentlyAddedProducts, useTopSellingProducts } from '../../hooks/useProducts';
+import { useTopBrands, useFeaturedBrands } from '../../hooks/useBrands';
+import { useFeaturedStyles, usePopularStyles } from '../../hooks/useStyles';
+import { useBanners } from '../../hooks/useBanners';
+import { getFirstImageSource, getImageSource, preloadImages, getImageUrl } from '../../utils/imageHelper';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { CommonActions } from '@react-navigation/native';
+
+const { width: screenWidth } = Dimensions.get('window');
+
+type HomeScreenNavigationProp = StackNavigationProp<HomeStackParamList, 'Home'>;
+
+interface HomeScreenProps {
+  navigation: HomeScreenNavigationProp;
+}
+
+const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
+  const styles = useStyles()
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const flatListRef = useRef<FlatList>(null);
+  const autoScrollTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [userName, setUserName] = useState<string | null>(null);
+  const [isAutoScrolling, setIsAutoScrolling] = useState(true);
+
+  // Get user name from AsyncStorage
+  useEffect(() => {
+    const loadUserName = async () => {
+      try {
+        const userStr = await AsyncStorage.getItem('user');
+        if (userStr) {
+          const user = JSON.parse(userStr);
+          setUserName(user.name || null);
+        }
+      } catch (error) {
+        console.log('Error loading user name:', error);
+      }
+    };
+    loadUserName();
+  }, []);
+
+  // Get greeting based on time of day
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  };
+
+  // API Hooks - MUST be called before using the data
+  const { data: categoriesData, isLoading: categoriesLoading, error: categoriesError } = useCategories();
+  const { data: featuredProductsData, isLoading: featuredLoading } = useFeaturedProducts(4);
+  const { data: recommendedProductsData, isLoading: recommendedLoading } = useRecommendedProducts(2);
+  const { data: recentlyAddedData, isLoading: recentlyAddedLoading } = useRecentlyAddedProducts(2);
+  const { data: topBrandsData, isLoading: topBrandsLoading } = useTopBrands();
+  const { data: featuredStylesData, isLoading: featuredStylesLoading } = useFeaturedStyles();
+  const { data: allProductsData, isLoading: allProductsLoading } = useProducts({ limit: 50, status: 'active' });
+  const { data: bannersData, isLoading: bannersLoading } = useBanners('homepage', 'active');
+
+  // Map API data arrays - now safe to use after API hooks
+  const bannersArray = bannersData?.data || [];
+  const categoriesArray = categoriesData?.data || [];
+  const stylesArray = featuredStylesData?.data || [];
+  const recommendedArray = recommendedProductsData?.data || [];
+  const topBrandsArray = topBrandsData?.data || [];
+  const allProductsArray = allProductsData?.data || [];
+
+  // Debug: Log banners array to verify all banners are fetched
+  useEffect(() => {
+    if (bannersArray.length > 0) {
+      console.log('🏠 HomeScreen - Banners fetched:', bannersArray.length);
+      console.log('📋 Banners data:', bannersArray.map(b => ({ 
+        id: b.id || b._id, 
+        title: b.title, 
+        position: b.position,
+        status: b.status,
+        imageUrl: b.imageUrl || b.image 
+      })));
+    }
+  }, [bannersArray]);
+
+  // Preload images with priority: above-the-fold first, then below-the-fold
+  useEffect(() => {
+    const preloadPriorityImages = async () => {
+      const priorityUrls: string[] = [];
+
+      // Priority 1: Banner images (most visible)
+      bannersArray.forEach(banner => {
+        if (banner.imageUrl || banner.image) {
+          const url = getImageUrl(banner.imageUrl || banner.image);
+          if (url) priorityUrls.push(url);
+        }
+      });
+
+      // Priority 2: Category images (above the fold)
+      categoriesArray.forEach(category => {
+        if (category.image) {
+          const url = getImageUrl(category.image);
+          if (url) priorityUrls.push(url);
+        }
+      });
+
+      // Priority 3: Style images
+      stylesArray.forEach(style => {
+        if (style.image) {
+          const url = getImageUrl(style.image);
+          if (url) priorityUrls.push(url);
+        }
+      });
+
+      // Priority 4: Recommended product images
+      recommendedArray.forEach(product => {
+        if (product.images && product.images.length > 0) {
+          const url = getImageUrl(product.images[0]);
+          if (url) priorityUrls.push(url);
+        }
+      });
+
+      // Priority 5: Brand images
+      topBrandsArray.forEach(brand => {
+        if (brand.logo) {
+          const url = getImageUrl(brand.logo);
+          if (url) priorityUrls.push(url);
+        }
+      });
+
+      // Preload priority images immediately
+      if (priorityUrls.length > 0) {
+        console.log(`🚀 Preloading ${priorityUrls.length} priority images...`);
+        preloadImages(priorityUrls).then(() => {
+          console.log('✅ Priority image preloading completed');
+        }).catch(error => {
+          console.log('⚠️ Priority image preloading error:', error);
+        });
+      }
+    };
+
+    // Preload below-the-fold images after a delay
+    const preloadBelowFoldImages = async () => {
+      // Wait 1 second before preloading below-the-fold images
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      const belowFoldUrls: string[] = [];
+
+      // Preload bottom grid product images (limit to first 10 for initial load)
+      allProductsArray.slice(0, 10).forEach(product => {
+        if (product.images && product.images.length > 0) {
+          const url = getImageUrl(product.images[0]);
+          if (url) belowFoldUrls.push(url);
+        }
+      });
+
+      if (belowFoldUrls.length > 0) {
+        console.log(`🚀 Preloading ${belowFoldUrls.length} below-the-fold images...`);
+        preloadImages(belowFoldUrls).then(() => {
+          console.log('✅ Below-the-fold image preloading completed');
+        }).catch(error => {
+          console.log('⚠️ Below-the-fold image preloading error:', error);
+        });
+      }
+    };
+
+    // Preload priority images when data is available
+    if (
+      !categoriesLoading &&
+      !featuredStylesLoading &&
+      !recommendedLoading &&
+      !topBrandsLoading &&
+      !bannersLoading &&
+      (bannersArray.length > 0 || categoriesArray.length > 0)
+    ) {
+      preloadPriorityImages();
+    }
+
+    // Preload below-the-fold images after initial render
+    if (!allProductsLoading && allProductsArray.length > 0) {
+      preloadBelowFoldImages();
+    }
+  }, [
+    bannersArray,
+    categoriesArray,
+    stylesArray,
+    recommendedArray,
+    topBrandsArray,
+    allProductsArray,
+    categoriesLoading,
+    featuredStylesLoading,
+    recommendedLoading,
+    topBrandsLoading,
+    allProductsLoading,
+    bannersLoading,
+  ]);
+  // Sort banners by order if available, then map to carousel data
+  const carouselData = bannersArray.length > 0
+    ? bannersArray
+        .sort((a, b) => {
+          // Sort by order field if available (lower order = appears first)
+          const orderA = a.order ?? 999;
+          const orderB = b.order ?? 999;
+          return orderA - orderB;
+        })
+        .map((banner, index) => ({
+          id: banner.id || banner._id || `banner-${index}`,
+          title: banner.title || '', // Use empty string if no title
+          subtitle: banner.subtitle || '', // Use empty string if no subtitle
+          cta: banner.subtitle || '', // Use subtitle as CTA, or empty if no subtitle
+          // Backend returns imageUrl, not image - map it correctly
+          image: getImageSource(banner.imageUrl || banner.image, images.homesliderimage),
+          // Backend returns linkUrl, not link - map it correctly
+          link: banner.linkUrl || banner.link,
+        }))
+    : [];
+
+  // Debug: Log carousel data to verify all banners are included
+  useEffect(() => {
+    if (carouselData.length > 0) {
+      console.log('🎠 Carousel data prepared:', carouselData.length, 'items');
+      console.log('📊 Carousel items:', carouselData.map(c => ({ id: c.id, title: c.title })));
+    }
+  }, [carouselData.length]);
+
+  const renderCarouselItem = ({ item }: { item: any }) => {
+    const imageSource = typeof item.image === 'object' && item.image?.uri 
+      ? item.image 
+      : images.homesliderimage;
+    
+    return (
+      <TouchableOpacity 
+        style={[styles.heroImageContainer, { width: screenWidth }]}
+        activeOpacity={item.link ? 0.8 : 1}
+        onPress={() => {
+          if (item.link) {
+            // Handle banner link navigation if needed
+            console.log('Banner link:', item.link);
+          }
+        }}
+      >
+        <CachedImage
+          source={imageSource}
+          style={styles.heroImage}
+          resizeMode="cover"
+          priority="high"
+          cache="immutable"
+        />
+        
+      </TouchableOpacity>
+    );
+  };
+
+  const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
+    if (viewableItems.length > 0 && viewableItems[0].index !== null) {
+      setCurrentSlide(viewableItems[0].index);
+    }
+  }).current;
+
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 50,
+  }).current;
+
+  // Auto-scroll carousel for multiple banners
+  useEffect(() => {
+    if (carouselData.length <= 1 || !isAutoScrolling) {
+      return;
+    }
+
+    // Auto-scroll every 5 seconds
+    autoScrollTimerRef.current = setInterval(() => {
+      setCurrentSlide((prevSlide) => {
+        const nextSlide = (prevSlide + 1) % carouselData.length;
+        try {
+          flatListRef.current?.scrollToIndex({
+            index: nextSlide,
+            animated: true,
+          });
+        } catch (error) {
+          // Fallback to scrollToOffset if scrollToIndex fails
+          flatListRef.current?.scrollToOffset({
+            offset: nextSlide * screenWidth,
+            animated: true,
+          });
+        }
+        return nextSlide;
+      });
+    }, 5000);
+
+    return () => {
+      if (autoScrollTimerRef.current) {
+        clearInterval(autoScrollTimerRef.current);
+      }
+    };
+  }, [carouselData.length, isAutoScrolling]);
+
+  // Reset auto-scroll when user manually scrolls
+  const handleScrollBeginDrag = () => {
+    setIsAutoScrolling(false);
+    if (autoScrollTimerRef.current) {
+      clearInterval(autoScrollTimerRef.current);
+    }
+  };
+
+  const handleScrollEndDrag = () => {
+    // Resume auto-scroll after 8 seconds of inactivity
+    setTimeout(() => {
+      setIsAutoScrolling(true);
+    }, 8000);
+  };
+
+  // Map API categories to display format - use actual images from API
+  const displayCategories = Array.isArray(categoriesArray) && categoriesArray.length > 0
+    ? categoriesArray.slice(0, 5).map(category => ({
+        id: category._id,
+        name: category.name,
+        // Use actual image from API, fallback to icon if no image
+        image: category.image ? getImageSource(category.image) : null,
+        icon: category.image ? null : (() => {
+          // Fallback to icon mapping only if no image from API
+          const name = category.name.toLowerCase();
+          if (name.includes('accessor')) return icons.accessories;
+          if (name.includes('bag')) return icons.bags;
+          if (name.includes('shoe')) return icons.shoes;
+          if (name.includes('makeup') || name.includes('beauty')) return icons.makeup;
+          if (name.includes('cloth') || name.includes('dress') || name.includes('shirt')) return icons.clothes;
+          return icons.clothes;
+        })(),
+      }))
+    : [];
+
+  // Map API styles to display format - use actual images from API
+  const displayStyles = Array.isArray(stylesArray) && stylesArray.length > 0
+    ? stylesArray.slice(0, 3).map(style => ({
+        id: style._id,
+        name: style.name,
+        // Use actual image from API, fallback to local image only if no image from API
+        image: style.image 
+          ? getImageSource(style.image, images.casual)
+          : (() => {
+              // Fallback to name-based mapping only if no image from API
+              const name = style.name.toLowerCase();
+              if (name.includes('casual')) return images.casual;
+              if (name.includes('desi') || name.includes('traditional')) return images.desi;
+              if (name.includes('street') || name.includes('urban')) return images.streetwear;
+              return images.casual;
+            })(),
+      }))
+    : [];
+
+  // Format recommended products data
+  const formatPrice = (price: number) => `PKR ${price.toLocaleString()}`;
+  const formatRating = (rating: number, reviewCount: number) => `${rating.toFixed(1)} (${reviewCount})`;
+
+  // Check if recommended products data exists and is an array
+  const displayRecommendedProducts = Array.isArray(recommendedArray) && recommendedArray.length > 0
+    ? recommendedArray.map(product => ({
+        id: product._id,
+        name: product.name,
+        brand: product.brand || '', // Include brand field (empty if no brand)
+        price: formatPrice(product.price),
+        rating: formatRating(product.rating, product.reviewCount),
+        image: getFirstImageSource(product.images, images.velvetShawl),
+      }))
+    : [];
+
+  // Check if top brands data exists and is an array
+  const displayTopBrands = Array.isArray(topBrandsArray) && topBrandsArray.length > 0
+    ? topBrandsArray.slice(0, 3).map(brand => {
+        // Ensure we have a valid logo - check for null, undefined, or empty string
+        const brandLogo = brand.logo && brand.logo.trim() ? brand.logo : null;
+        const brandImage = getImageSource(brandLogo, images.khussakraft);
+        
+        return {
+          id: brand._id,
+          name: brand.name,
+          description: brand.description || '', // Use empty string if no description
+          rating: formatRating(brand.rating || 0, brand.reviewCount || 0), // Use actual rating from API
+          image: brandImage || images.khussakraft, // Ensure we always have a fallback
+          storeName: brand.name,
+          storeType: brand.businessInfo?.businessType || '', // Use business type from API, or empty
+          bannerImage: brand.banner ? getImageSource(brand.banner, images.shopBanner) : images.shopBanner,
+          logoImage: getImageSource(brandLogo, images.shopLogo) || images.shopLogo,
+        };
+      })
+    : [];
+
+  // Check if featured products data exists and is an array
+  const featuredArray = featuredProductsData?.data || [];
+  const displayFeaturedProducts = Array.isArray(featuredArray) && featuredArray.length > 0
+    ? featuredArray.map(product => ({
+        id: product._id,
+        name: product.name,
+        brand: product.brand || '', // Include brand field (empty if no brand)
+        price: formatPrice(product.price),
+        rating: formatRating(product.rating, product.reviewCount),
+        image: getFirstImageSource(product.images, images.silkDupatta),
+      }))
+    : [];
+
+  // Check if recently added products data exists and is an array
+  const recentlyAddedArray = recentlyAddedData?.data || [];
+  const displayRecentlyAddedProducts = Array.isArray(recentlyAddedArray) && recentlyAddedArray.length > 0
+    ? recentlyAddedArray.map(product => ({
+        id: product._id,
+        name: product.name,
+        brand: product.brand || '', // Include brand field (empty if no brand)
+        price: formatPrice(product.price),
+        rating: formatRating(product.rating, product.reviewCount),
+        image: getFirstImageSource(product.images, images.minicrossbody),
+      }))
+    : [];
+
+  // Check if bottom grid products data exists and is an array
+  const displayBottomGridProducts = Array.isArray(allProductsArray) && allProductsArray.length > 0
+    ? allProductsArray.map(product => ({
+        id: product._id,
+        name: product.name,
+        brand: product.brand || '', // Include brand field (empty if no brand)
+        price: formatPrice(product.price),
+        rating: formatRating(product.rating, product.reviewCount),
+        image: getFirstImageSource(product.images, images.bottomList.image1),
+      }))
+    : [];
+
+  // Navigation handlers for "See More" buttons
+  const handleSeeMoreCategories = () => {
+    // categoriesArray already contains ALL categories from useCategories()
+    const allCategories = categoriesArray.map((cat: any) => ({
+      _id: cat._id || cat.id,
+      id: cat._id || cat.id,
+      name: cat.name,
+      image: cat.image,
+    }));
+    
+    navigation.getParent()?.navigate('CategoryList', {
+      title: 'All Categories',
+      data: allCategories,
+      listType: 'category',
+      numColumns: 4,
+      showSearch: true,
+      headerText: 'All Categories',
+      searchPlaceholder: 'Search categories...',
+    });
+  };
+
+  const handleSeeMoreStyles = () => {
+    // stylesArray contains featured styles - use what we have
+    const allStyles = stylesArray.map((style: any) => ({
+      _id: style._id || style.id,
+      id: style._id || style.id,
+      name: style.name,
+      image: style.image,
+    }));
+    
+    navigation.getParent()?.navigate('CategoryList', {
+      title: 'All Styles',
+      data: allStyles,
+      listType: 'style',
+      numColumns: 2,
+      showSearch: true,
+      headerText: 'All Styles',
+      searchPlaceholder: 'Search styles...',
+    });
+  };
+
+  const handleSeeMoreBrands = () => {
+    // topBrandsArray contains top brands - use what we have
+    const allBrands = topBrandsArray.map((brand: any) => ({
+      _id: brand._id || brand.id,
+      id: brand._id || brand.id,
+      name: brand.name,
+      description: brand.description || '',
+      rating: brand.rating || 0,
+      reviewCount: brand.reviewCount || 0,
+      logo: brand.logo,
+      banner: brand.banner,
+      businessInfo: brand.businessInfo,
+    }));
+    
+    navigation.getParent()?.navigate('CategoryList', {
+      title: 'All Brands',
+      data: allBrands,
+      listType: 'brand',
+      numColumns: 2,
+      showSearch: true,
+      headerText: 'All Brands',
+      searchPlaceholder: 'Search brands...',
+    });
+  };
+
+  const handleSeeMoreRecommended = () => {
+    navigation.getParent()?.navigate('Search', {
+      autoFocus: false,
+      headerText: 'Recommended Products',
+      searchPlaceholder: 'Search recommended products...',
+    });
+  };
+
+  const handleSeeMoreFeatured = () => {
+    navigation.getParent()?.navigate('Search', {
+      autoFocus: false,
+      headerText: 'Featured Products',
+      searchPlaceholder: 'Search featured products...',
+    });
+  };
+
+  const renderCategoryItem = ({ item, index }: { item: any, index: number }) => {
+    // Use image from API if available, otherwise use icon fallback
+    const imageSource = item.image || item.icon || icons.clothes;
+    
+    return (
+      <TouchableOpacity onPress={() => navigation.getParent()?.navigate('Search',{autoFocus:false,headerText:item.name})} style={styles.categoryItem}>
+        <CategoryBg size={80}>
+          {item.image ? (
+            <CachedImage source={imageSource} style={[styles.categoryIcon,{width: index === 4 ? 35 : 60}]} priority="high" cache="immutable" />
+          ) : (
+            <Image source={item.icon || icons.clothes} style={[styles.categoryIcon,{width: index === 4 ? 35 : 60}]} />
+          )}
+        </CategoryBg>
+        <Text style={styles.categoryName}>{item.name}</Text>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderStyleItem = ({ item }: { item: any }) => (
+    <TouchableOpacity onPress={() => navigation.getParent()?.navigate('Search',{autoFocus:false,headerText:item.name})} style={styles.styleItem}>
+      <CachedImage source={item.image} style={styles.styleImage} priority="high" cache="immutable" />
+      <Text style={styles.styleName}>{item.name}</Text>
+    </TouchableOpacity>
+  );
+
+  const renderRecommendedItem = ({ item }: { item: any }) => (
+    <TouchableOpacity
+      style={styles.recommendedItem}
+      onPress={() => navigation.getParent()?.navigate('ProductDetail', { productId: item.id })}
+    >
+      <CachedImage source={item.image} style={styles.recommendedImage} priority="high" cache="immutable" />
+      <View style={styles.recommendedContent}>
+        {item.brand ? <Text style={styles.brandLogo}>{item.brand}</Text> : null}
+        <Text style={styles.recommendedPrice}>{item.price}</Text>
+        <View style={styles.nameAndRatingContainer}>
+          <Text style={styles.recommendedName}>{item.name}</Text>
+          <View style={styles.ratingContainer}>
+            <Image source={icons.star} style={styles.starIcon} />
+            <Text style={styles.ratingText}>{item.rating}</Text>
+          </View>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderBrandItem = ({ item }: { item: any }) => {
+    // Ensure we have a valid image source - handle both URI objects and require() statements
+    const imageSource = item.image || images.khussakraft;
+    
+    return (
+      <TouchableOpacity
+        style={styles.brandItem}
+        onPress={() => navigation.getParent()?.navigate('StoreDetail', { storeId: item.id })}
+      >
+        <View style={styles.brandImageContainer}>
+          <CachedImage 
+            source={imageSource} 
+            style={styles.brandImage}
+            priority="high"
+            cache="immutable"
+            onError={() => {
+              // If image fails to load, it will show nothing - this is handled by the fallback
+              console.log('Brand image failed to load for:', item.name);
+            }}
+          />
+        </View>
+        <View style={styles.brandContent}>
+          <View style={styles.brandRatingContainer}>
+            <Image source={icons.star} style={styles.brandStarIcon} />
+            <Text style={styles.brandRatingText}>{item.rating}</Text>
+          </View>
+          <Text style={styles.brandName}>{item.name}</Text>
+          {item.description ? <Text style={styles.brandDescription}>{item.description}</Text> : null}
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderBottomGridItem = ({ item }: { item: any }) => (
+    <TouchableOpacity
+      style={styles.bottomGridItem}
+      onPress={() => navigation.getParent()?.navigate('ProductDetail', { productId: item.id })}
+    >
+      <View style={styles.bottomImageContainer}>
+        <CachedImage 
+          source={item.image} 
+          style={styles.bottomImage} 
+          priority="low"
+          cache="immutable"
+          resizeMode="cover"
+        />
+        <TouchableOpacity style={styles.cartIconContainer}>
+          <Image source={icons.heart} style={styles.cartIcon} tintColor={'#FFFFFF'} />
+        </TouchableOpacity>
+      </View>
+      <View style={styles.bottomContent}>
+        <View style={styles.bottomRatingContainer}>
+          <Image source={icons.star} style={styles.bottomStarIcon} />
+          <Text style={styles.bottomRatingText}>{item.rating}</Text>
+        </View>
+        {item.brand ? (
+          <View style={styles.bottomBrandContainer}>
+            <View style={styles.brandLogoPlaceholder} />
+            <Text style={styles.bottomBrandName}>{item.brand}</Text>
+            <Image source={icons.verify} style={styles.verifyIcon} />
+          </View>
+        ) : null}
+        <Text style={styles.bottomProductName}>{item.name}</Text>
+        <Text style={styles.bottomPrice}>{item.price}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  return (
+    <SafeView style={styles.container}>
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <TouchableOpacity style={styles.menuButton}>
+            <Image source={icons.menubar} style={styles.menuIcon} />
+          </TouchableOpacity>
+          <Text style={styles.logoText}>LOGO</Text>
+        </View>
+        <View style={styles.headerRight}>
+          <TouchableOpacity 
+            style={styles.headerIconButton}
+            onPress={() => {
+              // Navigate to Cart tab in the Tab Navigator
+              // HomeScreen is in HomeStack, so getParent() gives us the Tab Navigator
+              const tabNavigator = navigation.getParent();
+              if (tabNavigator) {
+                tabNavigator.navigate('CartStack');
+              }
+            }}
+          >
+            <Image source={icons.cart} style={styles.headerIcon} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headerIconButton}
+            onPress={() => navigation.getParent()?.navigate('Notifications')}
+          >
+            <Image source={icons.notification} style={styles.headerIcon} />
+          </TouchableOpacity>
+        </View>
+      </View>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Top Header Section */}
+
+
+        {/* Greeting and Search Section */}
+        <View style={styles.greetingSection}>
+          <Text style={styles.greetingText}>
+            {userName ? `${getGreeting()}, ${userName} 👋` : `${getGreeting()} 👋`}
+          </Text>
+          <SearchFilterBar
+            placeholder="Search brands, items or styles..."
+            isNavigational={true}
+            showFilters={false}
+            showFilterButton={true}
+          />
+        </View>
+
+        {/* Hero Banner Section - Full Width Carousel */}
+        {bannersLoading ? (
+          <View style={styles.heroSection}>
+            <View style={{ width: screenWidth, height: 200, backgroundColor: '#F2F2F7', borderRadius: 12 }} />
+          </View>
+        ) : carouselData.length > 0 ? (
+          <View style={styles.heroSection}>
+            <FlatList
+              ref={flatListRef}
+              data={carouselData}
+              renderItem={renderCarouselItem}
+              keyExtractor={(item) => item.id}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onViewableItemsChanged={onViewableItemsChanged}
+              viewabilityConfig={viewabilityConfig}
+              onScrollBeginDrag={handleScrollBeginDrag}
+              onScrollEndDrag={handleScrollEndDrag}
+              onMomentumScrollEnd={(event) => {
+                const index = Math.round(event.nativeEvent.contentOffset.x / screenWidth);
+                if (index >= 0 && index < carouselData.length) {
+                  setCurrentSlide(index);
+                }
+              }}
+              getItemLayout={(data, index) => ({
+                length: screenWidth,
+                offset: screenWidth * index,
+                index,
+              })}
+              style={styles.carousel}
+              decelerationRate="fast"
+              snapToInterval={screenWidth}
+              snapToAlignment="start"
+              scrollEventThrottle={16}
+              removeClippedSubviews={false}
+            />
+            {carouselData.length > 1 && (
+              <View style={styles.carouselIndicators}>
+                {carouselData.map((_, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={[
+                      styles.indicator,
+                      index === currentSlide && styles.activeIndicator
+                    ]}
+                    onPress={() => {
+                      setIsAutoScrolling(false);
+                      setCurrentSlide(index);
+                      try {
+                        flatListRef.current?.scrollToIndex({ 
+                          index, 
+                          animated: true 
+                        });
+                      } catch (error) {
+                        // Fallback to scrollToOffset if scrollToIndex fails
+                        flatListRef.current?.scrollToOffset({
+                          offset: index * screenWidth,
+                          animated: true,
+                        });
+                      }
+                      // Resume auto-scroll after manual navigation
+                      setTimeout(() => {
+                        setIsAutoScrolling(true);
+                      }, 8000);
+                    }}
+                  />
+                ))}
+              </View>
+            )}
+          </View>
+        ) : (
+          <View style={styles.heroSection}>
+            <View style={{ width: screenWidth, height: 200, backgroundColor: '#F2F2F7', borderRadius: 12, justifyContent: 'center', alignItems: 'center' }}>
+              <Text style={{ color: '#8E8E93', fontSize: 14 }}>No banners available</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Browse by Category Section */}
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Browse by Category</Text>
+            {displayCategories.length > 0 && (
+              <TouchableOpacity onPress={handleSeeMoreCategories}>
+                <Text style={styles.viewMoreText}>See More</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          {categoriesLoading ? (
+            <View style={styles.horizontalList}>
+              <FlatList
+                data={[1, 2, 3, 4, 5]}
+                renderItem={() => <ShimmerCategoryItem />}
+                keyExtractor={(item) => item.toString()}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.categoriesList}
+              />
+            </View>
+          ) : displayCategories.length > 0 ? (
+            <FlatList
+              data={displayCategories}
+              renderItem={renderCategoryItem}
+              keyExtractor={(item) => item.id}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categoriesList}
+              style={styles.horizontalList}
+            />
+          ) : (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>No categories available</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Shop by Style Section */}
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Shop by Style</Text>
+            {displayStyles.length > 0 && (
+              <TouchableOpacity onPress={handleSeeMoreStyles}>
+                <Text style={styles.viewMoreText}>See More</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          {featuredStylesLoading ? (
+            <View style={styles.horizontalList}>
+              <FlatList
+                data={[1, 2, 3]}
+                renderItem={() => <ShimmerProductCard />}
+                keyExtractor={(item) => item.toString()}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.stylesList}
+              />
+            </View>
+          ) : displayStyles.length > 0 ? (
+            <FlatList
+              data={displayStyles}
+              renderItem={renderStyleItem}
+              keyExtractor={(item) => item.id}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.stylesList}
+              style={styles.horizontalList}
+            />
+          ) : (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>No styles available</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Recommended for You Section */}
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Recommended for You</Text>
+            {displayRecommendedProducts.length > 0 && (
+              <TouchableOpacity onPress={handleSeeMoreRecommended}>
+                <Text style={styles.viewMoreText}>See More</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          {recommendedLoading ? (
+            <ShimmerHorizontalList count={2} />
+          ) : displayRecommendedProducts.length > 0 ? (
+            <FlatList
+              data={displayRecommendedProducts}
+              renderItem={renderRecommendedItem}
+              keyExtractor={(item) => item.id}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.recommendedList}
+              style={styles.horizontalList}
+            />
+          ) : (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>No recommended products</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Top Brands Section */}
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Top Brands</Text>
+            {displayTopBrands.length > 0 && (
+              <TouchableOpacity onPress={handleSeeMoreBrands}>
+                <Text style={styles.viewMoreText}>See More</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          {topBrandsLoading ? (
+            <View style={styles.horizontalList}>
+              <FlatList
+                data={[1, 2, 3]}
+                renderItem={() => <ShimmerBrandItem />}
+                keyExtractor={(item) => item.toString()}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.brandsList}
+              />
+            </View>
+          ) : displayTopBrands.length > 0 ? (
+            <FlatList
+              data={displayTopBrands}
+              renderItem={renderBrandItem}
+              keyExtractor={(item) => item.id}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.brandsList}
+              style={styles.horizontalList}
+            />
+          ) : (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>No brands available</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Featured Items Section */}
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Featured Items</Text>
+            {displayFeaturedProducts.length > 0 && (
+              <TouchableOpacity onPress={handleSeeMoreFeatured}>
+                <Text style={styles.viewMoreText}>See More</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          {featuredLoading ? (
+            <ShimmerHorizontalList count={4} />
+          ) : displayFeaturedProducts.length > 0 ? (
+            <FlatList
+              data={displayFeaturedProducts}
+              renderItem={renderRecommendedItem}
+              keyExtractor={(item) => item.id}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.recommendedList}
+              style={styles.horizontalList}
+            />
+          ) : (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>No featured products</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Recently Added Section */}
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Recently Added</Text>
+          </View>
+          {recentlyAddedLoading ? (
+            <ShimmerHorizontalList count={2} />
+          ) : displayRecentlyAddedProducts.length > 0 ? (
+            <FlatList
+              data={displayRecentlyAddedProducts}
+              renderItem={renderRecommendedItem}
+              keyExtractor={(item) => item.id}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.recommendedList}
+              style={styles.horizontalList}
+            />
+          ) : (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>No recently added products</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Bottom Grid Section - No Header */}
+        <View style={styles.bottomGridContainer}>
+          {allProductsLoading ? (
+            <ShimmerGrid columns={2} count={4} />
+          ) : displayBottomGridProducts.length > 0 ? (
+            <FlatList
+              data={displayBottomGridProducts}
+              renderItem={renderBottomGridItem}
+              keyExtractor={(item) => item.id}
+              numColumns={2}
+              showsVerticalScrollIndicator={false}
+              scrollEnabled={false}
+              columnWrapperStyle={{ justifyContent: 'space-between' }}
+              contentContainerStyle={styles.bottomGridList}
+              removeClippedSubviews={true}
+              maxToRenderPerBatch={10}
+              updateCellsBatchingPeriod={50}
+              initialNumToRender={6}
+              windowSize={5}
+            />
+          ) : (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>No products available</Text>
+            </View>
+          )}
+        </View>
+      </ScrollView>
+    </SafeView>
+  );
+};
+
+export default HomeScreen;
