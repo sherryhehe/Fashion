@@ -9,6 +9,7 @@ import {
   FlatList,
   ActivityIndicator,
   Alert,
+  RefreshControl,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RouteProp, CommonActions } from '@react-navigation/native';
@@ -21,9 +22,9 @@ import styles from './styles';
 // API Hooks
 import { useProduct, useRecommendedProducts } from '../../hooks/useProducts';
 import { useBrandByName, useBrand } from '../../hooks/useBrands';
-import { useAddReview, useProductReviews } from '../../hooks/useReviews';
+import { useAddReview, useProductReviews, useUpdateReview, useDeleteReview } from '../../hooks/useReviews';
 import { useAddToCart } from '../../hooks/useCart';
-import { useAddToWishlist, useRemoveFromWishlist, useIsInWishlist } from '../../hooks/useWishlist';
+import { useAddToWishlist, useRemoveFromWishlist, useIsInWishlist, useWishlist } from '../../hooks/useWishlist';
 import { getFirstImageSource, getImageSource } from '../../utils/imageHelper';
 import { useQueryClient } from '@tanstack/react-query';
 import authService from '../../services/auth.service';
@@ -51,26 +52,55 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
   const [quantity, setQuantity] = useState(1);
   const [isFavorite, setIsFavorite] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
+  // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
   // Fetch product data from API
-  const { data: productData, isLoading, error } = useProduct(productId || '');
-  const { data: recommendedData } = useRecommendedProducts(4);
+  const { data: productData, isLoading, error, refetch: refetchProduct } = useProduct(productId || '');
+  const { data: recommendedData, refetch: refetchRecommended } = useRecommendedProducts(4);
   
+  // Get product early for brand lookup (but hooks still called unconditionally)
   const product = productData?.data;
-
-  // Fetch brand data if product has a brand - first by name to get the ID
-  const { data: brandAPIData } = useBrandByName(product?.brand || '');
-  const brandFromNameLookup = brandAPIData?.data?.[0]; // Get first matching brand by name
+  const productBrandName = product?.brand || '';
   
-  // Once we have the brand ID, fetch the exact brand by ID for consistency
-  const brandId = brandFromNameLookup?._id;
-  const { data: exactBrandData } = useBrand(brandId || '');
-  const brandFromAPI = exactBrandData?.data || brandFromNameLookup; // Use exact brand by ID, fallback to name lookup
+  // Fetch brand data - hooks called unconditionally with empty string if no brand
+  const { data: brandAPIData, refetch: refetchBrandByName } = useBrandByName(productBrandName);
+  const brandFromNameLookup = brandAPIData?.data?.[0];
+  const brandId = brandFromNameLookup?._id || '';
+  const { data: exactBrandData, refetch: refetchBrand } = useBrand(brandId);
+  const brandFromAPI = exactBrandData?.data || brandFromNameLookup;
 
   // Review hooks
   const addReviewMutation = useAddReview();
-  const { data: reviewsData, isLoading: reviewsLoading } = useProductReviews(productId || '');
+  const updateReviewMutation = useUpdateReview();
+  const deleteReviewMutation = useDeleteReview();
+  const { data: reviewsData, isLoading: reviewsLoading, refetch: refetchReviews } = useProductReviews(productId || '');
   const reviews = reviewsData?.data || [];
+  
+  // Get current user info for review ownership
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  useEffect(() => {
+    const getUserInfo = async () => {
+      try {
+        const user = await authService.getStoredUser();
+        setCurrentUserId(user?.id || null);
+      } catch (error) {
+        console.log('Error getting user info:', error);
+      }
+    };
+    getUserInfo();
+  }, []);
+
+  // Cart and wishlist mutations
+  const addToCartMutation = useAddToCart();
+  const addToWishlistMutation = useAddToWishlist();
+  const removeFromWishlistMutation = useRemoveFromWishlist();
+
+  // Check if product is in wishlist
+  const { data: isInWishlist, refetch: refetchWishlist } = useIsInWishlist(productId || '');
+  
+  // Get wishlist data for refreshing
+  const { refetch: refetchWishlistData } = useWishlist();
 
   // Debug: Log reviews data to verify what's being fetched
   useEffect(() => {
@@ -85,13 +115,55 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
     }
   }, [productId, reviews.length, product?.reviewCount, reviewsData]);
 
-  // Cart and wishlist mutations
-  const addToCartMutation = useAddToCart();
-  const addToWishlistMutation = useAddToWishlist();
-  const removeFromWishlistMutation = useRemoveFromWishlist();
+  // Check wishlist for saved color/size and auto-select - MUST be before conditional returns
+  useEffect(() => {
+    if (productId && isInWishlist) {
+      // Get wishlist data to check for saved color/size
+      const wishlistData = queryClient.getQueryData(['wishlist']) as any;
+      const wishlistItem = wishlistData?.data?.find(
+        (w: any) => w.productId === productId || w.product?._id === productId
+      );
+      
+      if (wishlistItem) {
+        // Auto-select saved color and size (only if not already set)
+        if (wishlistItem.color && selectedColor === '') {
+          setSelectedColor(wishlistItem.color);
+        }
+        if (wishlistItem.size && selectedSize === '') {
+          setSelectedSize(wishlistItem.size);
+        }
+      }
+    }
+  }, [productId, isInWishlist, queryClient]);
 
-  // Check if product is in wishlist
-  const { data: isInWishlist, refetch: refetchWishlist } = useIsInWishlist(productId || '');
+  // Pull to refresh handler - MUST be before conditional returns (useCallback is a hook)
+  const onRefresh = React.useCallback(async () => {
+    if (!productId) return;
+    
+    setRefreshing(true);
+    try {
+      // Invalidate and refetch all queries related to this product
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['product', productId] }),
+        queryClient.invalidateQueries({ queryKey: ['reviews', 'product', productId] }),
+        queryClient.invalidateQueries({ queryKey: ['brand'] }),
+        queryClient.invalidateQueries({ queryKey: ['wishlist'] }),
+        // Refetch all data
+        refetchProduct(),
+        refetchReviews(),
+        refetchRecommended(),
+        refetchWishlist(),
+        refetchWishlistData(),
+        // Refetch brand data if brand exists
+        productBrandName && refetchBrandByName(),
+        brandId && refetchBrand(),
+      ]);
+    } catch (error) {
+      console.log('Refresh error:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [productId, queryClient, refetchProduct, refetchReviews, refetchRecommended, refetchWishlist, refetchWishlistData, refetchBrandByName, refetchBrand, productBrandName, brandId]);
 
   // Show loading screen while fetching product
   if (isLoading) {
@@ -230,16 +302,23 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
     if (!productId) return;
 
     try {
+      // Get user info if authenticated
+      const user = await authService.getStoredUser();
+      const userName = user?.name || reviewData.name;
+
       await addReviewMutation.mutateAsync({
         productId: productId!,
         rating: reviewData.rating,
         comment: reviewData.comment,
-        name: reviewData.name,
+        name: userName, // Use authenticated user's name if available
       });
       setShowReviewModal(false);
       // Refetch reviews and product after adding review
       queryClient.invalidateQueries({ queryKey: ['reviews', 'product', productId] });
       queryClient.invalidateQueries({ queryKey: ['product', productId] });
+      // Refresh user info to update currentUserId
+      const updatedUser = await authService.getStoredUser();
+      setCurrentUserId(updatedUser?.id || null);
     } catch (error) {
       console.log('Review submission error:', error);
     }
@@ -376,11 +455,7 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
     // Check if user is guest and prompt login
     const isAuthenticated = await requireAuthOrPromptLogin(
       'add items to wishlist',
-      async () => {
-        // Clear guest mode and logout to force navigation to login
-        await authService.logout();
-        // Navigation will be handled by MainNavigator when isAuthenticated becomes false
-      }
+      navigation
     );
 
     if (!isAuthenticated) {
@@ -395,8 +470,12 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
         await removeFromWishlistMutation.mutateAsync(productId);
         setIsFavorite(false);
       } else {
-        // Add to wishlist
-        await addToWishlistMutation.mutateAsync(productId);
+        // Add to wishlist with current selected color and size
+        await addToWishlistMutation.mutateAsync({
+          productId,
+          color: selectedColor || undefined,
+          size: selectedSize || undefined,
+        });
         setIsFavorite(true);
       }
       
@@ -508,6 +587,14 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
         // Prevent gesture conflicts on Android
         nestedScrollEnabled={true}
         overScrollMode="never"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#007AFF']}
+            tintColor="#007AFF"
+          />
+        }
       >
         {/* Product Image Section */}
         <View style={styles.imageSection}>
@@ -745,52 +832,108 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
               <Text style={{ fontSize: 14, color: '#8E8E93', marginTop: 10 }}>Loading reviews...</Text>
             </View>
           ) : reviews && reviews.length > 0 ? (
-            reviews.map((review: any, index: number) => (
-              <View key={review._id || review.id || index} style={styles.reviewItem}>
-                <View style={styles.reviewHeader}>
-                  <View style={styles.reviewerInfo}>
-                    <Avatar
-                      name={review.name || 'Anonymous'}
-                      avatar={review.avatar}
-                      size={40}
-                      style={styles.reviewerAvatar}
-                    />
-                    <View style={styles.reviewerDetails}>
-                      <Text style={styles.reviewerName}>{review.name || 'Anonymous'}</Text>
-                      <View style={styles.reviewRating}>
-                        <View style={styles.starsContainer}>
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <Image
-                              key={star}
-                              source={icons.star}
-                              style={[
-                                styles.starIcon,
-                                star <= review.rating && styles.filledStar
-                              ]}
-                            />
-                          ))}
+            reviews.map((review: any, index: number) => {
+              const isOwnReview = currentUserId && review.userId === currentUserId;
+              const isAdminReview = review.isAdmin;
+              
+              return (
+                <View key={review._id || review.id || index} style={styles.reviewItem}>
+                  <View style={styles.reviewHeader}>
+                    <View style={styles.reviewerInfo}>
+                      <Avatar
+                        name={review.name || 'Anonymous'}
+                        avatar={review.avatar}
+                        size={40}
+                        style={styles.reviewerAvatar}
+                      />
+                      <View style={styles.reviewerDetails}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <Text style={styles.reviewerName}>{review.name || 'Anonymous'}</Text>
+                          {isAdminReview && (
+                            <View style={{ marginLeft: 6, flexDirection: 'row', alignItems: 'center' }}>
+                              <Image source={icons.verify} style={{ width: 12, height: 12, marginRight: 4 }} />
+                              <Text style={{ fontSize: 10, color: '#007AFF', fontWeight: '600' }}>Admin</Text>
+                            </View>
+                          )}
                         </View>
-                        <Text style={styles.reviewRatingText}>{review.rating?.toFixed(1) || '0.0'}</Text>
+                        <View style={styles.reviewRating}>
+                          <View style={styles.starsContainer}>
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Image
+                                key={star}
+                                source={icons.star}
+                                style={[
+                                  styles.starIcon,
+                                  star <= review.rating && styles.filledStar
+                                ]}
+                              />
+                            ))}
+                          </View>
+                          <Text style={styles.reviewRatingText}>{review.rating?.toFixed(1) || '0.0'}</Text>
+                        </View>
                       </View>
                     </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={styles.reviewTime}>
+                        {review.date ? new Date(review.date).toLocaleDateString() : 
+                         review.createdAt ? new Date(review.createdAt).toLocaleDateString() : 
+                         'Recently'}
+                      </Text>
+                      {isOwnReview && (
+                        <View style={{ flexDirection: 'row', marginTop: 4, gap: 8 }}>
+                          <TouchableOpacity
+                            onPress={() => {
+                              Alert.alert(
+                                'Edit Review',
+                                'Edit review functionality coming soon',
+                                [{ text: 'OK' }]
+                              );
+                            }}
+                          >
+                            <Text style={{ fontSize: 12, color: '#007AFF' }}>Edit</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            onPress={() => {
+                              Alert.alert(
+                                'Delete Review',
+                                'Are you sure you want to delete this review?',
+                                [
+                                  { text: 'Cancel', style: 'cancel' },
+                                  {
+                                    text: 'Delete',
+                                    style: 'destructive',
+                                    onPress: async () => {
+                                      try {
+                                        await deleteReviewMutation.mutateAsync(review._id || review.id);
+                                        queryClient.invalidateQueries({ queryKey: ['reviews', 'product', productId] });
+                                        queryClient.invalidateQueries({ queryKey: ['product', productId] });
+                                      } catch (error) {
+                                        console.log('Delete review error:', error);
+                                      }
+                                    },
+                                  },
+                                ]
+                              );
+                            }}
+                          >
+                            <Text style={{ fontSize: 12, color: '#FF3B30' }}>Delete</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                    </View>
                   </View>
-                  <Text style={styles.reviewTime}>
-                    {review.date ? new Date(review.date).toLocaleDateString() : 
-                     review.createdAt ? new Date(review.createdAt).toLocaleDateString() : 
-                     'Recently'}
+                  <Text style={styles.reviewText}>
+                    {review.comment || 'No comment provided'}
                   </Text>
+                  {review.verified && !isAdminReview && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+                      <Image source={icons.verify} style={{ width: 14, height: 14, marginRight: 4 }} />
+                      <Text style={{ fontSize: 12, color: '#34C759' }}>Verified Purchase</Text>
+                    </View>
+                  )}
                 </View>
-                <Text style={styles.reviewText}>
-                  {review.comment || 'No comment provided'}
-                </Text>
-                {review.verified && (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
-                    <Image source={icons.verify} style={{ width: 14, height: 14, marginRight: 4 }} />
-                    <Text style={{ fontSize: 12, color: '#34C759' }}>Verified Purchase</Text>
-                  </View>
-                )}
-              </View>
-            ))
+              );
+            })
           ) : (
             <View style={{ padding: 20, alignItems: 'center' }}>
               <Text style={{ fontSize: 14, color: '#8E8E93', textAlign: 'center' }}>

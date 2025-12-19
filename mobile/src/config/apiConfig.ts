@@ -5,7 +5,7 @@
 
 // Change this to your local machine's IP address for development
 // Find your IP with: ifconfig | grep "inet " | grep -v 127.0.0.1
-const LOCAL_IP = '192.168.100.233';
+const LOCAL_IP = '192.168.1.17';
 
 // FORCE PRODUCTION API - Set to true to always use production API
 // Set to false to use local backend for testing
@@ -16,7 +16,8 @@ const getBaseURL = (): string => {
   if (__DEV__ && !FORCE_PRODUCTION_API) {
     return `http://${LOCAL_IP}:8000`;
   }
-  return 'https://api.buyshopo.com';
+  return 'http://192.168.1.17:8000';
+  // return 'https://api.buyshopo.com';
 };
 
 // API endpoint path

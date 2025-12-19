@@ -12,13 +12,16 @@ export const DELIVERY_CONFIG = {
   DEFAULT_DELIVERY_FEE: 100,
   
   // Default shipping cost (in PKR)
-  DEFAULT_SHIPPING_COST: 200,
+  DEFAULT_SHIPPING_COST: 0,
+  // DEFAULT_SHIPPING_COST: 200,
   
   // Tax rate (as decimal, e.g., 0.05 = 5%)
-  DEFAULT_TAX_RATE: 0.05, // 5%
+  DEFAULT_TAX_RATE: 0, // 5%
+  // DEFAULT_TAX_RATE: 0.05, // 5%
   
   // Free delivery threshold (in PKR) - delivery is free above this amount
-  FREE_DELIVERY_THRESHOLD: 5000,
+  FREE_DELIVERY_THRESHOLD: 10,
+  // FREE_DELIVERY_THRESHOLD: 5000,
 };
 
 /**

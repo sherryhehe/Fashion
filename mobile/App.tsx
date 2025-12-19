@@ -16,6 +16,24 @@ import { queryClient } from './src/lib/queryClient';
 import Toast from 'react-native-toast-message';
 import authService from './src/services/auth.service';
 
+// Global function to handle logout and show auth screen
+// This will be set by App component
+let globalSetIsAuthenticated: ((value: boolean) => void) | null = null;
+
+export const setGlobalAuthHandler = (handler: (value: boolean) => void) => {
+  globalSetIsAuthenticated = handler;
+};
+
+export const navigateToAuth = async () => {
+  // Clear guest mode and logout
+  await authService.logout();
+  
+  // Trigger App to show Auth screen by setting isAuthenticated to false
+  if (globalSetIsAuthenticated) {
+    globalSetIsAuthenticated(false);
+  }
+};
+
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
   // Authentication state management
@@ -56,6 +74,14 @@ function App() {
     console.log('App: Current isAuthenticated state:', isAuthenticated);
     setIsAuthenticated(authenticated);
   };
+
+  // Set up global auth handler so guestHelper can trigger auth screen
+  useEffect(() => {
+    setGlobalAuthHandler(handleSetAuthenticated);
+    return () => {
+      setGlobalAuthHandler(() => {});
+    };
+  }, []);
 
   const handleLogout = async () => {
     console.log('App: Logging out user');

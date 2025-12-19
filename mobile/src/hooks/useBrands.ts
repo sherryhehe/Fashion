@@ -7,7 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import brandService from '../services/brand.service';
 
 /**
- * Hook to get all brands (requires authentication)
+ * Hook to get all brands (public endpoint - accessible to guests)
  */
 export const useBrands = () => {
   return useQuery({
@@ -18,7 +18,7 @@ export const useBrands = () => {
 };
 
 /**
- * Hook to get a single brand by ID (requires authentication)
+ * Hook to get a single brand by ID (public endpoint - accessible to guests)
  */
 export const useBrand = (id: string) => {
   return useQuery({

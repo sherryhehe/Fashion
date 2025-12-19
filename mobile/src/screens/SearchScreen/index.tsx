@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,8 +9,8 @@ import {
 } from 'react-native';
 import { SafeView, SearchFilterBar, LoadingScreen, CachedImage } from '../../components';
 import { icons } from '../../assets/icons';
-import images from '../../assets/images';
 import { styles } from './styles';
+import images from '../../assets/images';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../navigation/MainNavigator';
 import { RouteProp } from '@react-navigation/native';
@@ -18,7 +18,9 @@ import { RouteProp } from '@react-navigation/native';
 // API Hooks
 import { useProducts } from '../../hooks/useProducts';
 import { useCategories } from '../../hooks/useCategories';
-import { getFirstImageSource } from '../../utils/imageHelper';
+import { useStyles } from '../../hooks/useStyles';
+import { useBrands } from '../../hooks/useBrands';
+import { getFirstImageSource, getImageSource } from '../../utils/imageHelper';
 import { useDebounce } from '../../hooks/useDebounce';
 
 interface Product {
@@ -30,6 +32,8 @@ interface Product {
   image: any;
   category: string;
   brand?: string;
+  brandLogo?: any;
+  brandVerified?: boolean;
 }
 
 interface SearchScreenProps {
@@ -78,6 +82,51 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ navigation, route }) => {
   // Fetch categories for filter
   const { data: categoriesData } = useCategories();
   const categories = ['All', ...((categoriesData as any)?.data?.map((cat: any) => cat.name) || [])];
+  
+  // Fetch styles for filter (when filtering by style)
+  const { data: stylesData } = useStyles();
+  const styleOptions = ['All', ...((stylesData as any)?.data?.map((style: any) => style.name) || [])];
+  
+  // Fetch all brands to get brand logos
+  const { data: allBrandsData } = useBrands();
+  const allBrandsArray = allBrandsData?.data || [];
+  
+  // Create a map of brand name -> brand object for quick lookup
+  const brandMap = React.useMemo(() => {
+    const map = new Map();
+    if (Array.isArray(allBrandsArray)) {
+      allBrandsArray.forEach((brand: any) => {
+        if (brand.name) {
+          map.set(brand.name, brand);
+        }
+      });
+    }
+    return map;
+  }, [allBrandsArray]);
+  
+  // Determine if we should show style tabs or category tabs
+  const showStyleTabs = !!initialStyle;
+  const filterTabs = showStyleTabs ? styleOptions : categories;
+  const selectedFilter = showStyleTabs ? selectedStyle : selectedCategory;
+  
+  // Ref for filter tabs ScrollView to auto-scroll to selected filter
+  const filterTabsScrollRef = useRef<ScrollView>(null);
+  
+  // Auto-scroll to selected filter when initialCategory or initialStyle is provided and filters are loaded
+  useEffect(() => {
+    if ((initialCategory || initialStyle) && filterTabs.length > 0 && filterTabsScrollRef.current) {
+      const filterIndex = filterTabs.findIndex(filter => filter === (initialCategory || initialStyle));
+      if (filterIndex > 0) {
+        // Small delay to ensure ScrollView is rendered
+        setTimeout(() => {
+          filterTabsScrollRef.current?.scrollTo({
+            x: (filterIndex - 1) * 100, // Approximate width per tab (adjust as needed)
+            animated: true,
+          });
+        }, 100);
+      }
+    }
+  }, [initialCategory, initialStyle, filterTabs.length]);
 
   // Build filter object for API - memoize to prevent unnecessary recalculations
   const apiFilters = useMemo(() => {
@@ -91,12 +140,19 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ navigation, route }) => {
       filters.search = debouncedSearchQuery;
     }
     
-    if (selectedCategory !== 'All') {
+    // Apply category filter if not showing style tabs
+    if (!showStyleTabs && selectedCategory !== 'All') {
       filters.category = selectedCategory;
     }
     
-    // Apply style filter if provided
-    if (selectedStyle) {
+    // Apply style filter if showing style tabs
+    if (showStyleTabs) {
+      // Only apply style filter if a specific style is selected (not "All" or empty)
+      if (selectedStyle && selectedStyle !== 'All' && selectedStyle !== '') {
+        filters.style = selectedStyle;
+      }
+    } else if (selectedStyle && selectedStyle !== 'All' && selectedStyle !== '') {
+      // If not showing style tabs but style is selected (from other filters), still apply it
       filters.style = selectedStyle;
     }
     
@@ -127,7 +183,7 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ navigation, route }) => {
     }
     
     return filters;
-  }, [selectedCategory, selectedStyle, appliedFilters, shouldSearch, debouncedSearchQuery]);
+  }, [selectedCategory, selectedStyle, appliedFilters, shouldSearch, debouncedSearchQuery, showStyleTabs]);
 
   // Fetch products (with or without search based on query length)
   const { data: productsData, isLoading } = useProducts(apiFilters);
@@ -153,6 +209,11 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ navigation, route }) => {
         discount = Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100);
       }
       
+      // Get brand info from brandMap
+      const brandName = product.brand || '';
+      const brandInfo = brandName ? brandMap.get(brandName) : null;
+      const brandLogo = brandInfo?.logo ? getImageSource(brandInfo.logo, images.shopLogo) : null;
+      
       return {
         id: product._id,
         name: product.name,
@@ -162,7 +223,9 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ navigation, route }) => {
         rating: `${product.rating.toFixed(1)} (${product.reviewCount})`,
         image: getFirstImageSource(product.images, images.image1),
         category: product.category,
-        brand: product.brand || '',
+        brand: brandName,
+        brandLogo: brandLogo, // Include brand logo if available
+        brandVerified: brandInfo?.verified || false, // Include verified status
         discount: discount,
       };
     });
@@ -219,9 +282,19 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ navigation, route }) => {
         </View>
         {item.brand ? (
           <View style={styles.brandContainer}>
-            <View style={styles.brandLogoPlaceholder} />
+            {item.brandLogo ? (
+              <Image 
+                source={item.brandLogo} 
+                style={styles.brandLogo} 
+                resizeMode="contain"
+              />
+            ) : (
+              <View style={styles.brandLogoPlaceholder} />
+            )}
             <Text style={styles.brandName}>{item.brand}</Text>
-            <Image source={icons.verify} style={styles.verifyIcon} />
+            {item.brandVerified && (
+              <Image source={icons.verify} style={styles.verifyIcon} />
+            )}
           </View>
         ) : null}
         <Text style={styles.productName}>{item.name}</Text>
@@ -251,6 +324,41 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ navigation, route }) => {
       </Text>
     </TouchableOpacity>
   );
+
+  const renderStyleTab = (style: string) => {
+    // When showing style tabs, check if this style is selected
+    // If "All" is selected, selectedStyle should be empty
+    const isSelected = showStyleTabs && (
+      (style === 'All' && !selectedStyle) || 
+      (style !== 'All' && selectedStyle === style)
+    );
+    return (
+      <TouchableOpacity
+        key={style}
+        style={[
+          styles.categoryTab,
+          isSelected && styles.selectedCategoryTab
+        ]}
+        onPress={() => {
+          // If "All" is selected, clear the style filter
+          if (style === 'All') {
+            setSelectedStyle('');
+          } else {
+            setSelectedStyle(style);
+          }
+          // Scroll to top when style changes
+          // The API will automatically refetch due to apiFilters dependency change
+        }}
+      >
+        <Text style={[
+          styles.categoryTabText,
+          isSelected && styles.selectedCategoryTabText
+        ]}>
+          {style}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
 
   const renderEmptyState = () => {
     const trimmedQuery = searchQuery.trim();
@@ -333,14 +441,18 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ navigation, route }) => {
           </View>
         )}
 
-        {/* Category Tabs */}
+        {/* Filter Tabs (Categories or Styles) */}
         <View style={styles.categoryContainer}>
           <ScrollView
+            ref={filterTabsScrollRef}
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.categoryTabs}
           >
-            {categories.map(renderCategoryTab)}
+            {showStyleTabs 
+              ? filterTabs.map(renderStyleTab)
+              : filterTabs.map(renderCategoryTab)
+            }
           </ScrollView>
         </View>
 

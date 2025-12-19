@@ -4,7 +4,10 @@ export interface WishlistItem {
   id: string;
   userId: string;
   productId: string;
+  color?: string | null;
+  size?: string | null;
   addedAt: string;
+  product?: any; // Product details populated from backend
 }
 
 export interface WishlistResponse {
@@ -24,8 +27,8 @@ const wishlistService = {
   /**
    * Add product to wishlist
    */
-  addToWishlist: async (productId: string): Promise<WishlistResponse> => {
-    return apiClient.post('/wishlist', { productId });
+  addToWishlist: async (productId: string, color?: string, size?: string): Promise<WishlistResponse> => {
+    return apiClient.post('/wishlist', { productId, color, size });
   },
 
   /**

@@ -18,7 +18,8 @@ import { useCart } from '../../hooks/useCart';
 import { useCreateOrder } from '../../hooks/useOrders';
 import authService from '../../services/auth.service';
 import { showToast } from '../../utils/toast';
-import { getShippingCost, getTaxAmount } from '../../config/appConfig';
+// Static platform fee - matches cart screen (100 PKR)
+const PLATFORM_FEE = 100;
 import { requireAuthOrPromptLogin } from '../../utils/guestHelper';
 
 type CheckoutScreenNavigationProp = StackNavigationProp<CartStackParamList, 'Checkout'>;
@@ -69,11 +70,7 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
     // Check if user is guest and prompt login
     const isAuthenticated = await requireAuthOrPromptLogin(
       'complete checkout',
-      async () => {
-        // Clear guest mode and logout to force navigation to login
-        await authService.logout();
-        // Navigation will be handled by MainNavigator when isAuthenticated becomes false
-      }
+      navigation
     );
 
     if (!isAuthenticated) {
@@ -117,21 +114,45 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
     }
 
     // Prepare order items from cart
-    const orderItems = cartItems.map((item: any) => ({
-      productId: item.productId,
-      productName: item.productName || 'Unknown Product',
-      quantity: item.quantity,
-      price: item.price || 0,
-      total: (item.price || 0) * item.quantity,
-      size: item.size,
-      color: item.color,
-    }));
+    // Use productPrice from cart items (same as cart screen uses)
+    const orderItems = cartItems
+      .filter((item: any) => {
+        // Only include items with valid product and price (same filter as cart screen)
+        const product = item.product || null;
+        const productPrice = product && 
+                            product.price && 
+                            typeof product.price === 'number' && 
+                            product.price > 0 
+          ? product.price 
+          : 0;
+        return productPrice > 0 && item.quantity > 0;
+      })
+      .map((item: any) => {
+        // Get price - prefer productPrice if set (from CartScreen mapping), otherwise use product.price
+        const product = item.product || null;
+        const productPrice = item.productPrice || // Use productPrice if available (from CartScreen)
+                            (product && 
+                             product.price && 
+                             typeof product.price === 'number' && 
+                             product.price > 0 
+                              ? product.price 
+                              : 0);
+        
+        return {
+          productId: item.productId,
+          productName: item.productName || product?.name || 'Unknown Product',
+          quantity: item.quantity,
+          price: productPrice, // Use productPrice (what user saw in cart)
+          total: productPrice * item.quantity,
+          size: item.size,
+          color: item.color,
+        };
+      });
 
-    // Calculate totals
+    // Calculate totals - match cart screen calculation exactly
     const subtotal = orderItems.reduce((sum: number, item: any) => sum + item.total, 0);
-    const tax = getTaxAmount(subtotal);
-    const shippingCost = getShippingCost();
-    const total = subtotal + tax + shippingCost;
+    // Use platform fee (100 PKR) instead of tax + shipping
+    const total = subtotal + PLATFORM_FEE;
 
     // Prepare shipping address
     const shippingAddress = {
