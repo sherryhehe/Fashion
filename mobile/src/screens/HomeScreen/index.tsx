@@ -8,6 +8,7 @@ import {
   TextInput,
   Dimensions,
   FlatList,
+  RefreshControl,
 } from 'react-native';
 import { CachedImage } from '../../components';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -20,12 +21,15 @@ import useStyles from './styles';
 // API Hooks
 import { useCategories } from '../../hooks/useCategories';
 import { useProducts, useFeaturedProducts, useRecommendedProducts, useRecentlyAddedProducts, useTopSellingProducts } from '../../hooks/useProducts';
-import { useTopBrands, useFeaturedBrands } from '../../hooks/useBrands';
+import { useTopBrands, useFeaturedBrands, useBrands } from '../../hooks/useBrands';
+import { useAddToWishlist, useRemoveFromWishlist, useIsInWishlist, useWishlist } from '../../hooks/useWishlist';
+import { requireAuthOrPromptLogin } from '../../utils/guestHelper';
 import { useFeaturedStyles, usePopularStyles } from '../../hooks/useStyles';
 import { useBanners } from '../../hooks/useBanners';
 import { getFirstImageSource, getImageSource, preloadImages, getImageUrl } from '../../utils/imageHelper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CommonActions } from '@react-navigation/native';
+import { useQueryClient } from '@tanstack/react-query';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -37,11 +41,13 @@ interface HomeScreenProps {
 
 const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const styles = useStyles()
+  const queryClient = useQueryClient();
   const [currentSlide, setCurrentSlide] = useState(0);
   const flatListRef = useRef<FlatList>(null);
   const autoScrollTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
   const [isAutoScrolling, setIsAutoScrolling] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Get user name from AsyncStorage
   useEffect(() => {
@@ -68,14 +74,20 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   };
 
   // API Hooks - MUST be called before using the data
-  const { data: categoriesData, isLoading: categoriesLoading, error: categoriesError } = useCategories();
-  const { data: featuredProductsData, isLoading: featuredLoading } = useFeaturedProducts(4);
-  const { data: recommendedProductsData, isLoading: recommendedLoading } = useRecommendedProducts(2);
-  const { data: recentlyAddedData, isLoading: recentlyAddedLoading } = useRecentlyAddedProducts(2);
-  const { data: topBrandsData, isLoading: topBrandsLoading } = useTopBrands();
-  const { data: featuredStylesData, isLoading: featuredStylesLoading } = useFeaturedStyles();
-  const { data: allProductsData, isLoading: allProductsLoading } = useProducts({ limit: 50, status: 'active' });
-  const { data: bannersData, isLoading: bannersLoading } = useBanners('homepage', 'active');
+  const { data: categoriesData, isLoading: categoriesLoading, error: categoriesError, refetch: refetchCategories } = useCategories();
+  const { data: featuredProductsData, isLoading: featuredLoading, refetch: refetchFeatured } = useFeaturedProducts(4);
+  const { data: recommendedProductsData, isLoading: recommendedLoading, refetch: refetchRecommended } = useRecommendedProducts(2);
+  const { data: recentlyAddedData, isLoading: recentlyAddedLoading, refetch: refetchRecentlyAdded } = useRecentlyAddedProducts(2);
+  const { data: topBrandsData, isLoading: topBrandsLoading, refetch: refetchTopBrands } = useTopBrands();
+  const { data: featuredStylesData, isLoading: featuredStylesLoading, refetch: refetchStyles } = useFeaturedStyles();
+  const { data: allProductsData, isLoading: allProductsLoading, refetch: refetchAllProducts } = useProducts({ limit: 50, status: 'active' });
+  const { data: bannersData, isLoading: bannersLoading, refetch: refetchBanners } = useBanners('homepage', 'active');
+  const { data: allBrandsData, refetch: refetchAllBrands } = useBrands(); // Fetch all brands to get logos
+  
+  // Wishlist mutations and data
+  const addToWishlistMutation = useAddToWishlist();
+  const removeFromWishlistMutation = useRemoveFromWishlist();
+  const { data: wishlistData } = useWishlist(); // Subscribe to wishlist changes for immediate UI updates
 
   // Map API data arrays - now safe to use after API hooks
   const bannersArray = bannersData?.data || [];
@@ -84,6 +96,20 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const recommendedArray = recommendedProductsData?.data || [];
   const topBrandsArray = topBrandsData?.data || [];
   const allProductsArray = allProductsData?.data || [];
+  const allBrandsArray = allBrandsData?.data || [];
+
+  // Create a map of brand name -> brand object for quick lookup
+  const brandMap = React.useMemo(() => {
+    const map = new Map();
+    if (Array.isArray(allBrandsArray)) {
+      allBrandsArray.forEach((brand: any) => {
+        if (brand.name) {
+          map.set(brand.name, brand);
+        }
+      });
+    }
+    return map;
+  }, [allBrandsArray]);
 
   // Debug: Log banners array to verify all banners are fetched
   useEffect(() => {
@@ -326,8 +352,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   };
 
   // Map API categories to display format - use actual images from API
+  // Show ALL categories (no limit)
   const displayCategories = Array.isArray(categoriesArray) && categoriesArray.length > 0
-    ? categoriesArray.slice(0, 5).map(category => ({
+    ? categoriesArray.map(category => ({
         id: category._id,
         name: category.name,
         // Use actual image from API, fallback to icon if no image
@@ -346,8 +373,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     : [];
 
   // Map API styles to display format - use actual images from API
+  // Show ALL styles (no limit)
   const displayStyles = Array.isArray(stylesArray) && stylesArray.length > 0
-    ? stylesArray.slice(0, 3).map(style => ({
+    ? stylesArray.map(style => ({
         id: style._id,
         name: style.name,
         // Use actual image from API, fallback to local image only if no image from API
@@ -381,8 +409,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     : [];
 
   // Check if top brands data exists and is an array
+  // Show ALL brands (no limit)
   const displayTopBrands = Array.isArray(topBrandsArray) && topBrandsArray.length > 0
-    ? topBrandsArray.slice(0, 3).map(brand => {
+    ? topBrandsArray.map(brand => {
         // Ensure we have a valid logo - check for null, undefined, or empty string
         const brandLogo = brand.logo && brand.logo.trim() ? brand.logo : null;
         const brandImage = getImageSource(brandLogo, images.khussakraft);
@@ -429,14 +458,22 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   // Check if bottom grid products data exists and is an array
   const displayBottomGridProducts = Array.isArray(allProductsArray) && allProductsArray.length > 0
-    ? allProductsArray.map(product => ({
-        id: product._id,
-        name: product.name,
-        brand: product.brand || '', // Include brand field (empty if no brand)
-        price: formatPrice(product.price),
-        rating: formatRating(product.rating, product.reviewCount),
-        image: getFirstImageSource(product.images, images.bottomList.image1),
-      }))
+    ? allProductsArray.map(product => {
+        const brandName = product.brand || '';
+        const brandInfo = brandName ? brandMap.get(brandName) : null;
+        const brandLogo = brandInfo?.logo ? getImageSource(brandInfo.logo, images.shopLogo) : null;
+        
+        return {
+          id: product._id,
+          name: product.name,
+          brand: brandName,
+          brandLogo: brandLogo, // Include brand logo if available
+          brandVerified: brandInfo?.verified || false, // Include verified status
+          price: formatPrice(product.price),
+          rating: formatRating(product.rating, product.reviewCount),
+          image: getFirstImageSource(product.images, images.bottomList.image1),
+        };
+      })
     : [];
 
   // Navigation handlers for "See More" buttons
@@ -526,7 +563,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     const imageSource = item.image || item.icon || icons.clothes;
     
     return (
-      <TouchableOpacity onPress={() => navigation.getParent()?.navigate('Search',{autoFocus:false,headerText:item.name})} style={styles.categoryItem}>
+      <TouchableOpacity onPress={() => navigation.getParent()?.navigate('Search',{
+        autoFocus: false,
+        headerText: item.name,
+        initialCategory: item.name, // Pass category name to pre-select it in SearchScreen
+      })} style={styles.categoryItem}>
         <CategoryBg size={80}>
           {item.image ? (
             <CachedImage source={imageSource} style={[styles.categoryIcon,{width: index === 4 ? 35 : 60}]} priority="high" cache="immutable" />
@@ -540,7 +581,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   };
 
   const renderStyleItem = ({ item }: { item: any }) => (
-    <TouchableOpacity onPress={() => navigation.getParent()?.navigate('Search',{autoFocus:false,headerText:item.name})} style={styles.styleItem}>
+    <TouchableOpacity onPress={() => navigation.getParent()?.navigate('Search',{
+      autoFocus: false,
+      headerText: item.name,
+      initialStyle: item.name, // Pass style name to filter products by style in SearchScreen
+    })} style={styles.styleItem}>
       <CachedImage source={item.image} style={styles.styleImage} priority="high" cache="immutable" />
       <Text style={styles.styleName}>{item.name}</Text>
     </TouchableOpacity>
@@ -599,23 +644,59 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     );
   };
 
-  const renderBottomGridItem = ({ item }: { item: any }) => (
-    <TouchableOpacity
-      style={styles.bottomGridItem}
-      onPress={() => navigation.getParent()?.navigate('ProductDetail', { productId: item.id })}
-    >
-      <View style={styles.bottomImageContainer}>
-        <CachedImage 
-          source={item.image} 
-          style={styles.bottomImage} 
-          priority="low"
-          cache="immutable"
-          resizeMode="cover"
-        />
-        <TouchableOpacity style={styles.cartIconContainer}>
-          <Image source={icons.heart} style={styles.cartIcon} tintColor={'#FFFFFF'} />
-        </TouchableOpacity>
-      </View>
+  // Handle wishlist toggle for product cards
+  const handleWishlistToggle = async (productId: string, isInWishlist: boolean) => {
+    const canProceed = await requireAuthOrPromptLogin(
+      'add items to wishlist',
+      navigation.getParent() // Pass parent navigator to access root Auth screen
+    );
+
+    if (!canProceed) return;
+
+    try {
+      if (isInWishlist) {
+        await removeFromWishlistMutation.mutateAsync(productId);
+      } else {
+        await addToWishlistMutation.mutateAsync({ productId });
+      }
+    } catch (error) {
+      console.log('Wishlist toggle error:', error);
+    }
+  };
+
+  const renderBottomGridItem = ({ item }: { item: any }) => {
+    const wishlistLoading = addToWishlistMutation.isPending || removeFromWishlistMutation.isPending;
+    // Use wishlistData from hook to ensure component re-renders when wishlist changes
+    const isInWishlist = wishlistData?.data?.some((w: any) => w.productId === item.id || w.product?._id === item.id) || false;
+
+    return (
+      <TouchableOpacity
+        style={styles.bottomGridItem}
+        onPress={() => navigation.getParent()?.navigate('ProductDetail', { productId: item.id })}
+      >
+        <View style={styles.bottomImageContainer}>
+          <CachedImage 
+            source={item.image} 
+            style={styles.bottomImage} 
+            priority="low"
+            cache="immutable"
+            resizeMode="cover"
+          />
+          <TouchableOpacity 
+            style={styles.cartIconContainer}
+            onPress={(e) => {
+              e.stopPropagation();
+              handleWishlistToggle(item.id, isInWishlist);
+            }}
+            disabled={wishlistLoading}
+          >
+            <Image 
+              source={isInWishlist ? icons.headrtFilled : icons.heart} 
+              style={styles.cartIcon} 
+              tintColor={isInWishlist ? '#FF3B30' : '#FFFFFF'} 
+            />
+          </TouchableOpacity>
+        </View>
       <View style={styles.bottomContent}>
         <View style={styles.bottomRatingContainer}>
           <Image source={icons.star} style={styles.bottomStarIcon} />
@@ -623,16 +704,57 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         </View>
         {item.brand ? (
           <View style={styles.bottomBrandContainer}>
-            <View style={styles.brandLogoPlaceholder} />
+            {item.brandLogo ? (
+              <Image 
+                source={item.brandLogo} 
+                style={styles.bottomBrandLogo} 
+                resizeMode="contain"
+              />
+            ) : (
+              <View style={styles.brandLogoPlaceholder} />
+            )}
             <Text style={styles.bottomBrandName}>{item.brand}</Text>
-            <Image source={icons.verify} style={styles.verifyIcon} />
+            {item.brandVerified && (
+              <Image source={icons.verify} style={styles.verifyIcon} />
+            )}
           </View>
         ) : null}
         <Text style={styles.bottomProductName}>{item.name}</Text>
         <Text style={styles.bottomPrice}>{item.price}</Text>
       </View>
     </TouchableOpacity>
-  );
+    );
+  };
+
+  // Pull to refresh handler
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    try {
+      // Invalidate and refetch all queries
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['categories'] }),
+        queryClient.invalidateQueries({ queryKey: ['products'] }),
+        queryClient.invalidateQueries({ queryKey: ['brands'] }),
+        queryClient.invalidateQueries({ queryKey: ['styles'] }),
+        queryClient.invalidateQueries({ queryKey: ['banners'] }),
+        queryClient.invalidateQueries({ queryKey: ['wishlist'] }),
+        // Refetch all data
+        refetchCategories(),
+        refetchFeatured(),
+        refetchRecommended(),
+        refetchRecentlyAdded(),
+        refetchTopBrands(),
+        refetchStyles(),
+        refetchAllProducts(),
+        refetchBanners(),
+        refetchAllBrands(),
+      ]);
+    } catch (error) {
+      console.log('Refresh error:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [queryClient, refetchCategories, refetchFeatured, refetchRecommended, refetchRecentlyAdded, refetchTopBrands, refetchStyles, refetchAllProducts, refetchBanners, refetchAllBrands]);
 
   return (
     <SafeView style={styles.container}>
@@ -641,7 +763,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           <TouchableOpacity style={styles.menuButton}>
             <Image source={icons.menubar} style={styles.menuIcon} />
           </TouchableOpacity>
-          <Text style={styles.logoText}>LOGO</Text>
+          <Text style={styles.logoText}>SHOPO</Text>
         </View>
         <View style={styles.headerRight}>
           <TouchableOpacity 
@@ -665,7 +787,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </TouchableOpacity>
         </View>
       </View>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#007AFF']}
+            tintColor="#007AFF"
+          />
+        }
+      >
         {/* Top Header Section */}
 
 
@@ -765,11 +897,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         <View style={styles.sectionContainer}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Browse by Category</Text>
-            {displayCategories.length > 0 && (
-              <TouchableOpacity onPress={handleSeeMoreCategories}>
-                <Text style={styles.viewMoreText}>See More</Text>
-              </TouchableOpacity>
-            )}
           </View>
           {categoriesLoading ? (
             <View style={styles.horizontalList}>
@@ -803,11 +930,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         <View style={styles.sectionContainer}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Shop by Style</Text>
-            {displayStyles.length > 0 && (
-              <TouchableOpacity onPress={handleSeeMoreStyles}>
-                <Text style={styles.viewMoreText}>See More</Text>
-              </TouchableOpacity>
-            )}
           </View>
           {featuredStylesLoading ? (
             <View style={styles.horizontalList}>
@@ -870,11 +992,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         <View style={styles.sectionContainer}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Top Brands</Text>
-            {displayTopBrands.length > 0 && (
-              <TouchableOpacity onPress={handleSeeMoreBrands}>
-                <Text style={styles.viewMoreText}>See More</Text>
-              </TouchableOpacity>
-            )}
           </View>
           {topBrandsLoading ? (
             <View style={styles.horizontalList}>

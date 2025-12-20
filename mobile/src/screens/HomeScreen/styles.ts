@@ -402,6 +402,9 @@ const useStyles = ()=>{
     height: 16,
     tintColor: '#FFFFFF',
   },
+  heartIconFilled: {
+    tintColor: '#FF3B30',
+  },
   bottomContent: {
     padding: 12,
   },
@@ -430,6 +433,12 @@ const useStyles = ()=>{
     height: 16,
     borderRadius: 8,
     backgroundColor: '#E5E5E7',
+    marginRight: 6,
+  },
+  bottomBrandLogo: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     marginRight: 6,
   },
   bottomBrandName: {

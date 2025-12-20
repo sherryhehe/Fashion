@@ -173,6 +173,9 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         marginLeft: 12,
     },
+    addToCartButtonDisabled: {
+        opacity: 0.5,
+    },
     addToCartText: {
         fontSize: 14,
         fontWeight: '600',

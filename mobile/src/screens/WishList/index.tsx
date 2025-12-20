@@ -19,6 +19,7 @@ import styles from './styles';
 
 // API Hooks
 import { useWishlist, useRemoveFromWishlist } from '../../hooks/useWishlist';
+import { useAddToCart } from '../../hooks/useCart';
 import { getFirstImageSource } from '../../utils/imageHelper';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -83,12 +84,16 @@ interface WishListScreenProps {
 
 const WishListScreen: React.FC<WishListScreenProps> = ({ navigation }) => {
   const [searchText, setSearchText] = useState('');
+  const [addingToCartProductId, setAddingToCartProductId] = useState<string | null>(null);
 
   // Fetch wishlist data from API (backend already includes products)
   const { data: wishlistData, isLoading: wishlistLoading } = useWishlist();
 
   // Remove from wishlist mutation
   const removeFromWishlistMutation = useRemoveFromWishlist();
+  
+  // Add to cart mutation
+  const addToCartMutation = useAddToCart();
 
   const handleSearchChange = (text: string) => {
     setSearchText(text);
@@ -102,10 +107,32 @@ const WishListScreen: React.FC<WishListScreenProps> = ({ navigation }) => {
     }
   };
 
-  const handleAddToCart = (productId: string) => {
-    // Navigate to product detail screen where user can add to cart
-    // This is the standard flow - user can select size/color on product detail
-    navigation.navigate('ProductDetail', { productId });
+  const handleAddToCart = async (item: any) => {
+    try {
+      // Set the product ID that's being added
+      setAddingToCartProductId(item.productId);
+      
+      // Use saved color/size from wishlist, or fallback to first available
+      const sizeToUse = item.savedSize || item.firstSize || item.availableSizes?.[0] || undefined;
+      const colorToUse = item.savedColor || item.firstColor || item.availableColors?.[0]?.name || undefined;
+      
+      // Add to cart directly with saved size/color from wishlist
+      await addToCartMutation.mutateAsync({
+        productId: item.productId,
+        quantity: 1,
+        size: sizeToUse,
+        color: colorToUse,
+      });
+    } catch (error: any) {
+      console.log('Error adding to cart:', error);
+      // If error is 401, user needs to login - but don't navigate, just show error
+      if (error?.status === 401 || error?.message?.includes('No token') || error?.message?.includes('Unauthorized')) {
+        // Toast will be shown by the mutation's onError handler
+      }
+    } finally {
+      // Clear the adding state
+      setAddingToCartProductId(null);
+    }
   };
 
   // Format wishlist items with product data from wishlist response
@@ -120,9 +147,17 @@ const WishListScreen: React.FC<WishListScreenProps> = ({ navigation }) => {
       const availableColors = getColorsFromVariations(variations);
       const availableSizes = getSizesFromVariations(variations);
       
-      // Get first color and size for display, or show count if multiple
-      const firstColor = availableColors.length > 0 ? availableColors[0] : null;
-      const firstSize = availableSizes.length > 0 ? availableSizes[0] : null;
+      // Use saved color/size from wishlist item, or fallback to first available
+      const savedColor = item.color || null;
+      const savedSize = item.size || null;
+      
+      // Find saved color in available colors
+      const selectedColorObj = savedColor 
+        ? availableColors.find((c: any) => c.name === savedColor) || availableColors[0]
+        : (availableColors.length > 0 ? availableColors[0] : null);
+      
+      // Use saved size or first available
+      const selectedSize = savedSize || (availableSizes.length > 0 ? availableSizes[0] : null);
       
       return {
         id: product._id || item.productId,
@@ -131,9 +166,11 @@ const WishListScreen: React.FC<WishListScreenProps> = ({ navigation }) => {
         price: `PKR ${product.price?.toLocaleString() || '0'}`,
         availableColors,
         availableSizes,
-        firstColor: firstColor?.name || null,
-        firstColorCode: firstColor?.color || '#8E8E93',
-        firstSize: firstSize || null,
+        savedColor: savedColor, // Saved color from wishlist
+        savedSize: savedSize, // Saved size from wishlist
+        firstColor: selectedColorObj?.name || null,
+        firstColorCode: selectedColorObj?.color || '#8E8E93',
+        firstSize: selectedSize || null,
         hasMultipleColors: availableColors.length > 1,
         hasMultipleSizes: availableSizes.length > 1,
         quantity: 1,
@@ -149,34 +186,42 @@ const WishListScreen: React.FC<WishListScreenProps> = ({ navigation }) => {
   }
 
   const renderWishlistItem = ({ item }: { item: any }) => {
-    // Format color display text
-    const colorText = item.hasMultipleColors 
-      ? `${item.firstColor || 'Multiple'} (${item.availableColors.length})`
-      : (item.firstColor || 'N/A');
+    // Format color display text - show saved color if available
+    const colorText = item.savedColor 
+      ? item.savedColor
+      : (item.hasMultipleColors 
+        ? `${item.firstColor || 'Multiple'} (${item.availableColors.length})`
+        : (item.firstColor || 'N/A'));
     
-    // Format size display text
-    const sizeText = item.hasMultipleSizes
-      ? `${item.firstSize || 'Multiple'} (${item.availableSizes.length})`
-      : (item.firstSize || 'N/A');
+    // Format size display text - show saved size if available
+    const sizeText = item.savedSize
+      ? item.savedSize
+      : (item.hasMultipleSizes
+        ? `${item.firstSize || 'Multiple'} (${item.availableSizes.length})`
+        : (item.firstSize || 'N/A'));
     
     return (
-      <View style={styles.wishlistItem}>
+      <TouchableOpacity style={styles.wishlistItem} onPress={() => navigation.navigate('ProductDetail', { productId: item.productId })}>
         <Image source={item.image} style={styles.productImage} />
         <View style={styles.productInfo}>
           <Text style={styles.productName}>{item.name}</Text>
-          {(item.firstColor || item.firstSize) ? (
+          {(item.savedColor || item.savedSize || item.firstColor || item.firstSize) ? (
             <View style={styles.productAttributes}>
-              {item.firstColor ? (
+              {(item.savedColor || item.firstColor) ? (
                 <>
                   <View style={styles.attributeItem}>
                     <View style={[styles.colorDot, { backgroundColor: item.firstColorCode }]} />
-                    <Text style={styles.attributeText}>{colorText}</Text>
+                    <Text style={styles.attributeText}>
+                      {item.savedColor ? `Color: ${item.savedColor}` : colorText}
+                    </Text>
                   </View>
-                  {item.firstSize ? <View style={styles.separator} /> : null}
+                  {(item.savedSize || item.firstSize) ? <View style={styles.separator} /> : null}
                 </>
               ) : null}
-              {item.firstSize ? (
-                <Text style={styles.attributeText}>Size = {sizeText}</Text>
+              {(item.savedSize || item.firstSize) ? (
+                <Text style={styles.attributeText}>
+                  {item.savedSize ? `Size: ${item.savedSize}` : `Size = ${sizeText}`}
+                </Text>
               ) : null}
             </View>
           ) : null}
@@ -199,15 +244,25 @@ const WishListScreen: React.FC<WishListScreenProps> = ({ navigation }) => {
               )}
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.addToCartButton}
-              onPress={() => handleAddToCart(item.productId)}
+              style={[
+                styles.addToCartButton,
+                addingToCartProductId === item.productId && styles.addToCartButtonDisabled
+              ]}
+              onPress={() => handleAddToCart(item)}
+              disabled={addingToCartProductId === item.productId}
             >
-              <Text style={styles.addToCartText}>Add to cart</Text>
-              <Image source={icons.cart} style={styles.cartIcon} />
+              {addingToCartProductId === item.productId ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Text style={styles.addToCartText}>Add to cart</Text>
+                  <Image source={icons.cart} style={styles.cartIcon} />
+                </>
+              )}
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 

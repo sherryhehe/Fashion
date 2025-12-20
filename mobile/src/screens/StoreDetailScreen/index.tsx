@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -7,13 +7,16 @@ import {
   TouchableOpacity,
   FlatList,
   Dimensions,
+  RefreshControl,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { useFocusEffect, useRoute } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/MainNavigator';
 import { SafeView, ShimmerGrid } from '../../components';
 import { icons } from '../../assets/icons';
 import images from '../../assets/images';
 import styles from './styles';
+import { useQueryClient } from '@tanstack/react-query';
 
 // API Hooks
 import { useBrand } from '../../hooks/useBrands';
@@ -23,45 +26,142 @@ import { getFirstImageSource, getImageSource } from '../../utils/imageHelper';
 const { width: screenWidth } = Dimensions.get('window');
 
 type StoreDetailScreenNavigationProp = StackNavigationProp<RootStackParamList, 'StoreDetail'>;
+type StoreDetailRouteProp = {
+  key: string;
+  name: 'StoreDetail';
+  params?: {
+    storeId?: string;
+    storeData?: {
+      id: string;
+      name: string;
+      description: string;
+      rating: string;
+      image: any;
+      storeName: string;
+      storeType: string;
+      bannerImage: any;
+      logoImage: any;
+    };
+  };
+};
 
 interface StoreDetailScreenProps {
   navigation: StoreDetailScreenNavigationProp;
-  route: {
-    params: {
-      storeId: string;
-      storeData?: {
-        id: string;
-        name: string;
-        description: string;
-        rating: string;
-        image: any;
-        storeName: string;
-        storeType: string;
-        bannerImage: any;
-        logoImage: any;
-      };
-    };
-  };
+  route: StoreDetailRouteProp;
 }
 
 const StoreDetailScreen: React.FC<StoreDetailScreenProps> = ({ 
   navigation,
-  route
+  route: routeProp
 }) => {
-  const { storeId, storeData } = route.params;
+  // Use useRoute hook for better type safety and to get updated params
+  const route = useRoute<StoreDetailRouteProp>();
+  const queryClient = useQueryClient();
+  
+  // Safely extract route params with fallbacks
+  const storeId = route.params?.storeId || routeProp.params?.storeId || '';
+  const storeData = route.params?.storeData || routeProp.params?.storeData;
+  
+  // State to track previous storeId to detect changes
+  const [previousStoreId, setPreviousStoreId] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Fetch brand data
-  const { data: brandData, isLoading: brandLoading } = useBrand(storeId);
+  // Watch for route param changes and invalidate cache when storeId changes
+  useEffect(() => {
+    if (__DEV__) {
+      console.log('🏪 StoreDetailScreen - Route params changed:', {
+        storeId,
+        previousStoreId,
+        hasStoreData: !!storeData,
+      });
+    }
+    
+    // If storeId changed, invalidate the old query and update previousStoreId
+    if (storeId && storeId !== previousStoreId) {
+      // Invalidate previous query if it exists
+      if (previousStoreId) {
+        queryClient.invalidateQueries({ queryKey: ['brand', previousStoreId] });
+      }
+      
+      // Invalidate and refetch brand query for new storeId
+      queryClient.invalidateQueries({ queryKey: ['brand', storeId] });
+      
+      // Update previous storeId
+      setPreviousStoreId(storeId);
+      
+      if (__DEV__) {
+        console.log('🔄 StoreDetailScreen - StoreId changed, invalidated queries. Old:', previousStoreId, 'New:', storeId);
+      }
+    } else if (!previousStoreId && storeId) {
+      // First time setting storeId
+      setPreviousStoreId(storeId);
+    }
+  }, [storeId, previousStoreId, queryClient, storeData]);
+
+  // Refetch when screen comes into focus to ensure fresh data
+  useFocusEffect(
+    React.useCallback(() => {
+      if (storeId) {
+        // Refetch brand data when screen is focused
+        queryClient.invalidateQueries({ queryKey: ['brand', storeId] });
+        
+        if (__DEV__) {
+          console.log('👁️ StoreDetailScreen - Screen focused, refetching brand:', storeId);
+        }
+      }
+    }, [storeId, queryClient])
+  );
+
+  // Fetch brand data - only if storeId exists
+  const { data: brandData, isLoading: brandLoading, error: brandError, refetch: refetchBrand } = useBrand(storeId);
   const brand = brandData?.data || storeData;
+  
+  // Debug logging for brand data
+  useEffect(() => {
+    if (__DEV__) {
+      console.log('🏪 StoreDetailScreen - Brand data:', {
+        storeId,
+        hasBrandData: !!brandData,
+        brandName: brand?.name,
+        isLoading: brandLoading,
+        error: brandError,
+      });
+    }
+  }, [storeId, brandData, brand, brandLoading, brandError]);
 
-  // Fetch products by brand
-  const { data: productsData, isLoading: productsLoading } = useProducts({
-    brand: brand?.name,
+  // Fetch products by brand - only if brand name is available
+  const { data: productsData, isLoading: productsLoading, refetch: refetchProducts } = useProducts({
+    brand: brand?.name || '',
     status: 'active',
     limit: 20,
   });
 
   const products = productsData?.data || [];
+
+  // Show error state if storeId is missing
+  if (!storeId) {
+    return (
+      <SafeView>
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <View style={styles.headerContainer}>
+            <TouchableOpacity 
+              style={styles.backButton}
+              onPress={() => navigation.goBack()}
+            >
+              <Image source={icons.backArrow} style={styles.backIcon} />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.emptyState}>
+            <Image source={icons.search} style={styles.emptyIcon} />
+            <Text style={styles.emptyTitle}>Store Not Found</Text>
+            <Text style={styles.emptySubtitle}>
+              Unable to load store details. Please try again.
+            </Text>
+          </View>
+        </ScrollView>
+      </SafeView>
+    );
+  }
 
   // Format products for display
   const formatPrice = (price: number) => `Rs.${price.toLocaleString()}`;
@@ -79,6 +179,27 @@ const StoreDetailScreen: React.FC<StoreDetailScreenProps> = ({
 
   // Remove non-functional tabs - they don't filter products
   // Products are already filtered by brand name
+
+  // Pull to refresh handler
+  const onRefresh = React.useCallback(async () => {
+    if (!storeId) return;
+    
+    setRefreshing(true);
+    try {
+      // Invalidate and refetch all queries related to this brand
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['brand', storeId] }),
+        queryClient.invalidateQueries({ queryKey: ['products'] }),
+        // Refetch all data
+        refetchBrand(),
+        refetchProducts(),
+      ]);
+    } catch (error) {
+      console.log('Refresh error:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [storeId, queryClient, refetchBrand, refetchProducts]);
 
   const renderProductItem = ({ item }: { item: any }) => (
     <TouchableOpacity 
@@ -119,7 +240,17 @@ const StoreDetailScreen: React.FC<StoreDetailScreenProps> = ({
 
   return (
     <SafeView>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#007AFF']}
+            tintColor="#007AFF"
+          />
+        }
+      >
         {/* Header with Banner */}
         <View style={styles.headerContainer}>
           <Image 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { icons } from '../../assets/icons';
+import authService from '../../services/auth.service';
 import styles from './styles';
 
 interface AddReviewModalProps {
@@ -34,6 +35,30 @@ const AddReviewModal: React.FC<AddReviewModalProps> = ({
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [name, setName] = useState('');
+  const [userName, setUserName] = useState('');
+
+  // Get user name when modal opens
+  useEffect(() => {
+    if (visible) {
+      const getUserName = async () => {
+        try {
+          const user = await authService.getStoredUser();
+          if (user?.name) {
+            setUserName(user.name);
+            setName(user.name); // Pre-fill with user's name
+          } else {
+            setUserName('');
+            setName('');
+          }
+        } catch (error) {
+          console.log('Error getting user name:', error);
+          setUserName('');
+          setName('');
+        }
+      };
+      getUserName();
+    }
+  }, [visible]);
 
   const handleStarPress = (selectedRating: number) => {
     setRating(selectedRating);
@@ -45,12 +70,14 @@ const AddReviewModal: React.FC<AddReviewModalProps> = ({
       return;
     }
 
-    if (comment.trim().length < 10) {
-      Alert.alert('Comment Too Short', 'Please write at least 10 characters for your review.');
+    if (comment.trim().length < 2) {
+      Alert.alert('Comment Too Short', 'Please write at least 2 characters for your review.');
       return;
     }
 
-    if (name.trim().length < 2) {
+    // Use authenticated user's name if available, otherwise use name input
+    const finalName = userName || name.trim();
+    if (finalName.length < 2) {
       Alert.alert('Name Required', 'Please enter your name.');
       return;
     }
@@ -58,20 +85,28 @@ const AddReviewModal: React.FC<AddReviewModalProps> = ({
     onSubmit({
       rating,
       comment: comment.trim(),
-      name: name.trim(),
+      name: finalName,
     });
 
-    // Reset form
+    // Reset form (but keep userName if user is authenticated)
     setRating(0);
     setComment('');
-    setName('');
+    if (!userName) {
+      setName('');
+    } else {
+      setName(userName); // Keep user's name if authenticated
+    }
   };
 
   const handleClose = () => {
-    // Reset form when closing
+    // Reset form when closing (but keep userName if user is authenticated)
     setRating(0);
     setComment('');
-    setName('');
+    if (!userName) {
+      setName('');
+    } else {
+      setName(userName); // Keep user's name if authenticated
+    }
     onClose();
   };
 
@@ -129,17 +164,19 @@ const AddReviewModal: React.FC<AddReviewModalProps> = ({
               )}
             </View>
 
-            {/* Name Section */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Your Name *</Text>
-              <TextInput
-                style={styles.textInput}
-                placeholder="Enter your name"
-                value={name}
-                onChangeText={setName}
-                maxLength={50}
-              />
-            </View>
+            {/* Name Section - Only show if user is not authenticated */}
+            {!userName && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Your Name *</Text>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Enter your name"
+                  value={name}
+                  onChangeText={setName}
+                  maxLength={50}
+                />
+              </View>
+            )}
 
             {/* Comment Section */}
             <View style={styles.section}>
@@ -171,7 +208,7 @@ const AddReviewModal: React.FC<AddReviewModalProps> = ({
             <TouchableOpacity
               style={[styles.button, styles.submitButton]}
               onPress={handleSubmit}
-              disabled={isLoading || rating === 0 || comment.trim().length < 10 || name.trim().length < 2}
+              disabled={isLoading || rating === 0 || comment.trim().length < 2 || (!userName && name.trim().length < 2)}
             >
               <Text style={styles.submitButtonText}>
                 {isLoading ? 'Submitting...' : 'Submit Review'}

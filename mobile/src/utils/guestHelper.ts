@@ -4,18 +4,20 @@
  */
 
 import { Alert } from 'react-native';
+import { NavigationProp } from '@react-navigation/native';
 import authService from '../services/auth.service';
+import { navigateToAuth } from '../../App';
 
 /**
  * Check if user is a guest and prompt to login if needed
  * @param featureName - Name of the feature (e.g., "add to cart", "wishlist", "checkout")
- * @param onLogin - Callback when user chooses to login
+ * @param navigation - Navigation object to navigate to Auth screen
  * @param onCancel - Callback when user cancels (optional)
  * @returns Promise<boolean> - true if user is not a guest, false if guest
  */
 export const requireAuthOrPromptLogin = async (
   featureName: string = 'this feature',
-  onLogin: () => void,
+  navigation?: NavigationProp<any> | null,
   onCancel?: () => void
 ): Promise<boolean> => {
   try {
@@ -44,7 +46,17 @@ export const requireAuthOrPromptLogin = async (
         {
           text: 'Login',
           style: 'default',
-          onPress: onLogin,
+          onPress: async () => {
+            try {
+              // Use the global navigateToAuth function which will:
+              // 1. Logout and clear guest mode
+              // 2. Set isAuthenticated to false in App.tsx
+              // 3. MainNavigator will automatically show Auth screen
+              await navigateToAuth();
+            } catch (error) {
+              console.log('Navigation error:', error);
+            }
+          },
         },
       ]
     );

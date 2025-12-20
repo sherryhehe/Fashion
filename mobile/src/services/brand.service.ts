@@ -32,14 +32,14 @@ export interface SingleBrandResponse {
 
 const brandService = {
   /**
-   * Get all brands (requires authentication)
+   * Get all brands (public endpoint - accessible to guests)
    */
   getAll: async (): Promise<BrandResponse> => {
     return apiClient.get('/brands');
   },
 
   /**
-   * Get brand by ID (requires authentication)
+   * Get brand by ID (public endpoint - accessible to guests)
    */
   getById: async (id: string): Promise<SingleBrandResponse> => {
     return apiClient.get(`/brands/${id}`);
