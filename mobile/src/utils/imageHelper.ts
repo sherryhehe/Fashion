@@ -14,13 +14,20 @@ import { IMAGE_BASE_URL } from '../config/apiConfig';
 export const getImageUrl = (imagePath?: string | null): string | null => {
   if (!imagePath) return null;
   
-  // If it's already a full URL, return as is
+  // If it's already a full URL, check if it needs domain replacement
   if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-    return imagePath;
+    // Replace old domain with new domain if present
+    const updatedUrl = imagePath.replace(/https?:\/\/api\.buyshopo\.com/g, IMAGE_BASE_URL);
+    return updatedUrl;
   }
   
   // Ensure imagePath starts with / for proper URL construction
-  const normalizedPath = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
+  let normalizedPath = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
+  
+  // If the path starts with /uploads/, convert it to /api/uploads/ (matches backend routing)
+  if (normalizedPath.startsWith('/uploads/')) {
+    normalizedPath = normalizedPath.replace(/^\/uploads\//, '/api/uploads/');
+  }
   
   // Convert relative path to full URL
   const fullUrl = `${IMAGE_BASE_URL}${normalizedPath}`;

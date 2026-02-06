@@ -7,6 +7,7 @@ import ProductDetailScreen from '../screens/ProductDetailScreen';
 import StoreDetailScreen from '../screens/StoreDetailScreen';
 import NotificationsScreen from '../screens/Notifications';
 import OrdersScreen from '../screens/Orders';
+import OrderDetailScreen from '../screens/OrderDetailScreen';
 import WishListScreen from '../screens/WishList';
 import SearchScreen from '../screens/SearchScreen';
 import CategoryListScreen,{ ListItem, ListItemType } from '../screens/CetegoryListScreen';
@@ -19,6 +20,7 @@ export type RootStackParamList = {
   StoreDetail: { storeId?: string };
   Notifications: undefined;
   Orders: undefined;
+  OrderDetail: { orderId: string };
   WishList: undefined;
   Search: { autoFocus?: boolean, searchText?: string, headerText?: string, initialCategory?: string, initialStyle?: string };
   CategoryList: {
@@ -87,6 +89,14 @@ const MainNavigator: React.FC<MainNavigatorProps> = ({
             <Stack.Screen 
               name="Orders" 
               component={OrdersScreen}
+              options={{
+                headerShown: false,
+                gestureEnabled: true,
+              }}
+            />
+            <Stack.Screen 
+              name="OrderDetail" 
+              component={OrderDetailScreen}
               options={{
                 headerShown: false,
                 gestureEnabled: true,

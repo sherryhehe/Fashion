@@ -8,6 +8,7 @@ import {
   FlatList,
   Dimensions,
   RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useFocusEffect, useRoute } from '@react-navigation/native';
@@ -65,6 +66,19 @@ const StoreDetailScreen: React.FC<StoreDetailScreenProps> = ({
   // State to track previous storeId to detect changes
   const [previousStoreId, setPreviousStoreId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [accumulatedProducts, setAccumulatedProducts] = useState<any[]>([]);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  
+  // Reset pagination when store changes
+  useEffect(() => {
+    if (storeId && storeId !== previousStoreId) {
+      setCurrentPage(1);
+      setAccumulatedProducts([]);
+    }
+  }, [storeId, previousStoreId]);
 
   // Watch for route param changes and invalidate cache when storeId changes
   useEffect(() => {
@@ -134,9 +148,41 @@ const StoreDetailScreen: React.FC<StoreDetailScreenProps> = ({
     brand: brand?.name || '',
     status: 'active',
     limit: 20,
+    page: currentPage,
   });
 
   const products = productsData?.data || [];
+  const pagination = productsData?.pagination;
+  const hasMorePages = pagination ? currentPage < pagination.totalPages : false;
+  
+  // Accumulate products when new page data arrives
+  useEffect(() => {
+    if (products.length > 0) {
+      if (currentPage === 1) {
+        // First page - replace accumulated products
+        setAccumulatedProducts(products);
+      } else {
+        // Subsequent pages - append to accumulated products
+        setAccumulatedProducts(prev => {
+          // Avoid duplicates by checking product IDs
+          const existingIds = new Set(prev.map((p: any) => p._id || p.id));
+          const newProducts = products.filter((p: any) => !existingIds.has(p._id || p.id));
+          return [...prev, ...newProducts];
+        });
+      }
+      setIsLoadingMore(false);
+    } else if (currentPage === 1) {
+      // No products on first page - clear accumulated
+      setAccumulatedProducts([]);
+    }
+  }, [products, currentPage]);
+  
+  // Handle load more
+  const handleLoadMore = () => {
+    if (!hasMorePages || isLoadingMore || productsLoading) return;
+    setIsLoadingMore(true);
+    setCurrentPage(prev => prev + 1);
+  };
 
   // Show error state if storeId is missing
   if (!storeId) {
@@ -167,7 +213,7 @@ const StoreDetailScreen: React.FC<StoreDetailScreenProps> = ({
   const formatPrice = (price: number) => `Rs.${price.toLocaleString()}`;
   const formatRating = (rating: number, reviewCount: number) => `${rating.toFixed(1)} (${reviewCount})`;
 
-  const productData = products.map((product: any) => ({
+  const productData = accumulatedProducts.map((product: any) => ({
     id: product._id,
     name: product.name,
     price: formatPrice(product.price),
@@ -186,6 +232,10 @@ const StoreDetailScreen: React.FC<StoreDetailScreenProps> = ({
     
     setRefreshing(true);
     try {
+      // Reset pagination on refresh
+      setCurrentPage(1);
+      setAccumulatedProducts([]);
+      
       // Invalidate and refetch all queries related to this brand
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['brand', storeId] }),
@@ -286,9 +336,17 @@ const StoreDetailScreen: React.FC<StoreDetailScreenProps> = ({
                 <Image source={icons.verify} style={styles.storeVerifyIcon} />
               )}
             </View>
-            <Text style={styles.storeType}>
-              {brand?.description || storeData?.description || storeData?.storeType || 'Fashion Brand'}
-            </Text>
+            {brand?.description || storeData?.description ? (
+              <View style={styles.descriptionContainer}>
+                <Text style={styles.storeDescription}>
+                  {brand?.description || storeData?.description}
+                </Text>
+              </View>
+            ) : (
+              <Text style={styles.storeType}>
+                {storeData?.storeType || 'Fashion Brand'}
+              </Text>
+            )}
           </View>
           
           {/* Removed non-functional action buttons */}
@@ -298,19 +356,36 @@ const StoreDetailScreen: React.FC<StoreDetailScreenProps> = ({
 
         {/* Products Grid */}
         <View style={styles.productsContainer}>
-          {productsLoading ? (
+          {productsLoading && currentPage === 1 ? (
             <ShimmerGrid columns={2} count={6} />
           ) : productData.length > 0 ? (
-            <FlatList
-              data={productData}
-              renderItem={renderProductItem}
-              keyExtractor={(item) => item.id}
-              numColumns={2}
-              showsVerticalScrollIndicator={false}
-              scrollEnabled={false}
-              columnWrapperStyle={styles.productRow}
-              contentContainerStyle={styles.productsList}
-            />
+            <>
+              <FlatList
+                data={productData}
+                renderItem={renderProductItem}
+                keyExtractor={(item) => item.id}
+                numColumns={2}
+                showsVerticalScrollIndicator={false}
+                scrollEnabled={false}
+                columnWrapperStyle={styles.productRow}
+                contentContainerStyle={styles.productsList}
+              />
+              {hasMorePages && (
+                <View style={styles.loadMoreContainer}>
+                  <TouchableOpacity
+                    style={styles.loadMoreButton}
+                    onPress={handleLoadMore}
+                    disabled={isLoadingMore}
+                  >
+                    {isLoadingMore ? (
+                      <ActivityIndicator size="small" color="#007AFF" />
+                    ) : (
+                      <Text style={styles.loadMoreText}>Load More</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )}
+            </>
           ) : (
             <View style={styles.emptyState}>
               <Image source={icons.search} style={styles.emptyIcon} />

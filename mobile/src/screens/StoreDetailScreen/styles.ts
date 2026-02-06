@@ -113,6 +113,19 @@ const styles = StyleSheet.create({
   storeType: {
     fontSize: 14,
     color: '#8E8E93',
+    lineHeight: 20,
+  },
+  descriptionContainer: {
+    marginTop: 8,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5E7',
+  },
+  storeDescription: {
+    fontSize: 14,
+    color: '#2C2C2E',
+    lineHeight: 22,
+    textAlign: 'left',
   },
   storeActions: {
     flexDirection: 'row',
@@ -295,6 +308,25 @@ const styles = StyleSheet.create({
     color: '#8E8E93',
     textAlign: 'center',
     lineHeight: 20,
+  },
+  loadMoreContainer: {
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  loadMoreButton: {
+    backgroundColor: '#F2F2F7',
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderRadius: 8,
+    minWidth: 120,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadMoreText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#007AFF',
   },
 });
 

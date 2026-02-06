@@ -658,6 +658,25 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
   },
+  loadMoreReviewsContainer: {
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  loadMoreReviewsButton: {
+    backgroundColor: '#F2F2F7',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    minWidth: 200,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadMoreReviewsText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#007AFF',
+  },
 });
 
 export default styles;

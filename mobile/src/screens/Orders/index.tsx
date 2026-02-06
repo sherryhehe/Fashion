@@ -157,10 +157,7 @@ const OrdersScreen: React.FC<OrdersScreenProps> = ({
         <TouchableOpacity 
           style={styles.orderHeader}
           onPress={() => {
-            // Navigate to order details if we have a dedicated screen
-            // For now, just show order info - could navigate to a detail screen in future
-            console.log('View order details:', order._id || order.id);
-            // Future: navigation.getParent()?.navigate('OrderDetail', { orderId: order._id || order.id });
+            navigation.getParent()?.navigate('OrderDetail', { orderId: order._id || order.id });
           }}
         >
           <View style={styles.statusSection}>

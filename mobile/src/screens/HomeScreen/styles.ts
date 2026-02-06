@@ -347,10 +347,12 @@ const useStyles = ()=>{
     textAlign: 'center',
   },
   brandDescription: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#8E8E93',
     textAlign: 'center',
-    lineHeight: 16,
+    lineHeight: 15,
+    marginTop: 4,
+    paddingHorizontal: 4,
   },
 
   // Bottom Grid Styles

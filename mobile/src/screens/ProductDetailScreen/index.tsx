@@ -53,6 +53,10 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
   const [isFavorite, setIsFavorite] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  
+  // Reviews pagination state
+  const REVIEWS_PER_PAGE = 5;
+  const [displayedReviewsCount, setDisplayedReviewsCount] = useState(REVIEWS_PER_PAGE);
 
   // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
   // Fetch product data from API
@@ -74,8 +78,30 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
   const addReviewMutation = useAddReview();
   const updateReviewMutation = useUpdateReview();
   const deleteReviewMutation = useDeleteReview();
-  const { data: reviewsData, isLoading: reviewsLoading, refetch: refetchReviews } = useProductReviews(productId || '');
-  const reviews = reviewsData?.data || [];
+  const { data: reviewsData, isLoading: reviewsLoading, error: reviewsError, refetch: refetchReviews } = useProductReviews(productId || '');
+  // Handle both array response and object with data property
+  // Also check if product has embedded reviews (from admin form)
+  const apiReviews = Array.isArray(reviewsData?.data) 
+    ? reviewsData.data 
+    : Array.isArray(reviewsData) 
+      ? reviewsData 
+      : [];
+  const embeddedReviews = product?.reviews || [];
+  // Combine API reviews with embedded reviews, prioritizing API reviews
+  const allReviews = apiReviews.length > 0 ? apiReviews : embeddedReviews;
+  
+  // Get displayed reviews based on pagination
+  const reviews = allReviews.slice(0, displayedReviewsCount);
+  const hasMoreReviews = allReviews.length > displayedReviewsCount;
+  
+  // Reset displayed count when reviews change
+  useEffect(() => {
+    setDisplayedReviewsCount(REVIEWS_PER_PAGE);
+  }, [productId]);
+  
+  const handleLoadMoreReviews = () => {
+    setDisplayedReviewsCount(prev => prev + REVIEWS_PER_PAGE);
+  };
   
   // Get current user info for review ownership
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -105,15 +131,18 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
   // Debug: Log reviews data to verify what's being fetched
   useEffect(() => {
     if (productId) {
-      console.log('📝 ProductDetailScreen - Reviews Data:', {
+      console.log('📝 ProductDetailScreen - Reviews Debug:', {
         productId,
-        reviewsCount: reviews.length,
+        reviewsCount: allReviews.length,
+        displayedReviewsCount: reviews.length,
         productReviewCount: product?.reviewCount,
-        reviewsData: reviewsData,
-        reviewsArray: reviews,
+        reviewsDataRaw: reviewsData,
+        reviewsArray: allReviews,
+        reviewsLoading,
+        reviewsError: reviewsError ? JSON.stringify(reviewsError) : null,
       });
     }
-  }, [productId, reviews.length, product?.reviewCount, reviewsData]);
+  }, [productId, reviews.length, product?.reviewCount, reviewsData, reviewsLoading, reviewsError]);
 
   // Check wishlist for saved color/size and auto-select - MUST be before conditional returns
   useEffect(() => {
@@ -831,8 +860,21 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
               <ActivityIndicator size="small" color="#2C2C2E" />
               <Text style={{ fontSize: 14, color: '#8E8E93', marginTop: 10 }}>Loading reviews...</Text>
             </View>
-          ) : reviews && reviews.length > 0 ? (
-            reviews.map((review: any, index: number) => {
+          ) : reviewsError ? (
+            <View style={{ padding: 20, alignItems: 'center' }}>
+              <Text style={{ fontSize: 14, color: '#FF3B30', marginBottom: 10 }}>
+                Failed to load reviews
+              </Text>
+              <TouchableOpacity 
+                onPress={() => refetchReviews()}
+                style={{ padding: 10, backgroundColor: '#F2F2F7', borderRadius: 8 }}
+              >
+                <Text style={{ fontSize: 14, color: '#2C2C2E' }}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          ) : allReviews && allReviews.length > 0 ? (
+            <>
+              {reviews.map((review: any, index: number) => {
               const isOwnReview = currentUserId && review.userId === currentUserId;
               const isAdminReview = review.isAdmin;
               
@@ -933,7 +975,20 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
                   )}
                 </View>
               );
-            })
+              })}
+              {hasMoreReviews && (
+                <View style={styles.loadMoreReviewsContainer}>
+                  <TouchableOpacity
+                    style={styles.loadMoreReviewsButton}
+                    onPress={handleLoadMoreReviews}
+                  >
+                    <Text style={styles.loadMoreReviewsText}>
+                      Load More Reviews ({allReviews.length - displayedReviewsCount} remaining)
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </>
           ) : (
             <View style={{ padding: 20, alignItems: 'center' }}>
               <Text style={{ fontSize: 14, color: '#8E8E93', textAlign: 'center' }}>
@@ -948,7 +1003,11 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
           <View style={styles.recommendedSection}>
             <View style={styles.recommendedHeader}>
               <Text style={styles.sectionTitle}>Recommended for you</Text>
-              <TouchableOpacity>
+              <TouchableOpacity onPress={() => navigation.getParent()?.navigate('Search', {
+                autoFocus: false,
+                headerText: 'Recommended Products',
+                searchPlaceholder: 'Search recommended products...',
+              })}>
                 <Text style={styles.seeAllText}>See all</Text>
               </TouchableOpacity>
             </View>

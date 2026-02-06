@@ -14,10 +14,10 @@ const FORCE_PRODUCTION_API = true; // ✅ Production mode enabled
 // Base URL configuration
 const getBaseURL = (): string => {
   if (__DEV__ && !FORCE_PRODUCTION_API) {
-    return `http://${LOCAL_IP}:8000`;
+    return `http://${LOCAL_IP}:5000`;
   }
-  return 'http://192.168.1.17:8000';
-  // return 'https://api.buyshopo.com';
+  // Production API URL
+  return 'https://admin.buyshopo.com';
 };
 
 // API endpoint path

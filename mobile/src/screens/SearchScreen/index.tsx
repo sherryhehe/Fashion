@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Image,
   FlatList,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeView, SearchFilterBar, LoadingScreen, CachedImage } from '../../components';
 import { icons } from '../../assets/icons';
@@ -69,6 +70,17 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ navigation, route }) => {
     }
   }, [initialStyle]);
   const [appliedFilters, setAppliedFilters] = useState<FilterState>({});
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [accumulatedProducts, setAccumulatedProducts] = useState<any[]>([]);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  
+  // Reset pagination when filters/search change
+  useEffect(() => {
+    setCurrentPage(1);
+    setAccumulatedProducts([]);
+  }, [selectedCategory, selectedStyle, appliedFilters, debouncedSearchQuery, showStyleTabs]);
 
   // Minimum characters required before triggering search (prevents searching on single characters)
   const MIN_SEARCH_LENGTH = 2;
@@ -132,7 +144,8 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ navigation, route }) => {
   const apiFilters = useMemo(() => {
     const filters: any = {
       status: 'active', // Only show active products
-      limit: 100, // Increase limit for search results
+      limit: 20, // Products per page
+      page: currentPage,
     };
     
     // Add search query if it meets minimum length requirement
@@ -183,13 +196,15 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ navigation, route }) => {
     }
     
     return filters;
-  }, [selectedCategory, selectedStyle, appliedFilters, shouldSearch, debouncedSearchQuery, showStyleTabs]);
+  }, [selectedCategory, selectedStyle, appliedFilters, shouldSearch, debouncedSearchQuery, showStyleTabs, currentPage]);
 
   // Fetch products (with or without search based on query length)
-  const { data: productsData, isLoading } = useProducts(apiFilters);
+  const { data: productsData, isLoading, refetch } = useProducts(apiFilters);
   
   // Determine which data to use
   const productsDataFinal: any = productsData;
+  const pagination = productsDataFinal?.pagination;
+  const hasMorePages = pagination ? currentPage < pagination.totalPages : false;
 
   // Format products for display - memoize to prevent infinite loops
   const formattedProducts = useMemo(() => {
@@ -251,14 +266,44 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ navigation, route }) => {
     }
     
     return products;
-  }, [productsDataFinal?.data, appliedFilters, searchQuery]);
+  }, [productsDataFinal?.data, appliedFilters, searchQuery, brandMap]);
 
-  const [filteredData, setFilteredData] = useState(formattedProducts);
-
-  // Update filtered data when products change
+  // Accumulate products when new page data arrives
   useEffect(() => {
-    setFilteredData(formattedProducts);
-  }, [formattedProducts]);
+    if (formattedProducts.length > 0) {
+      if (currentPage === 1) {
+        // First page - replace accumulated products
+        setAccumulatedProducts(formattedProducts);
+      } else {
+        // Subsequent pages - append to accumulated products
+        setAccumulatedProducts(prev => {
+          // Avoid duplicates by checking product IDs
+          const existingIds = new Set(prev.map(p => p.id));
+          const newProducts = formattedProducts.filter(p => !existingIds.has(p.id));
+          return [...prev, ...newProducts];
+        });
+      }
+      setIsLoadingMore(false);
+    } else if (currentPage === 1) {
+      // No products on first page - clear accumulated
+      setAccumulatedProducts([]);
+    }
+  }, [formattedProducts, currentPage]);
+
+  const [filteredData, setFilteredData] = useState(accumulatedProducts);
+
+  // Update filtered data when accumulated products change
+  useEffect(() => {
+    setFilteredData(accumulatedProducts);
+  }, [accumulatedProducts]);
+
+  // Handle load more
+  const handleLoadMore = async () => {
+    if (!hasMorePages || isLoadingMore || isLoading) return;
+    
+    setIsLoadingMore(true);
+    setCurrentPage(prev => prev + 1);
+  };
 
   const renderProductItem = ({ item }: { item: Product }) => (
     <TouchableOpacity 
@@ -459,16 +504,33 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ navigation, route }) => {
         {/* Products Grid */}
         <View style={styles.productsContainer}>
           {filteredData.length > 0 ? (
-            <FlatList
-              data={filteredData}
-              renderItem={renderProductItem}
-              keyExtractor={(item) => item.id}
-              numColumns={2}
-              showsVerticalScrollIndicator={false}
-              scrollEnabled={false}
-              columnWrapperStyle={styles.productRow}
-              contentContainerStyle={styles.productsList}
-            />
+            <>
+              <FlatList
+                data={filteredData}
+                renderItem={renderProductItem}
+                keyExtractor={(item) => item.id}
+                numColumns={2}
+                showsVerticalScrollIndicator={false}
+                scrollEnabled={false}
+                columnWrapperStyle={styles.productRow}
+                contentContainerStyle={styles.productsList}
+              />
+              {hasMorePages && (
+                <View style={styles.loadMoreContainer}>
+                  <TouchableOpacity
+                    style={styles.loadMoreButton}
+                    onPress={handleLoadMore}
+                    disabled={isLoadingMore}
+                  >
+                    {isLoadingMore ? (
+                      <ActivityIndicator size="small" color="#007AFF" />
+                    ) : (
+                      <Text style={styles.loadMoreText}>Load More</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )}
+            </>
           ) : (
             renderEmptyState()
           )}

@@ -375,11 +375,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   // Map API styles to display format - use actual images from API
   // Show ALL styles (no limit)
   const displayStyles = Array.isArray(stylesArray) && stylesArray.length > 0
-    ? stylesArray.map(style => ({
-        id: style._id,
-        name: style.name,
-        // Use actual image from API, fallback to local image only if no image from API
-        image: style.image 
+    ? stylesArray.map(style => {
+        // Check if style has a valid image (not null, undefined, or empty string)
+        const hasImage = style.image && typeof style.image === 'string' && style.image.trim() !== '';
+        const imageSource = hasImage 
           ? getImageSource(style.image, images.casual)
           : (() => {
               // Fallback to name-based mapping only if no image from API
@@ -388,8 +387,23 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               if (name.includes('desi') || name.includes('traditional')) return images.desi;
               if (name.includes('street') || name.includes('urban')) return images.streetwear;
               return images.casual;
-            })(),
-      }))
+            })();
+        
+        // Debug logging for style images
+        if (__DEV__) {
+          console.log(`🎨 Style: ${style.name}`, {
+            hasImage,
+            imagePath: style.image,
+            imageSource: imageSource,
+          });
+        }
+        
+        return {
+          id: style._id,
+          name: style.name,
+          image: imageSource,
+        };
+      })
     : [];
 
   // Format recommended products data
@@ -558,6 +572,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     });
   };
 
+  const handleSeeMoreRecentlyAdded = () => {
+    navigation.getParent()?.navigate('Search', {
+      autoFocus: false,
+      headerText: 'Recently Added',
+      searchPlaceholder: 'Search recently added products...',
+    });
+  };
+
   const renderCategoryItem = ({ item, index }: { item: any, index: number }) => {
     // Use image from API if available, otherwise use icon fallback
     const imageSource = item.image || item.icon || icons.clothes;
@@ -580,16 +602,41 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     );
   };
 
-  const renderStyleItem = ({ item }: { item: any }) => (
-    <TouchableOpacity onPress={() => navigation.getParent()?.navigate('Search',{
-      autoFocus: false,
-      headerText: item.name,
-      initialStyle: item.name, // Pass style name to filter products by style in SearchScreen
-    })} style={styles.styleItem}>
-      <CachedImage source={item.image} style={styles.styleImage} priority="high" cache="immutable" />
-      <Text style={styles.styleName}>{item.name}</Text>
-    </TouchableOpacity>
-  );
+  const renderStyleItem = ({ item }: { item: any }) => {
+    // Ensure we have a valid image source - use fallback if image is null/undefined
+    const imageSource = item.image || images.casual;
+    const fallbackImage = images.casual;
+    
+    return (
+      <TouchableOpacity 
+        onPress={() => navigation.getParent()?.navigate('Search',{
+          autoFocus: false,
+          headerText: item.name,
+          initialStyle: item.name, // Pass style name to filter products by style in SearchScreen
+        })} 
+        style={styles.styleItem}
+      >
+        <CachedImage 
+          source={imageSource} 
+          style={styles.styleImage} 
+          priority="high" 
+          cache="immutable"
+          placeholder={fallbackImage}
+          fallback={true}
+          onError={(error) => {
+            if (__DEV__) {
+              console.log(`❌ Style image failed to load for "${item.name}":`, {
+                error,
+                imageSource,
+                itemImage: item.image,
+              });
+            }
+          }}
+        />
+        <Text style={styles.styleName}>{item.name}</Text>
+      </TouchableOpacity>
+    );
+  };
 
   const renderRecommendedItem = ({ item }: { item: any }) => (
     <TouchableOpacity
@@ -637,8 +684,18 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             <Image source={icons.star} style={styles.brandStarIcon} />
             <Text style={styles.brandRatingText}>{item.rating}</Text>
           </View>
-          <Text style={styles.brandName}>{item.name}</Text>
-          {item.description ? <Text style={styles.brandDescription}>{item.description}</Text> : null}
+          <Text style={styles.brandName} numberOfLines={1} ellipsizeMode="tail">
+            {item.name}
+          </Text>
+          {item.description ? (
+            <Text 
+              style={styles.brandDescription} 
+              numberOfLines={2} 
+              ellipsizeMode="tail"
+            >
+              {item.description}
+            </Text>
+          ) : null}
         </View>
       </TouchableOpacity>
     );
@@ -935,7 +992,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             <View style={styles.horizontalList}>
               <FlatList
                 data={[1, 2, 3]}
-                renderItem={() => <ShimmerProductCard />}
+                renderItem={() => <ShimmerProductCard width={140} noMargin />}
                 keyExtractor={(item) => item.toString()}
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -970,7 +1027,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             )}
           </View>
           {recommendedLoading ? (
-            <ShimmerHorizontalList count={2} />
+            <ShimmerHorizontalList count={2} cardWidth={screenWidth * 0.75} />
           ) : displayRecommendedProducts.length > 0 ? (
             <FlatList
               data={displayRecommendedProducts}
@@ -1032,7 +1089,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             )}
           </View>
           {featuredLoading ? (
-            <ShimmerHorizontalList count={4} />
+            <ShimmerHorizontalList count={4} cardWidth={screenWidth * 0.75} />
           ) : displayFeaturedProducts.length > 0 ? (
             <FlatList
               data={displayFeaturedProducts}
@@ -1054,6 +1111,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         <View style={styles.sectionContainer}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Recently Added</Text>
+            {displayRecentlyAddedProducts.length > 0 && (
+              <TouchableOpacity onPress={handleSeeMoreRecentlyAdded}>
+                <Text style={styles.viewMoreText}>See More</Text>
+              </TouchableOpacity>
+            )}
           </View>
           {recentlyAddedLoading ? (
             <ShimmerHorizontalList count={2} />

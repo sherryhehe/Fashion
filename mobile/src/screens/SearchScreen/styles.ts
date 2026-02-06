@@ -187,4 +187,23 @@ export const styles = StyleSheet.create({
     color: '#666666',
     textAlign: 'center',
   },
+  loadMoreContainer: {
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  loadMoreButton: {
+    backgroundColor: '#F2F2F7',
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderRadius: 8,
+    minWidth: 120,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadMoreText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#007AFF',
+  },
 });
