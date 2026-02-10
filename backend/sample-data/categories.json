@@ -1,0 +1,50 @@
+[
+  {
+    "name": "Accessories",
+    "description": "Beautiful accessories to complete your look",
+    "image": "/uploads/accessories.jpg",
+    "slug": "accessories",
+    "status": "active",
+    "productCount": 0
+  },
+  {
+    "name": "Bags",
+    "description": "Stylish bags for every occasion",
+    "image": "/uploads/bags.jpg",
+    "slug": "bags",
+    "status": "active",
+    "productCount": 0
+  },
+  {
+    "name": "Shoes",
+    "description": "Comfortable and stylish footwear",
+    "image": "/uploads/shoes.jpg",
+    "slug": "shoes",
+    "status": "active",
+    "productCount": 0
+  },
+  {
+    "name": "Makeup",
+    "description": "Premium makeup and beauty products",
+    "image": "/uploads/makeup.jpg",
+    "slug": "makeup",
+    "status": "active",
+    "productCount": 0
+  },
+  {
+    "name": "Clothes",
+    "description": "Fashionable clothing for all seasons",
+    "image": "/uploads/clothes.jpg",
+    "slug": "clothes",
+    "status": "active",
+    "productCount": 0
+  },
+  {
+    "name": "Jewelry",
+    "description": "Elegant jewelry and ornaments",
+    "image": "/uploads/jewelry.jpg",
+    "slug": "jewelry",
+    "status": "active",
+    "productCount": 0
+  }
+]

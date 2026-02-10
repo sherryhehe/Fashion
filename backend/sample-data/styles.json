@@ -1,0 +1,42 @@
+[
+  {
+    "name": "Casual",
+    "slug": "casual",
+    "description": "Relaxed and comfortable everyday style",
+    "image": "/uploads/casual.jpg",
+    "status": "active",
+    "featured": true,
+    "popular": true,
+    "productCount": 0
+  },
+  {
+    "name": "Desi",
+    "slug": "desi",
+    "description": "Traditional Pakistani and South Asian fashion",
+    "image": "/uploads/desi.jpg",
+    "status": "active",
+    "featured": true,
+    "popular": true,
+    "productCount": 0
+  },
+  {
+    "name": "Streetwear",
+    "slug": "streetwear",
+    "description": "Urban and trendy street fashion",
+    "image": "/uploads/streetwear.jpg",
+    "status": "active",
+    "featured": true,
+    "popular": true,
+    "productCount": 0
+  },
+  {
+    "name": "Formal",
+    "slug": "formal",
+    "description": "Elegant formal wear for special occasions",
+    "image": "/uploads/formal.jpg",
+    "status": "active",
+    "featured": false,
+    "popular": false,
+    "productCount": 0
+  }
+]

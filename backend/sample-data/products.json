@@ -1,0 +1,293 @@
+[
+  {
+    "name": "Velvet Shawl",
+    "description": "Luxurious velvet shawl perfect for special occasions. Made with premium quality velvet fabric.",
+    "price": 1800,
+    "originalPrice": 2200,
+    "discount": 18,
+    "category": "Accessories",
+    "brand": "SilkHouse",
+    "style": "Desi",
+    "sku": "VELVET-SHAWL-001",
+    "stock": 50,
+    "images": ["/uploads/velvet-shawl-1.jpg", "/uploads/velvet-shawl-2.jpg"],
+    "featured": true,
+    "status": "active",
+    "specifications": {
+      "Material": "Premium Velvet",
+      "Color": "Maroon",
+      "Size": "One Size",
+      "Care": "Dry Clean Only"
+    },
+    "variations": [
+      { "size": "One Size", "color": "Maroon", "price": 1800, "stock": 25 },
+      { "size": "One Size", "color": "Navy", "price": 1800, "stock": 25 }
+    ],
+    "rating": 4.9,
+    "reviewCount": 11,
+    "features": [
+      "Premium velvet material",
+      "Elegant design",
+      "Perfect for special occasions",
+      "Comfortable to wear"
+    ],
+    "tags": ["velvet", "shawl", "luxury", "desi"],
+    "salesCount": 0,
+    "views": 0
+  },
+  {
+    "name": "Chunky Sneakers",
+    "description": "Trendy chunky sneakers perfect for streetwear style. Comfortable and stylish.",
+    "price": 2500,
+    "originalPrice": 3000,
+    "discount": 17,
+    "category": "Shoes",
+    "brand": "UrbanStreet",
+    "style": "Streetwear",
+    "sku": "CHUNKY-SNEAKERS-001",
+    "stock": 30,
+    "images": ["/uploads/chunky-sneakers-1.jpg", "/uploads/chunky-sneakers-2.jpg"],
+    "featured": true,
+    "status": "active",
+    "specifications": {
+      "Material": "Canvas & Rubber",
+      "Color": "White",
+      "Size": "Multiple Sizes",
+      "Care": "Machine Washable"
+    },
+    "variations": [
+      { "size": "8", "color": "White", "price": 2500, "stock": 10 },
+      { "size": "9", "color": "White", "price": 2500, "stock": 10 },
+      { "size": "10", "color": "White", "price": 2500, "stock": 10 }
+    ],
+    "rating": 4.8,
+    "reviewCount": 15,
+    "features": [
+      "Comfortable cushioning",
+      "Durable construction",
+      "Trendy chunky design",
+      "Versatile styling"
+    ],
+    "tags": ["sneakers", "streetwear", "chunky", "casual"],
+    "salesCount": 0,
+    "views": 0
+  },
+  {
+    "name": "Silk Dupatta",
+    "description": "Beautiful silk dupatta with intricate embroidery. Perfect for traditional wear.",
+    "price": 1500,
+    "originalPrice": 1800,
+    "discount": 17,
+    "category": "Accessories",
+    "brand": "SilkHouse",
+    "style": "Desi",
+    "sku": "SILK-DUPATTA-001",
+    "stock": 40,
+    "images": ["/uploads/silk-dupatta-1.jpg", "/uploads/silk-dupatta-2.jpg"],
+    "featured": true,
+    "status": "active",
+    "specifications": {
+      "Material": "Pure Silk",
+      "Color": "Pink",
+      "Size": "One Size",
+      "Care": "Dry Clean Only"
+    },
+    "variations": [
+      { "size": "One Size", "color": "Pink", "price": 1500, "stock": 20 },
+      { "size": "One Size", "color": "Red", "price": 1500, "stock": 20 }
+    ],
+    "rating": 4.9,
+    "reviewCount": 8,
+    "features": [
+      "Pure silk material",
+      "Intricate embroidery",
+      "Traditional design",
+      "Luxury feel"
+    ],
+    "tags": ["silk", "dupatta", "traditional", "embroidery"],
+    "salesCount": 0,
+    "views": 0
+  },
+  {
+    "name": "Handmade Khussa",
+    "description": "Traditional handmade khussa with beautiful leather work. Authentic Pakistani craftsmanship.",
+    "price": 3200,
+    "originalPrice": 3800,
+    "discount": 16,
+    "category": "Shoes",
+    "brand": "KhussaKraft",
+    "style": "Desi",
+    "sku": "HANDMADE-KHUSSA-001",
+    "stock": 25,
+    "images": ["/uploads/handmade-khussa-1.jpg", "/uploads/handmade-khussa-2.jpg"],
+    "featured": true,
+    "status": "active",
+    "specifications": {
+      "Material": "Leather",
+      "Color": "Brown",
+      "Size": "Multiple Sizes",
+      "Care": "Leather Care"
+    },
+    "variations": [
+      { "size": "8", "color": "Brown", "price": 3200, "stock": 8 },
+      { "size": "9", "color": "Brown", "price": 3200, "stock": 8 },
+      { "size": "10", "color": "Brown", "price": 3200, "stock": 9 }
+    ],
+    "rating": 4.9,
+    "reviewCount": 12,
+    "features": [
+      "Handmade craftsmanship",
+      "Premium leather",
+      "Traditional design",
+      "Comfortable fit"
+    ],
+    "tags": ["khussa", "handmade", "leather", "traditional"],
+    "salesCount": 0,
+    "views": 0
+  },
+  {
+    "name": "Mini Crossbody Bag",
+    "description": "Stylish mini crossbody bag perfect for everyday use. Compact yet spacious.",
+    "price": 1200,
+    "originalPrice": 1500,
+    "discount": 20,
+    "category": "Bags",
+    "brand": "UrbanStreet",
+    "style": "Casual",
+    "sku": "MINI-CROSSBODY-001",
+    "stock": 35,
+    "images": ["/uploads/mini-crossbody-1.jpg", "/uploads/mini-crossbody-2.jpg"],
+    "featured": false,
+    "status": "active",
+    "specifications": {
+      "Material": "Canvas",
+      "Color": "Black",
+      "Size": "One Size",
+      "Care": "Spot Clean"
+    },
+    "variations": [
+      { "size": "One Size", "color": "Black", "price": 1200, "stock": 20 },
+      { "size": "One Size", "color": "Brown", "price": 1200, "stock": 15 }
+    ],
+    "rating": 4.7,
+    "reviewCount": 6,
+    "features": [
+      "Compact design",
+      "Adjustable strap",
+      "Multiple compartments",
+      "Durable material"
+    ],
+    "tags": ["crossbody", "mini", "casual", "everyday"],
+    "salesCount": 0,
+    "views": 0
+  },
+  {
+    "name": "Gold Jhumka",
+    "description": "Elegant gold jhumka earrings with traditional design. Perfect for special occasions.",
+    "price": 2800,
+    "originalPrice": 3200,
+    "discount": 13,
+    "category": "Jewelry",
+    "brand": "Khaddi",
+    "style": "Desi",
+    "sku": "GOLD-JHUMKA-001",
+    "stock": 20,
+    "images": ["/uploads/gold-jhumka-1.jpg", "/uploads/gold-jhumka-2.jpg"],
+    "featured": false,
+    "status": "active",
+    "specifications": {
+      "Material": "Gold Plated",
+      "Color": "Gold",
+      "Size": "One Size",
+      "Care": "Clean with Soft Cloth"
+    },
+    "variations": [
+      { "size": "One Size", "color": "Gold", "price": 2800, "stock": 20 }
+    ],
+    "rating": 4.8,
+    "reviewCount": 9,
+    "features": [
+      "Gold plated finish",
+      "Traditional design",
+      "Comfortable to wear",
+      "Elegant appearance"
+    ],
+    "tags": ["jhumka", "gold", "traditional", "jewelry"],
+    "salesCount": 0,
+    "views": 0
+  },
+  {
+    "name": "Button Down Shirt",
+    "description": "Classic button down shirt in premium cotton. Perfect for both casual and formal wear.",
+    "price": 3000,
+    "originalPrice": 3500,
+    "discount": 14,
+    "category": "Clothes",
+    "brand": "UrbanStreet",
+    "style": "Casual",
+    "sku": "BUTTON-SHIRT-001",
+    "stock": 45,
+    "images": ["/uploads/button-shirt-1.jpg", "/uploads/button-shirt-2.jpg"],
+    "featured": false,
+    "status": "active",
+    "specifications": {
+      "Material": "Cotton",
+      "Color": "White",
+      "Size": "Multiple Sizes",
+      "Care": "Machine Washable"
+    },
+    "variations": [
+      { "size": "M", "color": "White", "price": 3000, "stock": 15 },
+      { "size": "L", "color": "White", "price": 3000, "stock": 15 },
+      { "size": "XL", "color": "White", "price": 3000, "stock": 15 }
+    ],
+    "rating": 4.6,
+    "reviewCount": 7,
+    "features": [
+      "Premium cotton",
+      "Classic design",
+      "Comfortable fit",
+      "Versatile styling"
+    ],
+    "tags": ["shirt", "button", "cotton", "casual"],
+    "salesCount": 0,
+    "views": 0
+  },
+  {
+    "name": "Leather Jacket",
+    "description": "Stylish leather jacket perfect for streetwear. High quality leather with modern design.",
+    "price": 8500,
+    "originalPrice": 9500,
+    "discount": 11,
+    "category": "Clothes",
+    "brand": "UrbanStreet",
+    "style": "Streetwear",
+    "sku": "LEATHER-JACKET-001",
+    "stock": 15,
+    "images": ["/uploads/leather-jacket-1.jpg", "/uploads/leather-jacket-2.jpg"],
+    "featured": true,
+    "status": "active",
+    "specifications": {
+      "Material": "Genuine Leather",
+      "Color": "Black",
+      "Size": "Multiple Sizes",
+      "Care": "Leather Care"
+    },
+    "variations": [
+      { "size": "M", "color": "Black", "price": 8500, "stock": 5 },
+      { "size": "L", "color": "Black", "price": 8500, "stock": 5 },
+      { "size": "XL", "color": "Black", "price": 8500, "stock": 5 }
+    ],
+    "rating": 4.9,
+    "reviewCount": 18,
+    "features": [
+      "Genuine leather",
+      "Modern design",
+      "Comfortable fit",
+      "Durable construction"
+    ],
+    "tags": ["jacket", "leather", "streetwear", "premium"],
+    "salesCount": 0,
+    "views": 0
+  }
+]
