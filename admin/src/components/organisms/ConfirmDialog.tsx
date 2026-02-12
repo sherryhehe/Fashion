@@ -39,8 +39,13 @@ export default function ConfirmDialog({
   const variantClasses = {
     danger: 'btn-danger',
     warning: 'btn-warning',
-    info: 'btn-info',
+    info: 'btn-primary',
   };
+
+  const headerBgClass =
+    variant === 'danger' ? 'bg-danger' : variant === 'warning' ? 'bg-warning' : 'bg-primary';
+
+  const headerTextClass = variant === 'warning' ? 'text-dark' : 'text-white';
 
   return (
     <>
@@ -65,14 +70,14 @@ export default function ConfirmDialog({
       >
         <div className="modal-dialog modal-dialog-centered" role="document">
           <div className="modal-content">
-            <div className="modal-header">
-              <h5 className="modal-title">
-                <i className={`mdi mdi-alert-circle-outline me-2 text-${variant === 'danger' ? 'danger' : variant === 'warning' ? 'warning' : 'info'}`}></i>
+            <div className={`modal-header ${headerBgClass} ${headerTextClass}`}>
+              <h5 className="modal-title d-flex align-items-center">
+                <i className="mdi mdi-alert-circle-outline me-2"></i>
                 {title}
               </h5>
               <button
                 type="button"
-                className="btn-close"
+                className={`btn-close ${variant === 'warning' ? '' : 'btn-close-white'}`}
                 onClick={onCancel}
                 aria-label="Close"
               />

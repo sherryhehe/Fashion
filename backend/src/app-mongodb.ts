@@ -15,6 +15,7 @@ import styleRoutes from './routes/styleRoutes.mongodb';
 import brandRoutes from './routes/brandRoutes.mongodb';
 import notificationRoutes from './routes/notificationRoutes.mongodb';
 import cartRoutes from './routes/cartRoutes.mongodb';
+import wishlistRoutes from './routes/wishlistRoutes.mongodb';
 import orderRoutes from './routes/orderRoutes.mongodb';
 import dashboardRoutes from './routes/dashboardRoutes.mongodb';
 import userRoutes from './routes/userRoutes.mongodb';
@@ -89,6 +90,7 @@ app.use('/api/styles', styleRoutes);
 app.use('/api/brands', brandRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/cart', cartRoutes);
+app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/users', userRoutes);
@@ -209,6 +211,7 @@ app.get('/', (req, res) => {
       products: '/api/products',
       categories: '/api/categories',
       cart: '/api/cart',
+      wishlist: '/api/wishlist',
       orders: '/api/orders',
       upload: '/api/upload',
     },

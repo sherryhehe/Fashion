@@ -3,18 +3,36 @@
 import Layout from '@/components/layout/Layout';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useProduct } from '@/hooks/useApi';
 import { productsApi } from '@/lib/api';
+import { useNotificationContext } from '@/contexts/NotificationContext';
 import { getProductImageUrl } from '@/utils/imageHelper';
 import { formatCurrency } from '@/utils/currencyHelper';
 
 export default function ProductDetails() {
+  const { addNotification } = useNotificationContext();
   const searchParams = useSearchParams();
   const productId = searchParams.get('id');
   
   const { data: product, isLoading, error, refetch } = useProduct(productId);
   const [togglingFeatured, setTogglingFeatured] = useState(false);
+  const [deletingReviewKey, setDeletingReviewKey] = useState<string | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isClientMounted, setIsClientMounted] = useState(false);
+  const [duplicatingProduct, setDuplicatingProduct] = useState(false);
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [duplicateSkuPreview, setDuplicateSkuPreview] = useState<string>('');
+  const [reviewToDelete, setReviewToDelete] = useState<{
+    idx: number;
+    key: string;
+    review: any;
+  } | null>(null);
+
+  useEffect(() => {
+    setIsClientMounted(true);
+  }, []);
 
   if (isLoading) {
     return (
@@ -80,6 +98,114 @@ export default function ProductDetails() {
     }
   };
 
+  const makeDuplicateSku = (sku?: string) => {
+    const suffix = Date.now().toString().slice(-6);
+    const base = (sku || 'SKU')
+      .toString()
+      .trim()
+      .replace(/\s+/g, '-')
+      .replace(/[^A-Za-z0-9-_]/g, '')
+      .toUpperCase();
+    return `${base}-COPY-${suffix}`;
+  };
+
+  const handleOpenDuplicateModal = () => {
+    if (duplicatingProduct) return;
+    setDuplicateSkuPreview(makeDuplicateSku(product?.sku));
+    setShowDuplicateModal(true);
+  };
+
+  const handleCloseDuplicateModal = () => {
+    if (duplicatingProduct) return;
+    setShowDuplicateModal(false);
+  };
+
+  const handleDuplicateProduct = async () => {
+    try {
+      setDuplicatingProduct(true);
+
+      const payload: any = {
+        name: `${product.name || 'Product'} (Copy)`,
+        description: product.description || '',
+        price: product.price || 0,
+        originalPrice: product.originalPrice,
+        discount: product.discount,
+        category: product.category || '',
+        brand: product.brand,
+        style: product.style,
+        sku: duplicateSkuPreview || makeDuplicateSku(product.sku),
+        stock: product.stock ?? 0,
+        images: Array.isArray(product.images) ? product.images : [],
+        features: Array.isArray(product.features) ? product.features : [],
+        tags: Array.isArray(product.tags) ? product.tags : [],
+        specifications: product.specifications || {},
+        variations: product.variations || [],
+        seo: product.seo || {},
+        featured: false,
+        status: 'draft',
+        reviews: [],
+        reviewCount: 0,
+        rating: 0,
+        salesCount: 0,
+        views: 0,
+      };
+
+      const createdResp = await productsApi.create(payload);
+      const created: any = createdResp.data;
+
+      addNotification('success', 'Product duplicated. Redirecting to edit...');
+      window.location.href = `/product-edit?id=${created._id || created.id}`;
+    } catch (e: any) {
+      console.error('Failed to duplicate product:', e);
+      addNotification('error', e?.message || 'Failed to duplicate product');
+    } finally {
+      setDuplicatingProduct(false);
+    }
+  };
+
+  const handleOpenDeleteModal = (review: any, idx: number) => {
+    const key = review?.id ? String(review.id) : String(idx);
+    setReviewToDelete({ review, idx, key });
+    setShowDeleteModal(true);
+  };
+
+  const handleCloseDeleteModal = () => {
+    if (deletingReviewKey) return;
+    setShowDeleteModal(false);
+    setReviewToDelete(null);
+  };
+
+  // Delete review (confirm inside modal)
+  const handleConfirmDeleteReview = async () => {
+    if (!reviewToDelete) return;
+
+    try {
+      setDeletingReviewKey(reviewToDelete.key);
+      console.log('🗑️ Deleting review:', reviewToDelete);
+
+      const updatedReviews = product.reviews.filter((r: any, i: number) => {
+        // Prefer ID-based delete when available; fallback to index delete
+        if (reviewToDelete.review?.id) return r.id !== reviewToDelete.review.id;
+        return i !== reviewToDelete.idx;
+      });
+
+      await productsApi.update(productId!, {
+        ...product,
+        reviews: updatedReviews,
+      });
+
+      console.log('✅ Review deleted successfully');
+      setShowDeleteModal(false);
+      setReviewToDelete(null);
+      await refetch();
+    } catch (error) {
+      console.error('❌ Failed to delete review:', error);
+      alert('Failed to delete review. Please try again.');
+    } finally {
+      setDeletingReviewKey(null);
+    }
+  };
+
   return (
     <Layout pageTitle="Product Details">
       <style jsx>{`
@@ -104,6 +230,110 @@ export default function ProductDetails() {
           flex-wrap: wrap;
           gap: 0.75rem;
           align-items: center;
+        }
+        .review-modal-backdrop {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.6);
+          z-index: 9998;
+        }
+        .review-modal-container {
+          position: fixed;
+          inset: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 9999;
+          padding: 1rem;
+          pointer-events: none;
+        }
+        .review-modal {
+          width: min(560px, 92vw);
+          max-height: 80vh;
+          background: #fff;
+          border-radius: 12px;
+          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+          pointer-events: auto;
+        }
+        .review-modal__header {
+          background: #dc3545;
+          color: #fff;
+          padding: 0.9rem 1rem;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 1rem;
+          flex-shrink: 0;
+        }
+        .review-modal__header--secondary {
+          background: var(--bs-primary);
+        }
+        .review-modal__header--secondary .review-modal__close {
+          color: #fff;
+        }
+        .dup-kv {
+          display: flex;
+          gap: 0.75rem;
+          flex-wrap: wrap;
+        }
+        .dup-kv__item {
+          flex: 1;
+          min-width: 220px;
+          border: 1px solid var(--bs-border-color);
+          border-radius: 10px;
+          padding: 0.75rem;
+          background: var(--bs-body-bg);
+        }
+        .dup-kv__label {
+          font-size: 0.75rem;
+          color: var(--bs-secondary-color);
+          margin-bottom: 0.25rem;
+        }
+        .dup-kv__value {
+          font-weight: 600;
+          word-break: break-word;
+          color: var(--bs-body-color);
+        }
+        .dup-hint {
+          font-size: 0.85rem;
+          color: var(--bs-secondary-color);
+        }
+        .review-modal__title {
+          margin: 0;
+          font-size: 1rem;
+          font-weight: 600;
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+        .review-modal__close {
+          border: 0;
+          background: transparent;
+          color: #fff;
+          font-size: 1.25rem;
+          line-height: 1;
+          opacity: 0.9;
+        }
+        .review-modal__close:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+        .review-modal__body {
+          padding: 1rem;
+          overflow: auto;
+          flex: 1;
+        }
+        .review-modal__footer {
+          padding: 0.9rem 1rem;
+          border-top: 1px solid #e9ecef;
+          display: flex;
+          justify-content: flex-end;
+          gap: 0.5rem;
+          flex-shrink: 0;
+          background: #fff;
         }
         .featured-badge {
           background: linear-gradient(135deg, #ffc107, #ffb300);
@@ -243,6 +473,24 @@ export default function ProductDetails() {
                         <i className="mdi mdi-pencil me-1"></i>
                         Edit Product
                       </Link>
+                      <button
+                        className="btn btn-outline-secondary btn-featured"
+                        onClick={handleOpenDuplicateModal}
+                        disabled={duplicatingProduct}
+                        style={{ minWidth: '200px' }}
+                      >
+                        {duplicatingProduct ? (
+                          <>
+                            <span className="spinner-border spinner-border-sm me-1"></span>
+                            Duplicating...
+                          </>
+                        ) : (
+                          <>
+                            <i className="mdi mdi-content-copy me-1"></i>
+                            Duplicate Product
+                          </>
+                        )}
+                      </button>
                       <button 
                         className={`btn btn-featured ${product.featured ? 'btn-warning text-white' : 'btn-outline-warning'}`}
                         onClick={handleToggleFeatured}
@@ -402,6 +650,19 @@ export default function ProductDetails() {
                             {new Date(review.date).toLocaleDateString()}
                           </small>
                         </div>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-danger"
+                          onClick={() => handleOpenDeleteModal(review, idx)}
+                          disabled={deletingReviewKey === (review?.id ? String(review.id) : String(idx))}
+                          title="Delete Review"
+                        >
+                          {deletingReviewKey === (review?.id ? String(review.id) : String(idx)) ? (
+                            <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                          ) : (
+                            <i className="bx bx-trash"></i>
+                          )}
+                        </button>
                       </div>
                     </div>
                   ))
@@ -492,6 +753,202 @@ export default function ProductDetails() {
           </div>
         </div>
       </div>
+
+      {/* Delete Review Modal */}
+      {showDeleteModal && (
+        isClientMounted && typeof document !== 'undefined'
+          ? createPortal(
+              <>
+                <div className="review-modal-backdrop" />
+                <div
+                  className="review-modal-container"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-label="Delete review"
+                >
+                  <div className="review-modal">
+                    <div className="review-modal__header">
+                      <h5 className="review-modal__title">
+                        <i className="bx bx-trash" />
+                        Delete Review
+                      </h5>
+                      <button
+                        type="button"
+                        className="review-modal__close"
+                        onClick={handleCloseDeleteModal}
+                        disabled={!!deletingReviewKey}
+                        aria-label="Close"
+                        title="Close"
+                      >
+                        ×
+                      </button>
+                    </div>
+
+                    <div className="review-modal__body">
+                      <div className="alert alert-warning d-flex align-items-center" role="alert">
+                        <i className="bx bx-error-circle fs-20 me-2"></i>
+                        <div>
+                          <strong>Warning!</strong> This action cannot be undone.
+                        </div>
+                      </div>
+
+                      <p className="mb-3">Are you sure you want to delete this review?</p>
+
+                      {reviewToDelete?.review && (
+                        <div className="card bg-light mb-0">
+                          <div className="card-body">
+                            <div className="d-flex align-items-center mb-2">
+                              <strong className="me-2">{reviewToDelete.review.name}</strong>
+                              <div className="rating">
+                                {[...Array(5)].map((_, i) => (
+                                  <i
+                                    key={i}
+                                    className={`bx ${
+                                      i < (reviewToDelete.review.rating || 0)
+                                        ? 'bxs-star text-warning'
+                                        : 'bx-star text-muted'
+                                    }`}
+                                  ></i>
+                                ))}
+                              </div>
+                            </div>
+                            <p className="mb-2 text-muted small">{reviewToDelete.review.comment}</p>
+                            <small className="text-muted">
+                              <i className="mdi mdi-calendar me-1"></i>
+                              {reviewToDelete.review.date
+                                ? new Date(reviewToDelete.review.date).toLocaleDateString()
+                                : '-'}
+                            </small>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="review-modal__footer">
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={handleCloseDeleteModal}
+                        disabled={!!deletingReviewKey}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-danger"
+                        onClick={handleConfirmDeleteReview}
+                        disabled={!!deletingReviewKey}
+                      >
+                        {deletingReviewKey ? (
+                          <>
+                            <span
+                              className="spinner-border spinner-border-sm me-2"
+                              role="status"
+                              aria-hidden="true"
+                            ></span>
+                            Deleting...
+                          </>
+                        ) : (
+                          'Delete Review'
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </>,
+              document.body
+            )
+          : null
+      )}
+
+      {/* Duplicate Product Modal */}
+      {showDuplicateModal &&
+        isClientMounted &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <>
+            <div className="review-modal-backdrop" />
+            <div className="review-modal-container" role="dialog" aria-modal="true" aria-label="Duplicate product">
+              <div className="review-modal">
+                <div className="review-modal__header review-modal__header--secondary">
+                  <h5 className="review-modal__title">
+                    <i className="mdi mdi-content-copy" />
+                    Duplicate Product
+                  </h5>
+                  <button
+                    type="button"
+                    className="review-modal__close"
+                    onClick={handleCloseDuplicateModal}
+                    disabled={duplicatingProduct}
+                    aria-label="Close"
+                    title="Close"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                <div className="review-modal__body">
+                  <div className="alert alert-primary d-flex align-items-center" role="alert">
+                    <i className="mdi mdi-information-outline fs-20 me-2"></i>
+                    <div>
+                      Creates a <strong>Draft</strong> copy with a new <strong>SKU</strong> and opens it in Edit.
+                    </div>
+                  </div>
+
+                  <div className="dup-kv mb-3">
+                    <div className="dup-kv__item">
+                      <div className="dup-kv__label">Source</div>
+                      <div className="dup-kv__value">{product.name}</div>
+                    </div>
+                    <div className="dup-kv__item">
+                      <div className="dup-kv__label">Current SKU</div>
+                      <div className="dup-kv__value">{product.sku}</div>
+                    </div>
+                    <div className="dup-kv__item">
+                      <div className="dup-kv__label">New SKU</div>
+                      <div className="dup-kv__value">{duplicateSkuPreview}</div>
+                    </div>
+                  </div>
+
+                  <div className="dup-hint">
+                    Not copied: reviews, rating, sales count, views.
+                  </div>
+                </div>
+
+                <div className="review-modal__footer">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={handleCloseDuplicateModal}
+                    disabled={duplicatingProduct}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={async () => {
+                      if (duplicatingProduct) return;
+                      setShowDuplicateModal(false);
+                      await handleDuplicateProduct();
+                    }}
+                    disabled={duplicatingProduct}
+                  >
+                    {duplicatingProduct ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        Duplicating...
+                      </>
+                    ) : (
+                      'Duplicate'
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </>,
+          document.body
+        )}
     </Layout>
   );
 }

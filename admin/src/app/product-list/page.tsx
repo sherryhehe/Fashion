@@ -23,6 +23,7 @@ export default function ProductList() {
   const [products, setProducts] = useState<any[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
 
   // Sync search query from URL
   useEffect(() => {
@@ -95,6 +96,76 @@ export default function ProductList() {
     }
   };
 
+  const makeDuplicateSku = (sku?: string) => {
+    const suffix = Date.now().toString().slice(-6);
+    const base = (sku || 'SKU')
+      .toString()
+      .trim()
+      .replace(/\s+/g, '-')
+      .replace(/[^A-Za-z0-9-_]/g, '')
+      .toUpperCase();
+    return `${base}-COPY-${suffix}`;
+  };
+
+  const handleDuplicate = async (id: string) => {
+    const confirmed = await showConfirm({
+      title: 'Duplicate Product',
+      message: 'This will create a new product copy (as Draft) with a new SKU. Continue?',
+      confirmText: 'Duplicate',
+      cancelText: 'Cancel',
+      variant: 'info',
+    });
+
+    if (!confirmed) return;
+
+    try {
+      setDuplicatingId(id);
+
+      const sourceResp = await productsApi.getById(id);
+      const source: any = sourceResp.data;
+
+      const payload: any = {
+        name: `${source.name || 'Product'} (Copy)`,
+        description: source.description || '',
+        price: source.price || 0,
+        originalPrice: source.originalPrice,
+        discount: source.discount,
+        category: source.category || '',
+        brand: source.brand,
+        style: source.style,
+        sku: makeDuplicateSku(source.sku),
+        stock: source.stock ?? 0,
+        images: Array.isArray(source.images) ? source.images : [],
+        features: Array.isArray(source.features) ? source.features : [],
+        tags: Array.isArray(source.tags) ? source.tags : [],
+        specifications: source.specifications || {},
+        variations: source.variations || [],
+        seo: source.seo || {},
+        featured: false,
+        status: 'draft',
+        // Do not carry over reviews/ratings/sales
+        reviews: [],
+        reviewCount: 0,
+        rating: 0,
+        salesCount: 0,
+        views: 0,
+      };
+
+      const createdResp = await productsApi.create(payload);
+      const created: any = createdResp.data;
+
+      addNotification('success', 'Product duplicated. You can edit it now.');
+
+      // Go straight to edit screen for faster workflow
+      window.location.href = `/product-edit?id=${created._id || created.id}`;
+    } catch (error: any) {
+      console.error('Failed to duplicate product:', error);
+      addNotification('error', error?.message || 'Failed to duplicate product');
+    } finally {
+      setDuplicatingId(null);
+    }
+  };
+
   const columns = [
     {
       key: 'images',
@@ -158,6 +229,13 @@ export default function ProductList() {
 
   const handleEdit = (product: any) => {
     window.location.href = `/product-edit?id=${product._id || product.id}`;
+  };
+
+  const handleDuplicateAction = async (product: any) => {
+    const id = product._id || product.id;
+    if (!id) return;
+    if (duplicatingId) return;
+    await handleDuplicate(id);
   };
 
   const handleDeleteAction = async (product: any) => {
@@ -258,6 +336,7 @@ export default function ProductList() {
                   data={filteredProducts}
                   columns={columns}
                   onEdit={handleEdit}
+                  onDuplicate={handleDuplicateAction}
                   onDelete={handleDeleteAction}
                   itemsPerPage={10}
                   showSearch={false}

@@ -84,7 +84,12 @@ export default function Home() {
                   <h5 className="text-muted fw-normal mt-0 text-truncate" title="Revenue">
                     Revenue
                   </h5>
-                  <h3 className="my-2 py-1">{stats?.overview?.totalRevenue ? formatCurrencyNoDecimals(stats.overview.totalRevenue) : 'PKR 0'}</h3>
+                  <h3 className="my-2 py-1">{formatCurrencyNoDecimals(stats?.overview?.totalRevenue || 0)}</h3>
+                  <p className="mb-0 text-muted">
+                    <span className="text-success me-2">
+                      <i className="mdi mdi-arrow-up-bold"></i> {stats?.overview?.paidOrders || 0} paid
+                    </span>
+                  </p>
                 </div>
                 <div className="col-6">
                   <div className="text-end">
@@ -106,7 +111,10 @@ export default function Home() {
                   <h5 className="text-muted fw-normal mt-0 text-truncate" title="Orders">
                     Orders
                   </h5>
-                  <h3 className="my-2 py-1">{stats?.overview?.totalOrders || '0'}</h3>
+                  <h3 className="my-2 py-1">{stats?.overview?.totalOrders || 0}</h3>
+                  <p className="mb-0 text-muted">
+                    <span className="text-nowrap">Total orders</span>
+                  </p>
                 </div>
                 <div className="col-6">
                   <div className="text-end">
@@ -128,7 +136,10 @@ export default function Home() {
                   <h5 className="text-muted fw-normal mt-0 text-truncate" title="Customers">
                     Customers
                   </h5>
-                  <h3 className="my-2 py-1">{stats?.overview?.totalCustomers || '0'}</h3>
+                  <h3 className="my-2 py-1">{stats?.overview?.totalCustomers || 0}</h3>
+                  <p className="mb-0 text-muted">
+                    <span className="text-nowrap">Registered users</span>
+                  </p>
                 </div>
                 <div className="col-6">
                   <div className="text-end">
@@ -147,19 +158,81 @@ export default function Home() {
             <div className="card-body">
               <div className="row align-items-center">
                 <div className="col-6">
-                  <h5 className="text-muted fw-normal mt-0 text-truncate" title="Products">
-                    Products
+                  <h5 className="text-muted fw-normal mt-0 text-truncate" title="Average Order Value">
+                    AOV
                   </h5>
-                  <h3 className="my-2 py-1">{stats?.overview?.totalProducts || '0'}</h3>
+                  <h3 className="my-2 py-1">{formatCurrency(stats?.overview?.averageOrderValue || 0)}</h3>
+                  <p className="mb-0 text-muted">
+                    <span className="text-nowrap">Avg order value</span>
+                  </p>
                 </div>
                 <div className="col-6">
                   <div className="text-end">
                     <div className="avatar-sm bg-warning-subtle rounded">
-                      <i className="mdi mdi-package-variant avatar-title fs-22 text-warning"></i>
+                      <i className="mdi mdi-chart-line avatar-title fs-22 text-warning"></i>
                     </div>
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Secondary Stats Row */}
+      <div className="row">
+        <div className="col-md-3">
+          <div className="card">
+            <div className="card-body">
+              <h5 className="text-muted fw-normal mt-0 text-truncate" title="Products">
+                Products
+              </h5>
+              <h3 className="my-2 py-1">{stats?.overview?.totalProducts || 0}</h3>
+              <p className="mb-0 text-muted">
+                <span className="text-nowrap">Total products</span>
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="col-md-3">
+          <div className="card">
+            <div className="card-body">
+              <h5 className="text-muted fw-normal mt-0 text-truncate" title="Pending Orders">
+                Pending
+              </h5>
+              <h3 className="my-2 py-1">{stats?.orders?.pending || 0}</h3>
+              <p className="mb-0 text-muted">
+                <span className="text-nowrap">Pending orders</span>
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="col-md-3">
+          <div className="card">
+            <div className="card-body">
+              <h5 className="text-muted fw-normal mt-0 text-truncate" title="Processing Orders">
+                Processing
+              </h5>
+              <h3 className="my-2 py-1">{stats?.orders?.processing || 0}</h3>
+              <p className="mb-0 text-muted">
+                <span className="text-nowrap">In process</span>
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="col-md-3">
+          <div className="card">
+            <div className="card-body">
+              <h5 className="text-muted fw-normal mt-0 text-truncate" title="Delivered Orders">
+                Delivered
+              </h5>
+              <h3 className="my-2 py-1">{stats?.orders?.delivered || 0}</h3>
+              <p className="mb-0 text-muted">
+                <span className="text-nowrap">Completed</span>
+              </p>
             </div>
           </div>
         </div>

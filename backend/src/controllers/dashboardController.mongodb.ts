@@ -21,6 +21,12 @@ export const getDashboardStats = async (req: AuthRequest, res: Response): Promis
     ]);
     const totalRevenue = revenueData[0]?.total || 0;
 
+    // Get paid orders count for AOV calculation
+    const paidOrdersCount = await Order.countDocuments({ paymentStatus: 'paid' });
+    
+    // Calculate Average Order Value (AOV)
+    const averageOrderValue = paidOrdersCount > 0 ? totalRevenue / paidOrdersCount : 0;
+
     // Get recent orders
     const recentOrders = await Order.find()
       .sort({ createdAt: -1 })
@@ -39,19 +45,23 @@ export const getDashboardStats = async (req: AuthRequest, res: Response): Promis
     const processingOrders = await Order.countDocuments({ status: 'processing' });
     const shippedOrders = await Order.countDocuments({ status: 'shipped' });
     const deliveredOrders = await Order.countDocuments({ status: 'delivered' });
+    const cancelledOrders = await Order.countDocuments({ status: 'cancelled' });
 
     const stats = {
       overview: {
-        totalRevenue: `$${totalRevenue.toFixed(2)}`,
-        totalOrders: totalOrders.toString(),
-        totalCustomers: totalUsers.toString(),
-        totalProducts: totalProducts.toString(),
+        totalRevenue: totalRevenue,
+        totalOrders: totalOrders,
+        totalCustomers: totalUsers,
+        totalProducts: totalProducts,
+        averageOrderValue: averageOrderValue,
+        paidOrders: paidOrdersCount,
       },
       orders: {
         pending: pendingOrders,
         processing: processingOrders,
         shipped: shippedOrders,
         delivered: deliveredOrders,
+        cancelled: cancelledOrders,
         total: totalOrders,
       },
       recentOrders: recentOrders.map(order => ({

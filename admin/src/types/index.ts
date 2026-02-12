@@ -251,17 +251,37 @@ export interface ChartData {
 
 // Dashboard Types
 export interface DashboardStats {
-  totalOrders: number;
-  totalSales: number;
-  totalCustomers: number;
-  totalProducts: number;
-  revenue: number;
-  growth: {
-    orders: number;
-    sales: number;
-    customers: number;
-    revenue: number;
+  overview: {
+    totalRevenue: number;
+    totalOrders: number;
+    totalCustomers: number;
+    totalProducts: number;
+    averageOrderValue: number;
+    paidOrders: number;
   };
+  orders: {
+    pending: number;
+    processing: number;
+    shipped: number;
+    delivered: number;
+    cancelled: number;
+    total: number;
+  };
+  recentOrders: Array<{
+    id: string;
+    orderNumber: string;
+    customer: string;
+    total: number;
+    status: string;
+    createdAt: Date;
+  }>;
+  lowStockProducts: Array<{
+    _id: string;
+    name: string;
+    stock: number;
+    sku: string;
+  }>;
+  categories: number;
 }
 
 // Search and Filter Types

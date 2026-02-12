@@ -34,14 +34,12 @@ export default function DashboardSales() {
       if (response.ok) {
         const data = await response.json();
         setSalesData({
-          totalSales: data.data.totalRevenue || 0,
+          totalSales: data.data.overview.totalRevenue || 0,
           todaySales: 0, // TODO: Add this to backend
           weeklySales: 0, // TODO: Add this to backend
-          monthlySales: data.data.totalRevenue || 0,
-          totalOrders: data.data.totalOrders || 0,
-          averageOrderValue: data.data.totalOrders > 0 
-            ? data.data.totalRevenue / data.data.totalOrders 
-            : 0
+          monthlySales: data.data.overview.totalRevenue || 0,
+          totalOrders: data.data.overview.totalOrders || 0,
+          averageOrderValue: data.data.overview.averageOrderValue || 0
         });
       }
     } catch (error) {

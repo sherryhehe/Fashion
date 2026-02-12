@@ -31,6 +31,7 @@ interface InteractiveTableProps {
   className?: string;
   onRowClick?: (row: any) => void;
   onEdit?: (row: any) => void;
+  onDuplicate?: (row: any) => void;
   onDelete?: (row: any) => void;
   showActions?: boolean;
   showSearch?: boolean;
@@ -47,6 +48,7 @@ export default function InteractiveTable({
   className = '',
   onRowClick,
   onEdit,
+  onDuplicate,
   onDelete,
   showActions = true,
   showSearch = true,
@@ -205,6 +207,15 @@ export default function InteractiveTable({
                           onClick={() => onEdit(row)}
                         >
                           <i className="bx bx-edit"></i>
+                        </InteractiveButton>
+                      )}
+                      {onDuplicate && (
+                        <InteractiveButton
+                          variant="outline-secondary"
+                          size="sm"
+                          onClick={() => onDuplicate(row)}
+                        >
+                          <i className="bx bx-copy"></i>
                         </InteractiveButton>
                       )}
                       {onDelete && (
