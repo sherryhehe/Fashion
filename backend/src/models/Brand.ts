@@ -15,6 +15,8 @@ export interface IBrand extends Document {
   country?: string;
   zipCode?: string;
   status: 'active' | 'inactive' | 'pending';
+  /** Allowed checkout methods for this brand: 'card', 'cash'. Empty or both = allow all. */
+  allowedPaymentMethods: string[];
   featured: boolean;
   verified: boolean;
   rating: number;
@@ -107,6 +109,11 @@ const BrandSchema = new Schema<IBrand>(
       type: String,
       enum: ['active', 'inactive', 'pending'],
       default: 'pending',
+    },
+    allowedPaymentMethods: {
+      type: [String],
+      enum: ['card', 'cash'],
+      default: ['card', 'cash'],
     },
     featured: {
       type: Boolean,

@@ -5,12 +5,13 @@ import AuthNavigator from './AuthNavigator';
 import HomeNavigator from './HomeNavigator';
 import ProductDetailScreen from '../screens/ProductDetailScreen';
 import StoreDetailScreen from '../screens/StoreDetailScreen';
-import NotificationsScreen from '../screens/Notifications';
 import OrdersScreen from '../screens/Orders';
 import OrderDetailScreen from '../screens/OrderDetailScreen';
 import WishListScreen from '../screens/WishList';
 import SearchScreen from '../screens/SearchScreen';
 import CategoryListScreen,{ ListItem, ListItemType } from '../screens/CetegoryListScreen';
+import StyleDetailScreen from '../screens/StyleDetailScreen';
+import AllBrandsScreen from '../screens/AllBrandsScreen';
 
 
 export type RootStackParamList = {
@@ -18,7 +19,8 @@ export type RootStackParamList = {
   Home: undefined;
   ProductDetail: { productId?: string };
   StoreDetail: { storeId?: string };
-  Notifications: undefined;
+  StyleDetail: { styleName: string };
+  AllBrands: undefined;
   Orders: undefined;
   OrderDetail: { orderId: string };
   WishList: undefined;
@@ -79,8 +81,16 @@ const MainNavigator: React.FC<MainNavigatorProps> = ({
               }}
             />
             <Stack.Screen 
-              name="Notifications" 
-              component={NotificationsScreen}
+              name="StyleDetail" 
+              component={StyleDetailScreen}
+              options={{
+                headerShown: false,
+                gestureEnabled: true,
+              }}
+            />
+            <Stack.Screen 
+              name="AllBrands" 
+              component={AllBrandsScreen}
               options={{
                 headerShown: false,
                 gestureEnabled: true,

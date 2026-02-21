@@ -21,6 +21,7 @@ import userRoutes from './routes/userRoutes.mongodb';
 import uploadRoutes from './routes/uploadRoutes';
 import reviewRoutes from './routes/reviewRoutes.mongodb';
 import bannerRoutes from './routes/bannerRoutes.mongodb';
+import wishlistRoutes from './routes/wishlistRoutes.mongodb';
 
 // Load environment variables (prefer local.env if present)
 const localEnvPath = path.join(__dirname, '..', 'local.env');
@@ -95,6 +96,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/banners', bannerRoutes);
+app.use('/api/wishlist', wishlistRoutes);
 
 // Serve uploaded files through API route (for reverse proxy compatibility)
 // This must come after all other API routes to avoid conflicts
@@ -131,16 +133,13 @@ app.use('/api/uploads', (req, res, next) => {
     });
   }
   
-  // Check if file exists
+  // Check if file exists - if not, redirect to a placeholder (temporary until uploads are fixed)
   if (!fs.existsSync(resolvedPath)) {
-    console.error('❌ File not found:', resolvedPath);
-    return res.status(404).json({
-      success: false,
-      error: 'File not found',
-      requested: cleanPath,
-      resolved: resolvedPath,
-      uploadsDir: uploadsDir
-    });
+    console.warn('⚠️ File not found, serving placeholder:', cleanPath);
+    // Placeholder: random Unsplash-style image via Picsum (same missing path = same image for cache)
+    const seed = encodeURIComponent(cleanPath.replace(/\.[^.]+$/, '') || 'missing');
+    const placeholderUrl = `https://picsum.photos/seed/${seed}/400/400`;
+    return res.redirect(302, placeholderUrl);
   }
   
   // Check if it's a file (not directory)

@@ -16,11 +16,30 @@ export default function StyleDetails() {
   const [styleProducts, setStyleProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingProducts, setLoadingProducts] = useState(true);
+  const [prevStyleId, setPrevStyleId] = useState<string | null>(null);
+  const [nextStyleId, setNextStyleId] = useState<string | null>(null);
 
   useEffect(() => {
     if (styleId) {
       fetchStyle();
     }
+  }, [styleId]);
+
+  // Fetch style list to get prev/next for navigation arrows
+  useEffect(() => {
+    if (!styleId) return;
+    let cancelled = false;
+    stylesApi.getAll({ limit: 500 }).then((res: any) => {
+      if (cancelled) return;
+      const list = Array.isArray(res?.data) ? res.data : (res?.data?.data ?? res?.data ?? []);
+      const ids = (Array.isArray(list) ? list : []).map((s: any) => s._id || s.id).filter(Boolean);
+      const idx = ids.indexOf(styleId);
+      if (idx > 0) setPrevStyleId(ids[idx - 1]);
+      else setPrevStyleId(null);
+      if (idx >= 0 && idx < ids.length - 1) setNextStyleId(ids[idx + 1]);
+      else setNextStyleId(null);
+    }).catch(() => {});
+    return () => { cancelled = true; };
   }, [styleId]);
 
   // Fetch products after style is loaded
@@ -88,16 +107,28 @@ export default function StyleDetails() {
   return (
     <Layout pageTitle={`Style: ${style.name}`}>
       <div className="container-fluid">
-        {/* Breadcrumb */}
+        {/* Breadcrumb and prev/next navigation */}
         <div className="row mb-3">
-          <div className="col-12">
+          <div className="col-12 d-flex justify-content-between align-items-center flex-wrap gap-2">
             <nav aria-label="breadcrumb">
-              <ol className="breadcrumb">
+              <ol className="breadcrumb mb-0">
                 <li className="breadcrumb-item"><Link href="/">Home</Link></li>
                 <li className="breadcrumb-item"><Link href="/styles-list">Styles</Link></li>
                 <li className="breadcrumb-item active" aria-current="page">{style.name}</li>
               </ol>
             </nav>
+            <div className="d-flex gap-2">
+              {prevStyleId && (
+                <Link href={`/style-details?id=${prevStyleId}`} className="btn btn-sm btn-outline-primary">
+                  <i className="mdi mdi-arrow-left me-1" /> Previous
+                </Link>
+              )}
+              {nextStyleId && (
+                <Link href={`/style-details?id=${nextStyleId}`} className="btn btn-sm btn-outline-primary">
+                  Next <i className="mdi mdi-arrow-right ms-1" />
+                </Link>
+              )}
+            </div>
           </div>
         </div>
 

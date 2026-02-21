@@ -28,7 +28,8 @@ const wishlistService = {
    * Add product to wishlist
    */
   addToWishlist: async (productId: string, color?: string, size?: string): Promise<WishlistResponse> => {
-    return apiClient.post('/wishlist', { productId, color, size });
+    const id = productId != null ? String(productId).trim() : '';
+    return apiClient.post('/wishlist', { productId: id, color, size });
   },
 
   /**

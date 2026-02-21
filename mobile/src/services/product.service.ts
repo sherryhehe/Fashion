@@ -50,6 +50,7 @@ export interface ProductFilters {
   limit?: number;
   category?: string;
   brand?: string;
+  style?: string;
   status?: string;
   featured?: boolean;
   search?: string;
@@ -111,9 +112,14 @@ const productService = {
    * TODO: Implement actual recommendation algorithm
    */
   getRecommended: async (limit: number = 10): Promise<ProductResponse> => {
-    // For now, we'll use featured products as recommended
-    // In the future, this could be based on user preferences, purchase history, etc.
     return apiClient.get(`/products/featured?limit=${limit}`);
+  },
+
+  /**
+   * Get personalized products (cart + wishlist first, then featured). Requires auth.
+   */
+  getPersonalized: async (limit: number = 10): Promise<ProductResponse> => {
+    return apiClient.get(`/products/personalized?limit=${limit}`);
   },
 
   /**

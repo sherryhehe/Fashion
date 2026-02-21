@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Dimensions,
   FlatList,
   RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { CachedImage } from '../../components';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -20,7 +21,7 @@ import useStyles from './styles';
 
 // API Hooks
 import { useCategories } from '../../hooks/useCategories';
-import { useProducts, useFeaturedProducts, useRecommendedProducts, useRecentlyAddedProducts, useTopSellingProducts } from '../../hooks/useProducts';
+import { useFeaturedProducts, useRecommendedProducts, useRecentlyAddedProducts, usePersonalizedProducts, useInfiniteProducts } from '../../hooks/useProducts';
 import { useTopBrands, useFeaturedBrands, useBrands } from '../../hooks/useBrands';
 import { useAddToWishlist, useRemoveFromWishlist, useIsInWishlist, useWishlist } from '../../hooks/useWishlist';
 import { requireAuthOrPromptLogin } from '../../utils/guestHelper';
@@ -32,6 +33,16 @@ import { CommonActions } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
 
 const { width: screenWidth } = Dimensions.get('window');
+
+/** Shuffle array so product order varies each time (e.g. on app open / data load). Works on both Android and iOS. */
+function shuffleArray<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
 
 type HomeScreenNavigationProp = StackNavigationProp<HomeStackParamList, 'Home'>;
 
@@ -46,23 +57,28 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const flatListRef = useRef<FlatList>(null);
   const autoScrollTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
+  const [hasToken, setHasToken] = useState(false);
   const [isAutoScrolling, setIsAutoScrolling] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Get user name from AsyncStorage
+  // Get user name and auth token from AsyncStorage (for personalization)
   useEffect(() => {
-    const loadUserName = async () => {
+    const loadUserAndToken = async () => {
       try {
-        const userStr = await AsyncStorage.getItem('user');
+        const [userStr, token] = await Promise.all([
+          AsyncStorage.getItem('user'),
+          AsyncStorage.getItem('token'),
+        ]);
         if (userStr) {
           const user = JSON.parse(userStr);
           setUserName(user.name || null);
         }
+        setHasToken(!!token);
       } catch (error) {
-        console.log('Error loading user name:', error);
+        console.log('Error loading user:', error);
       }
     };
-    loadUserName();
+    loadUserAndToken();
   }, []);
 
   // Get greeting based on time of day
@@ -77,10 +93,18 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const { data: categoriesData, isLoading: categoriesLoading, error: categoriesError, refetch: refetchCategories } = useCategories();
   const { data: featuredProductsData, isLoading: featuredLoading, refetch: refetchFeatured } = useFeaturedProducts(4);
   const { data: recommendedProductsData, isLoading: recommendedLoading, refetch: refetchRecommended } = useRecommendedProducts(2);
+  const { data: personalizedProductsData, isLoading: personalizedLoading } = usePersonalizedProducts(2, hasToken);
   const { data: recentlyAddedData, isLoading: recentlyAddedLoading, refetch: refetchRecentlyAdded } = useRecentlyAddedProducts(2);
   const { data: topBrandsData, isLoading: topBrandsLoading, refetch: refetchTopBrands } = useTopBrands();
   const { data: featuredStylesData, isLoading: featuredStylesLoading, refetch: refetchStyles } = useFeaturedStyles();
-  const { data: allProductsData, isLoading: allProductsLoading, refetch: refetchAllProducts } = useProducts({ limit: 50, status: 'active' });
+  const {
+    data: infiniteProductsData,
+    isLoading: allProductsLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    refetch: refetchAllProducts,
+  } = useInfiniteProducts({ status: 'active' });
   const { data: bannersData, isLoading: bannersLoading, refetch: refetchBanners } = useBanners('homepage', 'active');
   const { data: allBrandsData, refetch: refetchAllBrands } = useBrands(); // Fetch all brands to get logos
   
@@ -94,8 +118,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const categoriesArray = categoriesData?.data || [];
   const stylesArray = featuredStylesData?.data || [];
   const recommendedArray = recommendedProductsData?.data || [];
+  const personalizedArray = personalizedProductsData?.data || [];
+  // For "Recommended for You": when logged in use personalized (cart + wishlist first), else recommended
+  const recommendedSourceArray = (hasToken && Array.isArray(personalizedArray) && personalizedArray.length > 0)
+    ? personalizedArray
+    : recommendedArray;
   const topBrandsArray = topBrandsData?.data || [];
-  const allProductsArray = allProductsData?.data || [];
+  const allProductsArray = infiniteProductsData?.pages?.flatMap((p: any) => p?.data ?? []) ?? [];
   const allBrandsArray = allBrandsData?.data || [];
 
   // Create a map of brand name -> brand object for quick lookup
@@ -155,7 +184,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       });
 
       // Priority 4: Recommended product images
-      recommendedArray.forEach(product => {
+      recommendedSourceArray.forEach(product => {
         if (product.images && product.images.length > 0) {
           const url = getImageUrl(product.images[0]);
           if (url) priorityUrls.push(url);
@@ -226,7 +255,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     bannersArray,
     categoriesArray,
     stylesArray,
-    recommendedArray,
+    recommendedSourceArray,
     topBrandsArray,
     allProductsArray,
     categoriesLoading,
@@ -410,17 +439,18 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const formatPrice = (price: number) => `PKR ${price.toLocaleString()}`;
   const formatRating = (rating: number, reviewCount: number) => `${rating.toFixed(1)} (${reviewCount})`;
 
-  // Check if recommended products data exists and is an array
-  const displayRecommendedProducts = Array.isArray(recommendedArray) && recommendedArray.length > 0
-    ? recommendedArray.map(product => ({
-        id: product._id,
-        name: product.name,
-        brand: product.brand || '', // Include brand field (empty if no brand)
-        price: formatPrice(product.price),
-        rating: formatRating(product.rating, product.reviewCount),
-        image: getFirstImageSource(product.images, images.velvetShawl),
-      }))
-    : [];
+  // Recommended products: shuffle so order varies each time user opens app (uses personalized when logged in)
+  const displayRecommendedProducts = useMemo(() => {
+    if (!Array.isArray(recommendedSourceArray) || recommendedSourceArray.length === 0) return [];
+    return shuffleArray(recommendedSourceArray).map(product => ({
+      id: product._id,
+      name: product.name,
+      brand: product.brand || '',
+      price: formatPrice(product.price),
+      rating: formatRating(product.rating, product.reviewCount),
+      image: getFirstImageSource(product.images, images.velvetShawl),
+    }));
+  }, [recommendedSourceArray]);
 
   // Check if top brands data exists and is an array
   // Show ALL brands (no limit)
@@ -444,51 +474,62 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       })
     : [];
 
-  // Check if featured products data exists and is an array
+  // Featured products: shuffle so order varies each time
   const featuredArray = featuredProductsData?.data || [];
-  const displayFeaturedProducts = Array.isArray(featuredArray) && featuredArray.length > 0
-    ? featuredArray.map(product => ({
-        id: product._id,
-        name: product.name,
-        brand: product.brand || '', // Include brand field (empty if no brand)
-        price: formatPrice(product.price),
-        rating: formatRating(product.rating, product.reviewCount),
-        image: getFirstImageSource(product.images, images.silkDupatta),
-      }))
-    : [];
+  const displayFeaturedProducts = useMemo(() => {
+    if (!Array.isArray(featuredArray) || featuredArray.length === 0) return [];
+    return shuffleArray(featuredArray).map(product => ({
+      id: product._id,
+      name: product.name,
+      brand: product.brand || '',
+      price: formatPrice(product.price),
+      rating: formatRating(product.rating, product.reviewCount),
+      image: getFirstImageSource(product.images, images.silkDupatta),
+    }));
+  }, [featuredArray]);
 
-  // Check if recently added products data exists and is an array
+  // Recently added products: shuffle so order varies each time
   const recentlyAddedArray = recentlyAddedData?.data || [];
-  const displayRecentlyAddedProducts = Array.isArray(recentlyAddedArray) && recentlyAddedArray.length > 0
-    ? recentlyAddedArray.map(product => ({
+  const displayRecentlyAddedProducts = useMemo(() => {
+    if (!Array.isArray(recentlyAddedArray) || recentlyAddedArray.length === 0) return [];
+    return shuffleArray(recentlyAddedArray).map(product => ({
+      id: product._id,
+      name: product.name,
+      brand: product.brand || '',
+      price: formatPrice(product.price),
+      rating: formatRating(product.rating, product.reviewCount),
+      image: getFirstImageSource(product.images, images.minicrossbody),
+    }));
+  }, [recentlyAddedArray]);
+
+  // Bottom grid products: sorted by recently added (infinite scroll); no shuffle so load-more is consistent
+  const displayBottomGridProducts = useMemo(() => {
+    if (!Array.isArray(allProductsArray) || allProductsArray.length === 0) return [];
+    return allProductsArray.map((product: any) => {
+      const brandName = product.brand || '';
+      const brandInfo = brandName ? brandMap.get(brandName) : null;
+      const brandLogo = brandInfo?.logo ? getImageSource(brandInfo.logo, images.shopLogo) : null;
+      return {
         id: product._id,
         name: product.name,
-        brand: product.brand || '', // Include brand field (empty if no brand)
+        brand: brandName,
+        brandLogo: brandLogo,
+        brandVerified: brandInfo?.verified || false,
         price: formatPrice(product.price),
         rating: formatRating(product.rating, product.reviewCount),
-        image: getFirstImageSource(product.images, images.minicrossbody),
-      }))
-    : [];
+        image: getFirstImageSource(product.images, images.bottomList.image1),
+      };
+    });
+  }, [allProductsArray, brandMap]);
 
-  // Check if bottom grid products data exists and is an array
-  const displayBottomGridProducts = Array.isArray(allProductsArray) && allProductsArray.length > 0
-    ? allProductsArray.map(product => {
-        const brandName = product.brand || '';
-        const brandInfo = brandName ? brandMap.get(brandName) : null;
-        const brandLogo = brandInfo?.logo ? getImageSource(brandInfo.logo, images.shopLogo) : null;
-        
-        return {
-          id: product._id,
-          name: product.name,
-          brand: brandName,
-          brandLogo: brandLogo, // Include brand logo if available
-          brandVerified: brandInfo?.verified || false, // Include verified status
-          price: formatPrice(product.price),
-          rating: formatRating(product.rating, product.reviewCount),
-          image: getFirstImageSource(product.images, images.bottomList.image1),
-        };
-      })
-    : [];
+  const handleScroll = (e: any) => {
+    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+    const padding = 400;
+    const nearBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - padding;
+    if (nearBottom && hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  };
 
   // Navigation handlers for "See More" buttons
   const handleSeeMoreCategories = () => {
@@ -609,11 +650,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     
     return (
       <TouchableOpacity 
-        onPress={() => navigation.getParent()?.navigate('Search',{
-          autoFocus: false,
-          headerText: item.name,
-          initialStyle: item.name, // Pass style name to filter products by style in SearchScreen
-        })} 
+        onPress={() => navigation.getParent()?.navigate('StyleDetail', { styleName: item.name })} 
         style={styles.styleItem}
       >
         <CachedImage 
@@ -836,16 +873,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           >
             <Image source={icons.cart} style={styles.headerIcon} />
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.headerIconButton}
-            onPress={() => navigation.getParent()?.navigate('Notifications')}
-          >
-            <Image source={icons.notification} style={styles.headerIcon} />
-          </TouchableOpacity>
         </View>
       </View>
       <ScrollView 
         contentContainerStyle={styles.scrollContent}
+        onScroll={handleScroll}
+        scrollEventThrottle={200}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -1020,13 +1053,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         <View style={styles.sectionContainer}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Recommended for You</Text>
-            {displayRecommendedProducts.length > 0 && (
-              <TouchableOpacity onPress={handleSeeMoreRecommended}>
-                <Text style={styles.viewMoreText}>See More</Text>
-              </TouchableOpacity>
-            )}
           </View>
-          {recommendedLoading ? (
+          {(hasToken ? personalizedLoading : recommendedLoading) ? (
             <ShimmerHorizontalList count={2} cardWidth={screenWidth * 0.75} />
           ) : displayRecommendedProducts.length > 0 ? (
             <FlatList
@@ -1082,11 +1110,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         <View style={styles.sectionContainer}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Featured Items</Text>
-            {displayFeaturedProducts.length > 0 && (
-              <TouchableOpacity onPress={handleSeeMoreFeatured}>
-                <Text style={styles.viewMoreText}>See More</Text>
-              </TouchableOpacity>
-            )}
           </View>
           {featuredLoading ? (
             <ShimmerHorizontalList count={4} cardWidth={screenWidth * 0.75} />
@@ -1111,11 +1134,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         <View style={styles.sectionContainer}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Recently Added</Text>
-            {displayRecentlyAddedProducts.length > 0 && (
-              <TouchableOpacity onPress={handleSeeMoreRecentlyAdded}>
-                <Text style={styles.viewMoreText}>See More</Text>
-              </TouchableOpacity>
-            )}
           </View>
           {recentlyAddedLoading ? (
             <ShimmerHorizontalList count={2} />
@@ -1136,26 +1154,33 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           )}
         </View>
 
-        {/* Bottom Grid Section - No Header */}
+        {/* Bottom Grid Section - Infinite scroll (load more when near bottom) */}
         <View style={styles.bottomGridContainer}>
           {allProductsLoading ? (
             <ShimmerGrid columns={2} count={4} />
           ) : displayBottomGridProducts.length > 0 ? (
-            <FlatList
-              data={displayBottomGridProducts}
-              renderItem={renderBottomGridItem}
-              keyExtractor={(item) => item.id}
-              numColumns={2}
-              showsVerticalScrollIndicator={false}
-              scrollEnabled={false}
-              columnWrapperStyle={{ justifyContent: 'space-between' }}
-              contentContainerStyle={styles.bottomGridList}
-              removeClippedSubviews={true}
-              maxToRenderPerBatch={10}
-              updateCellsBatchingPeriod={50}
-              initialNumToRender={6}
-              windowSize={5}
-            />
+            <>
+              <FlatList
+                data={displayBottomGridProducts}
+                renderItem={renderBottomGridItem}
+                keyExtractor={(item) => item.id}
+                numColumns={2}
+                showsVerticalScrollIndicator={false}
+                scrollEnabled={false}
+                columnWrapperStyle={{ justifyContent: 'space-between' }}
+                contentContainerStyle={styles.bottomGridList}
+                removeClippedSubviews={true}
+                maxToRenderPerBatch={10}
+                updateCellsBatchingPeriod={50}
+                initialNumToRender={6}
+                windowSize={5}
+              />
+              {isFetchingNextPage && (
+                <View style={{ paddingVertical: 16, alignItems: 'center' }}>
+                  <ActivityIndicator size="small" color="#007AFF" />
+                </View>
+              )}
+            </>
           ) : (
             <View style={styles.emptyState}>
               <Text style={styles.emptyStateText}>No products available</Text>

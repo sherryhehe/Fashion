@@ -9,6 +9,7 @@ import { useBrands } from '@/hooks/useApi';
 import { getProductImageUrl } from '@/utils/imageHelper';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import ConfirmDialog from '@/components/organisms/ConfirmDialog';
+import { getApiUrl } from '@/utils/apiHelper';
 
 export default function ProductEdit() {
   const router = useRouter();
@@ -64,6 +65,7 @@ export default function ProductEdit() {
   const [reviews, setReviews] = useState<any[]>([]);
   const [newReview, setNewReview] = useState({ name: '', rating: 5, comment: '' });
   const [showAddReview, setShowAddReview] = useState(false);
+  const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null);
 
   // Image management
   const [existingImages, setExistingImages] = useState<string[]>([]);
@@ -191,7 +193,7 @@ export default function ProductEdit() {
     }
   };
 
-  const handleDeleteReview = async (reviewId: number) => {
+  const handleDeleteReview = async (reviewIdStr: string) => {
     const confirmed = await showConfirm({
       title: 'Delete Review',
       message: 'Are you sure you want to delete this review? This action cannot be undone.',
@@ -200,8 +202,19 @@ export default function ProductEdit() {
       variant: 'danger',
     });
 
-    if (confirmed) {
-      setReviews(reviews.filter(review => review.id !== reviewId));
+    if (!confirmed || !productId) return;
+
+    try {
+      setDeletingReviewId(reviewIdStr);
+      await productsApi.deleteReview(productId, reviewIdStr);
+      setReviews(reviews.filter((review, idx) => {
+        const id = review._id ?? review.id ?? String(idx);
+        return String(id) !== reviewIdStr;
+      }));
+    } catch (error) {
+      console.error('Failed to delete review:', error);
+    } finally {
+      setDeletingReviewId(null);
     }
   };
 
@@ -272,7 +285,7 @@ export default function ProductEdit() {
         });
 
         const token = localStorage.getItem('token');
-        const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/upload/images`, {
+        const uploadResponse = await fetch(`${getApiUrl()}/upload/images`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -907,33 +920,41 @@ export default function ProductEdit() {
                   {reviews.length === 0 ? (
                     <p className="text-muted text-center">No reviews added yet</p>
                   ) : (
-                    reviews.map((review) => (
-                      <div key={review.id} className="border-bottom pb-2 mb-2">
-                        <div className="d-flex justify-content-between align-items-start">
-                          <div className="flex-grow-1">
-                            <div className="d-flex align-items-center mb-1">
-                              <strong className="me-2">{review.name}</strong>
-                              <div className="rating me-2">
-                                {[...Array(5)].map((_, i) => (
-                                  <i key={i} className={`bx ${i < review.rating ? 'bxs-star text-warning' : 'bx-star text-muted'}`}></i>
-                                ))}
+                    reviews.map((review, idx) => {
+                      const reviewIdStr = String(review._id ?? review.id ?? idx);
+                      return (
+                        <div key={reviewIdStr} className="border-bottom pb-2 mb-2">
+                          <div className="d-flex justify-content-between align-items-start">
+                            <div className="flex-grow-1">
+                              <div className="d-flex align-items-center mb-1">
+                                <strong className="me-2">{review.name}</strong>
+                                <div className="rating me-2">
+                                  {[...Array(5)].map((_, i) => (
+                                    <i key={i} className={`bx ${i < review.rating ? 'bxs-star text-warning' : 'bx-star text-muted'}`}></i>
+                                  ))}
+                                </div>
+                                {review.verified && <span className="badge bg-success badge-sm">Verified</span>}
                               </div>
-                              {review.verified && <span className="badge bg-success badge-sm">Verified</span>}
+                              <p className="mb-1 small">{review.comment}</p>
+                              <small className="text-muted">{review.date}</small>
                             </div>
-                            <p className="mb-1 small">{review.comment}</p>
-                            <small className="text-muted">{review.date}</small>
+                            <button 
+                              type="button"
+                              className="btn btn-sm btn-outline-danger"
+                              onClick={() => handleDeleteReview(reviewIdStr)}
+                              title="Delete Review"
+                              disabled={deletingReviewId === reviewIdStr}
+                            >
+                              {deletingReviewId === reviewIdStr ? (
+                                <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                              ) : (
+                                <i className="bx bx-trash"></i>
+                              )}
+                            </button>
                           </div>
-                          <button 
-                            type="button"
-                            className="btn btn-sm btn-outline-danger"
-                            onClick={() => handleDeleteReview(review.id)}
-                            title="Delete Review"
-                          >
-                            <i className="bx bx-trash"></i>
-                          </button>
                         </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>

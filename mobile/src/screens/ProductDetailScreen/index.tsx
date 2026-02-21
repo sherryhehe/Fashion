@@ -69,7 +69,7 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
   
   // Fetch brand data - hooks called unconditionally with empty string if no brand
   const { data: brandAPIData, refetch: refetchBrandByName } = useBrandByName(productBrandName);
-  const brandFromNameLookup = brandAPIData?.data?.[0];
+  const brandFromNameLookup = brandAPIData?.data && !Array.isArray(brandAPIData.data) ? brandAPIData.data : (Array.isArray(brandAPIData?.data) ? brandAPIData?.data?.[0] : null);
   const brandId = brandFromNameLookup?._id || '';
   const { data: exactBrandData, refetch: refetchBrand } = useBrand(brandId);
   const brandFromAPI = exactBrandData?.data || brandFromNameLookup;
@@ -747,12 +747,15 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
             </TouchableOpacity>
           </View>
 
-          {/* Brand/Shop Section */}
+          {/* Brand/Shop Section - use brand from exact name lookup only; navigate only when name matches product's brand */}
           <TouchableOpacity 
             style={styles.brandSection}
             onPress={() => {
-              const brandIdToNavigate = brandFromAPI?._id || brandFromAPI?.id;
-              if (brandIdToNavigate) {
+              const brandIdToNavigate = brandFromNameLookup?._id || brandFromNameLookup?.id;
+              const lookupName = (brandFromNameLookup?.name ?? '').trim().toLowerCase();
+              const productBrand = (productBrandName ?? '').trim().toLowerCase();
+              const nameMatches = lookupName && productBrand && lookupName === productBrand;
+              if (brandIdToNavigate && nameMatches) {
                 navigation.navigate('StoreDetail', { storeId: brandIdToNavigate });
               }
             }}

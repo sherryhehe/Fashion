@@ -1,6 +1,7 @@
 'use client';
 
 import Layout from '@/components/layout/Layout';
+import { getApiUrl } from '@/utils/apiHelper';
 import { useState, useEffect } from 'react';
 
 export default function DashboardUserLocation() {
@@ -21,7 +22,7 @@ export default function DashboardUserLocation() {
       const token = localStorage.getItem('token');
       
       // Using existing users endpoint
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users`, {
+      const response = await fetch(`${getApiUrl()}/users`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

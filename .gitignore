@@ -11,6 +11,7 @@ backend/node_modules/
 out/
 dist/
 build/
+shehryarcreates-attachments/
 
 # Environment files
 .env

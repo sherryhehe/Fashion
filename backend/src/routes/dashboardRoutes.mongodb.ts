@@ -10,6 +10,7 @@ router.use(requireAdmin);
 
 router.get('/stats', dashboardController.getDashboardStats);
 router.get('/sales-chart', dashboardController.getSalesChartData);
+router.get('/finance', dashboardController.getFinanceData);
 
 export default router;
 

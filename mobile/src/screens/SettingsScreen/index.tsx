@@ -5,7 +5,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  Switch,
   Alert,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -27,7 +26,6 @@ interface SettingsScreenProps {
 }
 
 const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onLogout }) => {
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   
@@ -173,28 +171,8 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onLogout })
           </>
         ))}
 
-        {/* General Section */}
-        {renderSection('General', (
-          <>
-            {renderSectionItem(
-              icons.notification2,
-              'Notifications',
-              () => {
-                // Toggle handled by Switch's onValueChange
-                // This onPress can be used for navigation to notification settings in future
-              },
-              false,
-              <Switch
-                value={notificationsEnabled}
-                onValueChange={setNotificationsEnabled}
-                trackColor={{ false: '#E0E0E0', true: '#1A1A1A' }}
-                thumbColor={notificationsEnabled ? '#FFFFFF' : '#FFFFFF'}
-                style={styles.switch}
-              />
-            )}
-            {/* Removed non-functional buttons: Choose Language, Privacy Policy, About App */}
-          </>
-        ))}
+        {/* General Section - Notifications tab removed (not set up yet per requirements) */}
+        {/* Removed non-functional buttons: Choose Language, Privacy Policy, About App */}
 
         {/* Logout Button */}
         <View style={styles.logoutSection}>

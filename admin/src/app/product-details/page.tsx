@@ -3,7 +3,7 @@
 import Layout from '@/components/layout/Layout';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useProduct } from '@/hooks/useApi';
 import { productsApi } from '@/lib/api';
 import { getProductImageUrl } from '@/utils/imageHelper';
@@ -15,6 +15,28 @@ export default function ProductDetails() {
   
   const { data: product, isLoading, error, refetch } = useProduct(productId);
   const [togglingFeatured, setTogglingFeatured] = useState(false);
+  const [togglingPromoted, setTogglingPromoted] = useState(false);
+  const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null);
+  const [duplicating, setDuplicating] = useState(false);
+  const [prevProductId, setPrevProductId] = useState<string | null>(null);
+  const [nextProductId, setNextProductId] = useState<string | null>(null);
+
+  // Fetch product list to get prev/next for navigation arrows
+  useEffect(() => {
+    if (!productId) return;
+    let cancelled = false;
+    productsApi.getAll({ limit: 500, page: 1 }).then((res: any) => {
+      if (cancelled) return;
+      const list = Array.isArray(res?.data) ? res.data : (res?.data?.data ?? res?.data ?? []);
+      const ids = (Array.isArray(list) ? list : []).map((p: any) => p._id || p.id).filter(Boolean);
+      const idx = ids.indexOf(productId);
+      if (idx > 0) setPrevProductId(ids[idx - 1]);
+      else setPrevProductId(null);
+      if (idx >= 0 && idx < ids.length - 1) setNextProductId(ids[idx + 1]);
+      else setNextProductId(null);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [productId]);
 
   if (isLoading) {
     return (
@@ -58,25 +80,54 @@ export default function ProductDetails() {
   const handleToggleFeatured = async () => {
     try {
       setTogglingFeatured(true);
-      console.log('🌟 Toggling featured status for product:', productId);
-      console.log('Current featured status:', product.featured);
-      console.log('New featured status:', !product.featured);
-      
-      const response = await productsApi.update(productId!, {
-        ...product,
-        featured: !product.featured
-      });
-      
-      console.log('✅ Featured status updated:', response);
-      
-      // Refetch product to get updated data
+      await productsApi.setFeatured(productId!, !product.featured);
       await refetch();
-      
-      console.log('✅ Product data refreshed');
     } catch (error) {
-      console.error('❌ Failed to update featured status:', error);
+      console.error('Failed to update featured status:', error);
     } finally {
       setTogglingFeatured(false);
+    }
+  };
+
+  // Toggle promoted status
+  const handleTogglePromoted = async () => {
+    try {
+      setTogglingPromoted(true);
+      await productsApi.setPromoted(productId!, !(product as any).promoted);
+      await refetch();
+    } catch (error) {
+      console.error('Failed to update promoted status:', error);
+    } finally {
+      setTogglingPromoted(false);
+    }
+  };
+
+  // Duplicate product
+  const handleDuplicate = async () => {
+    try {
+      setDuplicating(true);
+      const created = await productsApi.duplicate(productId!);
+      const newId = (created as any)?.data?._id || (created as any)?._id;
+      if (newId) window.location.href = `/product-edit?id=${newId}`;
+      else await refetch();
+    } catch (error) {
+      console.error('Failed to duplicate product:', error);
+    } finally {
+      setDuplicating(false);
+    }
+  };
+
+  // Delete a review
+  const handleDeleteReview = async (reviewId: string) => {
+    if (!confirm('Delete this review? This cannot be undone.')) return;
+    try {
+      setDeletingReviewId(reviewId);
+      await productsApi.deleteReview(productId!, reviewId);
+      await refetch();
+    } catch (error) {
+      console.error('Failed to delete review:', error);
+    } finally {
+      setDeletingReviewId(null);
     }
   };
 
@@ -114,14 +165,26 @@ export default function ProductDetails() {
       <div className="container-fluid">
         {/* Breadcrumb */}
         <div className="row mb-3">
-          <div className="col-12">
+          <div className="col-12 d-flex justify-content-between align-items-center flex-wrap gap-2">
             <nav aria-label="breadcrumb">
-              <ol className="breadcrumb">
+              <ol className="breadcrumb mb-0">
                 <li className="breadcrumb-item"><Link href="/">Home</Link></li>
                 <li className="breadcrumb-item"><Link href="/product-list">Products</Link></li>
                 <li className="breadcrumb-item active" aria-current="page">{product.name}</li>
               </ol>
             </nav>
+            <div className="d-flex gap-2">
+              {prevProductId && (
+                <Link href={`/product-details?id=${prevProductId}`} className="btn btn-sm btn-outline-primary">
+                  <i className="mdi mdi-arrow-left me-1" /> Previous
+                </Link>
+              )}
+              {nextProductId && (
+                <Link href={`/product-details?id=${nextProductId}`} className="btn btn-sm btn-outline-primary">
+                  Next <i className="mdi mdi-arrow-right ms-1" />
+                </Link>
+              )}
+            </div>
           </div>
         </div>
 
@@ -250,15 +313,35 @@ export default function ProductDetails() {
                         style={{ minWidth: '200px' }}
                       >
                         {togglingFeatured ? (
-                          <>
-                            <span className="spinner-border spinner-border-sm me-1"></span>
-                            Updating...
-                          </>
+                          <><span className="spinner-border spinner-border-sm me-1"></span>Updating...</>
                         ) : (
-                          <>
-                            <i className={`mdi ${product.featured ? 'mdi-star' : 'mdi-star-outline'} me-1`}></i>
-                            {product.featured ? 'Remove from Featured' : 'Add to Featured'}
-                          </>
+                          <><i className={`mdi ${product.featured ? 'mdi-star' : 'mdi-star-outline'} me-1`}></i>{product.featured ? 'Remove from Featured' : 'Add to Featured'}</>
+                        )}
+                      </button>
+                      <button 
+                        className={`btn btn-featured ${(product as any).promoted ? 'btn-info text-white' : 'btn-outline-info'}`}
+                        onClick={handleTogglePromoted}
+                        disabled={togglingPromoted}
+                        style={{ minWidth: '160px' }}
+                        title="Promoted products appear first in search, homepage, categories"
+                      >
+                        {togglingPromoted ? (
+                          <><span className="spinner-border spinner-border-sm me-1"></span>Updating...</>
+                        ) : (
+                          <><i className="mdi mdi-arrow-up-bold me-1"></i>{(product as any).promoted ? 'Unpromote' : 'Promote'}</>
+                        )}
+                      </button>
+                      <button 
+                        className="btn btn-outline-secondary btn-featured"
+                        onClick={handleDuplicate}
+                        disabled={duplicating}
+                        style={{ minWidth: '140px' }}
+                        title="Duplicate this product to create a copy"
+                      >
+                        {duplicating ? (
+                          <><span className="spinner-border spinner-border-sm me-1"></span>Copying...</>
+                        ) : (
+                          <><i className="bx bx-copy me-1"></i>Duplicate</>
                         )}
                       </button>
                       <Link href="/product-list" className="btn btn-outline-secondary btn-featured">
@@ -381,8 +464,11 @@ export default function ProductDetails() {
               </div>
               <div className="card-body">
                 {product.reviews && Array.isArray(product.reviews) && product.reviews.length > 0 ? (
-                  product.reviews.map((review: any, idx: number) => (
-                    <div key={review.id || idx} className="border-bottom pb-3 mb-3">
+                  product.reviews.map((review: any, idx: number) => {
+                    const reviewIdForDelete = review._id ?? review.id ?? String(idx);
+                    const reviewIdStr = typeof reviewIdForDelete === 'string' ? reviewIdForDelete : String(reviewIdForDelete);
+                    return (
+                    <div key={reviewIdStr} className="border-bottom pb-3 mb-3">
                       <div className="d-flex justify-content-between align-items-start">
                         <div className="flex-grow-1">
                           <div className="d-flex align-items-center mb-2">
@@ -402,9 +488,22 @@ export default function ProductDetails() {
                             {new Date(review.date).toLocaleDateString()}
                           </small>
                         </div>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-danger ms-2"
+                          onClick={() => handleDeleteReview(reviewIdStr)}
+                          disabled={deletingReviewId !== null}
+                          title="Delete review"
+                        >
+                          {deletingReviewId === reviewIdStr ? (
+                            <span className="spinner-border spinner-border-sm" />
+                          ) : (
+                            <i className="bx bx-trash" />
+                          )}
+                        </button>
                       </div>
                     </div>
-                  ))
+                  ); })
                 ) : (
                   <div className="text-center py-4">
                     <i className="bx bx-message-rounded-dots display-4 text-muted"></i>

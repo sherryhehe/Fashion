@@ -101,6 +101,8 @@ export default function OrderDetail() {
   const [order, setOrder] = useState<OrderData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [prevOrderId, setPrevOrderId] = useState<string | null>(null);
+  const [nextOrderId, setNextOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     if (orderId) {
@@ -109,6 +111,23 @@ export default function OrderDetail() {
       setError('Order ID is required');
       setLoading(false);
     }
+  }, [orderId]);
+
+  // Fetch order list to get prev/next for navigation arrows
+  useEffect(() => {
+    if (!orderId) return;
+    let cancelled = false;
+    ordersApi.getAll({ limit: 500, page: 1 }).then((res: any) => {
+      if (cancelled) return;
+      const list = Array.isArray(res?.data) ? res.data : (res?.data?.data ?? []);
+      const ids = list.map((o: any) => o._id || o.id).filter(Boolean);
+      const idx = ids.indexOf(orderId);
+      if (idx > 0) setPrevOrderId(ids[idx - 1]);
+      else setPrevOrderId(null);
+      if (idx >= 0 && idx < ids.length - 1) setNextOrderId(ids[idx + 1]);
+      else setNextOrderId(null);
+    }).catch(() => {});
+    return () => { cancelled = true; };
   }, [orderId]);
 
   const fetchOrder = async () => {
@@ -359,16 +378,28 @@ export default function OrderDetail() {
   return (
     <Layout pageTitle="Order Detail">
       <div className="container-fluid">
-        {/* Breadcrumb */}
+        {/* Breadcrumb and prev/next navigation */}
         <div className="row mb-3">
-          <div className="col-12">
+          <div className="col-12 d-flex justify-content-between align-items-center flex-wrap gap-2">
             <nav aria-label="breadcrumb">
-              <ol className="breadcrumb">
+              <ol className="breadcrumb mb-0">
                 <li className="breadcrumb-item"><Link href="/">Home</Link></li>
                 <li className="breadcrumb-item"><Link href="/orders-list">Orders</Link></li>
                 <li className="breadcrumb-item active" aria-current="page">Order #{order.orderNumber || order.id}</li>
               </ol>
             </nav>
+            <div className="d-flex gap-2">
+              {prevOrderId ? (
+                <Link href={`/order-detail?id=${prevOrderId}`} className="btn btn-sm btn-outline-primary">
+                  <i className="mdi mdi-arrow-left me-1"></i>Previous order
+                </Link>
+              ) : null}
+              {nextOrderId ? (
+                <Link href={`/order-detail?id=${nextOrderId}`} className="btn btn-sm btn-outline-primary">
+                  Next order<i className="mdi mdi-arrow-right ms-1"></i>
+                </Link>
+              ) : null}
+            </div>
           </div>
         </div>
 

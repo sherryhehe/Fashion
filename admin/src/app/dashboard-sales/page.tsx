@@ -1,11 +1,13 @@
 'use client';
 
 import Layout from '@/components/layout/Layout';
+import { getApiUrl } from '@/utils/apiHelper';
 import { useState, useEffect } from 'react';
 import { formatCurrencyNoDecimals, formatCurrency } from '@/utils/currencyHelper';
 
 export default function DashboardSales() {
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [salesData, setSalesData] = useState({
     totalSales: 0,
     todaySales: 0,
@@ -22,30 +24,31 @@ export default function DashboardSales() {
   const fetchSalesData = async () => {
     try {
       setLoading(true);
+      setError(null);
       const token = localStorage.getItem('token');
-      
-      // Using existing dashboard stats endpoint
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/dashboard/stats`, {
+      const response = await fetch(`${getApiUrl()}/dashboard/stats`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
-
-      if (response.ok) {
-        const data = await response.json();
+      const data = await response.json();
+      if (response.ok && data.success) {
+        const overview = data.data?.overview || data.data || {};
+        const totalRevenue = Number(overview.totalRevenue) || 0;
+        const totalOrders = Number(overview.totalOrders) || 0;
         setSalesData({
-          totalSales: data.data.totalRevenue || 0,
-          todaySales: 0, // TODO: Add this to backend
-          weeklySales: 0, // TODO: Add this to backend
-          monthlySales: data.data.totalRevenue || 0,
-          totalOrders: data.data.totalOrders || 0,
-          averageOrderValue: data.data.totalOrders > 0 
-            ? data.data.totalRevenue / data.data.totalOrders 
-            : 0
+          totalSales: totalRevenue,
+          todaySales: Number(overview.todaySales) || 0,
+          weeklySales: Number(overview.weeklySales) || 0,
+          monthlySales: totalRevenue,
+          totalOrders,
+          averageOrderValue: totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0
         });
+      } else {
+        setError(data.error || data.message || 'Failed to load sales data');
       }
-    } catch (error) {
-      console.error('Failed to fetch sales data:', error);
+    } catch (err) {
+      setError('Could not load sales data. Check that the backend is running.');
     } finally {
       setLoading(false);
     }
@@ -57,6 +60,16 @@ export default function DashboardSales() {
         <div className="text-center py-5">
           <div className="spinner-border text-primary"></div>
           <p className="mt-2">Loading sales data...</p>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (error) {
+    return (
+      <Layout pageTitle="Sales Dashboard">
+        <div className="alert alert-danger mx-3 mt-3" role="alert">
+          <strong>Error:</strong> {error}
         </div>
       </Layout>
     );

@@ -6,10 +6,9 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useCreateBrand } from '@/hooks/useApi';
 import { useNotificationContext } from '@/contexts/NotificationContext';
+import { getApiUrl } from '@/utils/apiHelper';
 
 export default function BrandAdd() {
-  console.log('🏢 Brand Add Page Loaded');
-  
   const router = useRouter();
   const createBrand = useCreateBrand();
   const { addNotification } = useNotificationContext();
@@ -115,12 +114,7 @@ export default function BrandAdd() {
     uploadFormData.append('images', file);
     
     const token = localStorage.getItem('token');
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
-      (typeof window !== 'undefined' && window.location.hostname === 'admin.buyshopo.com'
-        ? 'https://admin.buyshopo.com/api'
-        : process.env.NODE_ENV === 'production'
-          ? 'https://admin.buyshopo.com/api'
-          : 'http://localhost:8000/api');
+    const apiUrl = getApiUrl();
     
     // Create timeout controller
     const timeoutController = new AbortController();

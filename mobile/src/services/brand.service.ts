@@ -60,10 +60,31 @@ const brandService = {
   },
 
   /**
-   * Get brand by name (for product detail screen)
+   * Get brand by exact name (for product detail screen - returns single brand to fix wrong brand opening)
    */
-  getByName: async (name: string): Promise<BrandResponse> => {
-    return apiClient.get(`/brands?name=${encodeURIComponent(name)}`);
+  getByName: async (name: string): Promise<SingleBrandResponse> => {
+    if (!name || !name.trim()) {
+      return { success: false, data: null as any };
+    }
+    const res = await apiClient.get(`/brands/by-name/${encodeURIComponent(name.trim())}`);
+    return { success: true, data: res.data };
+  },
+
+  /**
+   * Get allowed payment methods for given brand names (intersection). For checkout.
+   */
+  getAllowedPaymentMethods: async (brandNames: string[]): Promise<{ allowedPaymentMethods: string[] }> => {
+    const names = [...new Set(brandNames.map((n) => (n || '').trim()).filter(Boolean))];
+    if (names.length === 0) {
+      return { allowedPaymentMethods: ['card', 'cash'] };
+    }
+    const res = await apiClient.get(
+      `/brands/allowed-payment-methods?names=${names.map((n) => encodeURIComponent(n)).join(',')}`
+    );
+    const raw = res?.data?.allowedPaymentMethods ?? res?.allowedPaymentMethods;
+    return {
+      allowedPaymentMethods: Array.isArray(raw) ? raw : ['card', 'cash'],
+    };
   },
 };
 

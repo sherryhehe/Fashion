@@ -18,43 +18,31 @@ export default function BurgerMenu({
 
   useEffect(() => {
     setMounted(true);
-    console.log('BurgerMenu mounted');
   }, []);
 
   useEffect(() => {
     if (!mounted) return;
 
     const button = buttonRef.current;
-    if (!button) {
-      console.error('Button ref is null');
-      return;
-    }
-
-    console.log('Setting up button handlers');
+    if (!button) return;
 
     let touchStartTime = 0;
     let touchMoved = false;
 
     // Touch event handler for mobile
     const handleTouchStart = (e: TouchEvent) => {
-      console.log('Touch start on button');
       touchStartTime = Date.now();
       touchMoved = false;
       e.stopPropagation();
     };
 
-    const handleTouchMove = (e: TouchEvent) => {
-      console.log('Touch move detected');
+    const handleTouchMove = () => {
       touchMoved = true;
     };
 
     const handleTouchEnd = (e: TouchEvent) => {
-      console.log('Touch end on button');
       const touchDuration = Date.now() - touchStartTime;
-      
-      // Only trigger if it was a tap (not a scroll/swipe)
       if (!touchMoved && touchDuration < 500) {
-        console.log('Valid tap detected!');
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
@@ -64,7 +52,6 @@ export default function BurgerMenu({
 
     // Click handler for desktop
     const handleClick = (e: MouseEvent) => {
-      console.log('Click detected!', e.type);
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
@@ -90,19 +77,16 @@ export default function BurgerMenu({
 
   // Inline handlers as ultimate fallback
   const handleDirectClick = (e: React.MouseEvent | React.TouchEvent) => {
-    console.log('Inline React handler fired');
     e.preventDefault();
     e.stopPropagation();
     toggleSidebar();
   };
 
   const handleTouchStartReact = (e: React.TouchEvent) => {
-    console.log('React touch start inline');
     e.stopPropagation();
   };
 
   const handleTouchEndReact = (e: React.TouchEvent) => {
-    console.log('React touch end inline - triggering sidebar');
     e.preventDefault();
     e.stopPropagation();
     toggleSidebar();

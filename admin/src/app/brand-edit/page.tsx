@@ -8,6 +8,7 @@ import { brandsApi } from '@/lib/api';
 import { getBrandLogoUrl, getBrandBannerUrl } from '@/utils/imageHelper';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import ConfirmDialog from '@/components/organisms/ConfirmDialog';
+import { getApiUrl } from '@/utils/apiHelper';
 
 export default function BrandEdit() {
   const router = useRouter();
@@ -33,7 +34,8 @@ export default function BrandEdit() {
     commission: 10,
     verified: false,
     featured: false,
-    popular: false
+    popular: false,
+    allowedPaymentMethods: ['card', 'cash'] as string[],
   });
 
   const [existingLogo, setExistingLogo] = useState<string>('');
@@ -42,11 +44,30 @@ export default function BrandEdit() {
   const [existingBanner, setExistingBanner] = useState<string>('');
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string>('');
+  const [prevBrandId, setPrevBrandId] = useState<string | null>(null);
+  const [nextBrandId, setNextBrandId] = useState<string | null>(null);
 
   useEffect(() => {
     if (brandId) {
       fetchBrand();
     }
+  }, [brandId]);
+
+  // Fetch brand list to get prev/next for navigation arrows
+  useEffect(() => {
+    if (!brandId) return;
+    let cancelled = false;
+    brandsApi.getAll({ limit: 500 }).then((res: any) => {
+      if (cancelled) return;
+      const list = Array.isArray(res?.data) ? res.data : (res?.data?.data ?? res?.data ?? []);
+      const ids = (Array.isArray(list) ? list : []).map((b: any) => b._id || b.id).filter(Boolean);
+      const idx = ids.indexOf(brandId);
+      if (idx > 0) setPrevBrandId(ids[idx - 1]);
+      else setPrevBrandId(null);
+      if (idx >= 0 && idx < ids.length - 1) setNextBrandId(ids[idx + 1]);
+      else setNextBrandId(null);
+    }).catch(() => {});
+    return () => { cancelled = true; };
   }, [brandId]);
 
   const fetchBrand = async () => {
@@ -70,7 +91,10 @@ export default function BrandEdit() {
         commission: brandData.commission || 10,
         verified: brandData.verified || false,
         featured: brandData.featured || false,
-        popular: brandData.popular || false
+        popular: brandData.popular || false,
+        allowedPaymentMethods: Array.isArray(brandData.allowedPaymentMethods) && brandData.allowedPaymentMethods.length > 0
+          ? brandData.allowedPaymentMethods
+          : ['card', 'cash'],
       });
 
       if (brandData.logo) {
@@ -177,7 +201,7 @@ export default function BrandEdit() {
         uploadFormData.append('images', newLogoFile);
 
         const token = localStorage.getItem('token');
-        const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/upload/images`, {
+        const uploadResponse = await fetch(`${getApiUrl()}/upload/images`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -204,7 +228,7 @@ export default function BrandEdit() {
         uploadFormData.append('images', bannerFile);
 
         const token = localStorage.getItem('token');
-        const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/upload/images`, {
+        const uploadResponse = await fetch(`${getApiUrl()}/upload/images`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -255,6 +279,7 @@ export default function BrandEdit() {
         verified: brand.verified,
         featured: brand.featured,
         popular: brand.popular,
+        allowedPaymentMethods: brand.allowedPaymentMethods?.length ? brand.allowedPaymentMethods : ['card', 'cash'],
       };
       
       // Only add banner if it has a value (undefined fields are excluded by JSON.stringify)
@@ -312,7 +337,7 @@ export default function BrandEdit() {
     <Layout pageTitle="Edit Brand">
       <div className="container-fluid">
         <div className="row">
-          <div className="col-12">
+          <div className="col-12 d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div className="page-title-box">
               <div className="page-title-right">
                 <ol className="breadcrumb m-0">
@@ -322,6 +347,18 @@ export default function BrandEdit() {
                 </ol>
               </div>
               <h4 className="page-title">Edit Brand</h4>
+            </div>
+            <div className="d-flex gap-2">
+              {prevBrandId && (
+                <Link href={`/brand-edit?id=${prevBrandId}`} className="btn btn-sm btn-outline-primary">
+                  <i className="mdi mdi-arrow-left me-1" /> Previous
+                </Link>
+              )}
+              {nextBrandId && (
+                <Link href={`/brand-edit?id=${nextBrandId}`} className="btn btn-sm btn-outline-primary">
+                  Next <i className="mdi mdi-arrow-right ms-1" />
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -581,6 +618,41 @@ export default function BrandEdit() {
                         <option value="Active">Active</option>
                         <option value="Inactive">Inactive</option>
                       </select>
+                    </div>
+                  </div>
+
+                  <div className="mb-3">
+                    <label className="form-label">Checkout methods</label>
+                    <p className="text-muted small mb-2">Select which payment methods this brand accepts. Customers will only see allowed options at checkout.</p>
+                    <div className="d-flex gap-4">
+                      <label className="d-flex align-items-center gap-2">
+                        <input
+                          type="checkbox"
+                          className="form-check-input"
+                          checked={brand.allowedPaymentMethods.includes('card')}
+                          onChange={(e) => {
+                            const next = e.target.checked
+                              ? [...new Set([...brand.allowedPaymentMethods, 'card'])]
+                              : brand.allowedPaymentMethods.filter((m: string) => m !== 'card');
+                            setBrand(prev => ({ ...prev, allowedPaymentMethods: next.length ? next : ['cash'] }));
+                          }}
+                        />
+                        Card
+                      </label>
+                      <label className="d-flex align-items-center gap-2">
+                        <input
+                          type="checkbox"
+                          className="form-check-input"
+                          checked={brand.allowedPaymentMethods.includes('cash')}
+                          onChange={(e) => {
+                            const next = e.target.checked
+                              ? [...new Set([...brand.allowedPaymentMethods, 'cash'])]
+                              : brand.allowedPaymentMethods.filter((m: string) => m !== 'cash');
+                            setBrand(prev => ({ ...prev, allowedPaymentMethods: next.length ? next : ['card'] }));
+                          }}
+                        />
+                        Cash on Delivery
+                      </label>
                     </div>
                   </div>
 

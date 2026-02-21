@@ -3,6 +3,8 @@
 import { Layout, InteractiveTable } from '@/components';
 import { useState, useEffect } from 'react';
 
+import { getApiUrl } from '@/utils/apiHelper';
+
 export default function CustomerList() {
   const [statusFilter, setStatusFilter] = useState('');
   const [customers, setCustomers] = useState<any[]>([]);
@@ -20,7 +22,7 @@ export default function CustomerList() {
       params.append('role', 'customer');
       if (statusFilter) params.append('status', statusFilter);
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users?${params}`, {
+      const response = await fetch(`${getApiUrl()}/users?${params}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',

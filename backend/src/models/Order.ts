@@ -8,6 +8,8 @@ export interface IOrderItem {
   total: number;
   size?: string;
   color?: string;
+  /** Product image URL/path for order history (per-item so each line shows correct image) */
+  productImage?: string;
 }
 
 export interface IOrder extends Document {
@@ -52,6 +54,7 @@ const OrderSchema = new Schema<IOrder>(
         total: { type: Number, required: true, min: 0 },
         size: String,
         color: String,
+        productImage: { type: String },
       },
     ],
     subtotal: {

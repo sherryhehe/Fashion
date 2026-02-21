@@ -5,10 +5,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { notificationsApi } from '@/lib/api';
+import { getApiUrl } from '@/utils/apiHelper';
 
 export default function NotificationCreate() {
-  console.log('🔔 Notification Create Page Loaded');
-  
   const router = useRouter();
   const [saving, setSaving] = useState(false);
 
@@ -73,7 +72,7 @@ export default function NotificationCreate() {
         uploadFormData.append('images', imageFile);
 
         const token = localStorage.getItem('token');
-        const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/upload/images`, {
+        const uploadResponse = await fetch(`${getApiUrl()}/upload/images`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,

@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { stylesApi } from '@/lib/api';
 import { getStyleImageUrl } from '@/utils/imageHelper';
+import { getApiUrl } from '@/utils/apiHelper';
 
 export default function StyleEdit() {
   const router = useRouter();
@@ -32,11 +33,30 @@ export default function StyleEdit() {
   const [existingIcon, setExistingIcon] = useState<string>('');
   const [newIconFile, setNewIconFile] = useState<File | null>(null);
   const [newIconPreview, setNewIconPreview] = useState<string>('');
+  const [prevStyleId, setPrevStyleId] = useState<string | null>(null);
+  const [nextStyleId, setNextStyleId] = useState<string | null>(null);
 
   useEffect(() => {
     if (styleId) {
       fetchStyle();
     }
+  }, [styleId]);
+
+  // Fetch style list to get prev/next for navigation arrows
+  useEffect(() => {
+    if (!styleId) return;
+    let cancelled = false;
+    stylesApi.getAll({ limit: 500 }).then((res: any) => {
+      if (cancelled) return;
+      const list = Array.isArray(res?.data) ? res.data : (res?.data?.data ?? res?.data ?? []);
+      const ids = (Array.isArray(list) ? list : []).map((s: any) => s._id || s.id).filter(Boolean);
+      const idx = ids.indexOf(styleId);
+      if (idx > 0) setPrevStyleId(ids[idx - 1]);
+      else setPrevStyleId(null);
+      if (idx >= 0 && idx < ids.length - 1) setNextStyleId(ids[idx + 1]);
+      else setNextStyleId(null);
+    }).catch(() => {});
+    return () => { cancelled = true; };
   }, [styleId]);
 
   const fetchStyle = async () => {
@@ -159,7 +179,7 @@ export default function StyleEdit() {
         uploadFormData.append('images', newImageFile);
 
         const token = localStorage.getItem('token');
-        const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/upload/images`, {
+        const uploadResponse = await fetch(`${getApiUrl()}/upload/images`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -186,7 +206,7 @@ export default function StyleEdit() {
         uploadFormData.append('images', newIconFile);
 
         const token = localStorage.getItem('token');
-        const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/upload/images`, {
+        const uploadResponse = await fetch(`${getApiUrl()}/upload/images`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -265,7 +285,7 @@ export default function StyleEdit() {
     <Layout pageTitle="Edit Style">
       <div className="container-fluid">
         <div className="row">
-          <div className="col-12">
+          <div className="col-12 d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div className="page-title-box">
               <div className="page-title-right">
                 <ol className="breadcrumb m-0">
@@ -275,6 +295,18 @@ export default function StyleEdit() {
                 </ol>
               </div>
               <h4 className="page-title">Edit Style</h4>
+            </div>
+            <div className="d-flex gap-2">
+              {prevStyleId && (
+                <Link href={`/style-edit?id=${prevStyleId}`} className="btn btn-sm btn-outline-primary">
+                  <i className="mdi mdi-arrow-left me-1" /> Previous
+                </Link>
+              )}
+              {nextStyleId && (
+                <Link href={`/style-edit?id=${nextStyleId}`} className="btn btn-sm btn-outline-primary">
+                  Next <i className="mdi mdi-arrow-right ms-1" />
+                </Link>
+              )}
             </div>
           </div>
         </div>

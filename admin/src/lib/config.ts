@@ -1,35 +1,13 @@
 /**
  * Application Configuration
- * 
- * Centralized configuration management for environment variables
- * and application settings.
+ * Centralized configuration management for environment variables and application settings.
  */
-
-/**
- * API Configuration
- * Defaults to production API if NEXT_PUBLIC_API_URL is not set
- */
-const getApiBaseUrl = (): string => {
-  if (process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL;
-  }
-  
-  // Check if we're in production by hostname
-  if (typeof window !== 'undefined' && window.location.hostname === 'admin.buyshopo.com') {
-    return 'https://admin.buyshopo.com/api';
-  }
-  
-  // Check if we're in production by NODE_ENV
-  if (process.env.NODE_ENV === 'production') {
-    return 'https://admin.buyshopo.com/api';
-  }
-  
-  // Default to localhost for development
-  return 'http://localhost:8000/api';
-};
+import { getApiUrl } from '@/utils/apiHelper';
 
 export const API_CONFIG = {
-  baseURL: getApiBaseUrl(),
+  get baseURL() {
+    return getApiUrl();
+  },
   timeout: 30000, // 30 seconds
 } as const;
 

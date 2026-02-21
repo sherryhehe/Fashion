@@ -52,5 +52,23 @@ export const productsApi = {
    */
   setFeatured: (id: string, featured: boolean) =>
     apiClient.patch<Product>(`/products/${id}/featured`, { featured }),
+
+  /**
+   * Set product as promoted (appears first in search, homepage, categories)
+   */
+  setPromoted: (id: string, promoted: boolean) =>
+    apiClient.patch<Product>(`/products/${id}/promoted`, { promoted }),
+
+  /**
+   * Duplicate product (creates a copy with new SKU)
+   */
+  duplicate: (id: string) =>
+    apiClient.post<Product>(`/products/${id}/duplicate`),
+
+  /**
+   * Delete a review from a product
+   */
+  deleteReview: (productId: string, reviewId: string) =>
+    apiClient.delete<void>(`/products/${productId}/reviews/${reviewId}`),
 };
 

@@ -42,7 +42,7 @@ export default function LoginPage() {
         setError(data.error || 'Invalid credentials');
       }
     } catch (err) {
-      setError('Failed to connect. Ensure backend is running on port 8000.');
+      setError('Could not reach the server. Check that the API is running and try again.');
     } finally {
       setLoading(false);
     }

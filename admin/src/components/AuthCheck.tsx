@@ -12,10 +12,9 @@ export default function AuthCheck({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const checkAuth = () => {
       try {
-        // Check if we're in the browser (client-side)
         if (typeof window === 'undefined') {
           setIsChecking(false);
-          setShouldRender(true);
+          setShouldRender(false);
           return;
         }
 
@@ -44,9 +43,11 @@ export default function AuthCheck({ children }: { children: React.ReactNode }) {
         // Always stop loading after check
         setIsChecking(false);
       } catch (error) {
-        console.error('AuthCheck error:', error);
+        if (typeof window !== 'undefined') {
+          router.replace('/login');
+        }
         setIsChecking(false);
-        setShouldRender(true); // Show page on error
+        setShouldRender(false);
       }
     };
 
