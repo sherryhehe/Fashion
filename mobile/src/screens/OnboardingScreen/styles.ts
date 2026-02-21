@@ -9,57 +9,18 @@ export const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: 20,
   },
-  imageGrid: {
+  heroImageContainer: {
     marginTop: 20,
     marginBottom: 20,
-    gap: 8,
-  },
-  topImageContainer: {
-    marginBottom: 8,
-  },
-  topImage: {
-    height: 180,
-  },
-  middleRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 8,
-  },
-  leftColumn: {
-    flex: 1,
-    gap: 8,
-    width: '50%',
-  },
-  rightColumn: {
-    flex: 1,
-  },
-  middleImage: {
-    height: 85,
-  },
-  rightImage: {
-    height: 178, // Same height as left column (85 + 85 + 8 gap)
-  },
-  bottomRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  bottomImage: {
-    flex: 1,
-    height: 100,
-  },
-  placeholderImage: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    overflow: 'hidden',
-  },
-  mainImage: {
-    height: '100%',
     width: '100%',
-    resizeMode: 'cover',
+    height: 474,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#F5F5F5',
+  },
+  heroImage: {
+    width: '100%',
+    height: '100%',
   },
   contentSection: {
     marginBottom: 40,

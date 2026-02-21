@@ -4,15 +4,12 @@ import {
   Text,
   Image,
   TouchableOpacity,
-  Dimensions,
   ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import images from '../../assets/images';
-import { ONBOARDING_TITLE, ONBOARDING_SUBTITLE, ONBOARDING_MAIN_IMAGE } from '../../config/onboardingConfig';
+import { ONBOARDING_TITLE, ONBOARDING_SUBTITLE } from '../../config/onboardingConfig';
 import { styles } from './styles';
-
-const { width, height } = Dimensions.get('window');
 
 interface OnboardingScreenProps {
   navigation: any;
@@ -28,44 +25,13 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ navigation }) => {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Fashion Images Grid */}
-        <View style={styles.imageGrid}>
-          {/* Top large image */}
-          <View style={styles.topImageContainer}>
-            <View style={[styles.placeholderImage, styles.topImage]}>
-              <Image source={images.image1} style={styles.mainImage} />
-            </View>
-          </View>
-          
-          {/* Middle row with left column (2 images) and right column (1 image) */}
-          <View style={styles.middleRow}>
-            {/* Left column with 2 images */}
-            <View style={styles.leftColumn}>
-              <View style={[styles.placeholderImage, styles.middleImage]}>
-                <Image source={images.bagImage} style={styles.mainImage} />
-              </View>
-              <View style={[styles.placeholderImage, styles.middleImage]}>
-                <Image source={images.jacket} style={styles.mainImage} />
-              </View>
-            </View>
-            
-            {/* Right column with 1 image */}
-            <View style={styles.rightColumn}>
-              <View style={[styles.placeholderImage, styles.rightImage]}>
-                <Image source={images.shirtImage} style={styles.mainImage} />
-              </View>
-            </View>
-          </View>
-          
-          {/* Bottom row with 2 images side by side */}
-          <View style={styles.bottomRow}>
-            <View style={[styles.placeholderImage, styles.bottomImage]}>
-              <Image source={images.jeans} style={styles.mainImage} />
-            </View>
-            <View style={[styles.placeholderImage, styles.bottomImage]}>
-              <Image source={images.coat} style={styles.mainImage} />
-            </View>
-          </View>
+        {/* Single onboarding image - fills space previously used by the grid */}
+        <View style={styles.heroImageContainer}>
+          <Image
+            source={images.discoverNewClothes}
+            style={styles.heroImage}
+            resizeMode="cover"
+          />
         </View>
 
         {/* Content Section - edit text in src/config/onboardingConfig.ts */}

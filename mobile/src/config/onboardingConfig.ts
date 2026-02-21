@@ -14,7 +14,7 @@ export interface OnboardingSlide {
 
 export const ONBOARDING_SLIDES: OnboardingSlide[] = [
   {
-    image: images.image1,
+    image: images.discoverNewClothes,
     title: 'Discover New Clothes',
     subtitle: 'Explore our online shopping experience and get everything you needed.',
   },
@@ -26,4 +26,4 @@ export const ONBOARDING_SLIDES: OnboardingSlide[] = [
 export const ONBOARDING_TITLE = 'Discover New Clothes';
 export const ONBOARDING_SUBTITLE =
   'Explore our online shopping experience and get everything you needed.';
-export const ONBOARDING_MAIN_IMAGE = images.image1;
+export const ONBOARDING_MAIN_IMAGE = images.discoverNewClothes;
