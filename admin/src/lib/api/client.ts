@@ -1,29 +1,7 @@
 import { ApiResponse, PaginatedResponse } from '@/types';
+import { getApiUrl } from '@/utils/apiHelper';
 
-/**
- * Base API configuration
- * Defaults to production API if NEXT_PUBLIC_API_URL is not set
- */
-const getApiBaseUrl = (): string => {
-  if (process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL;
-  }
-  
-  // Check if we're in production by hostname
-  if (typeof window !== 'undefined' && window.location.hostname === 'admin.buyshopo.com') {
-    return 'https://admin.buyshopo.com/api';
-  }
-  
-  // Check if we're in production by NODE_ENV
-  if (process.env.NODE_ENV === 'production') {
-    return 'https://admin.buyshopo.com/api';
-  }
-  
-  // Default to localhost for development
-  return 'http://localhost:8000/api';
-};
-
-const API_BASE_URL = getApiBaseUrl();
+const API_BASE_URL = getApiUrl();
 
 /**
  * HTTP methods
@@ -108,14 +86,6 @@ class ApiClient {
     // Get token from localStorage if available
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     const authHeaders = token ? { 'Authorization': `Bearer ${token}` } : {};
-    
-    // Debug logging
-    console.log('🔧 API Client Request:');
-    console.log('  URL:', url);
-    console.log('  Method:', config.method);
-    console.log('  Token exists:', !!token);
-    console.log('  Token preview:', token ? token.substring(0, 30) + '...' : 'NO TOKEN');
-    console.log('  Headers:', { ...this.defaultHeaders, ...authHeaders, ...config.headers });
     
     try {
       const response = await fetch(url, {

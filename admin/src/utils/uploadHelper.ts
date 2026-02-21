@@ -1,6 +1,7 @@
 /**
  * Shared utility for uploading images with proper error handling and timeout
  */
+import { getApiUrl } from './apiHelper';
 
 export interface UploadResult {
   success: boolean;
@@ -17,12 +18,7 @@ export const uploadImage = async (file: File, apiUrl?: string): Promise<string> 
   uploadFormData.append('images', file);
   
   const token = localStorage.getItem('token');
-  const baseUrl = apiUrl || process.env.NEXT_PUBLIC_API_URL || 
-    (typeof window !== 'undefined' && window.location.hostname === 'admin.buyshopo.com'
-      ? 'https://admin.buyshopo.com/api'
-      : process.env.NODE_ENV === 'production'
-        ? 'https://admin.buyshopo.com/api'
-        : 'http://localhost:8000/api');
+  const baseUrl = apiUrl || getApiUrl();
   
   // Create timeout controller
   const timeoutController = new AbortController();
@@ -81,12 +77,7 @@ export const uploadImages = async (files: File[], apiUrl?: string): Promise<stri
   });
   
   const token = localStorage.getItem('token');
-  const baseUrl = apiUrl || process.env.NEXT_PUBLIC_API_URL || 
-    (typeof window !== 'undefined' && window.location.hostname === 'admin.buyshopo.com'
-      ? 'https://admin.buyshopo.com/api'
-      : process.env.NODE_ENV === 'production'
-        ? 'https://admin.buyshopo.com/api'
-        : 'http://localhost:8000/api');
+  const baseUrl = apiUrl || getApiUrl();
   
   // Create timeout controller
   const timeoutController = new AbortController();

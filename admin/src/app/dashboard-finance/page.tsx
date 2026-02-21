@@ -2,10 +2,12 @@
 
 import Layout from '@/components/layout/Layout';
 import { formatCurrencyNoDecimals } from '@/utils/currencyHelper';
+import { getApiUrl } from '@/utils/apiHelper';
 import { useState, useEffect } from 'react';
 
 export default function DashboardFinance() {
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [financialData, setFinancialData] = useState({
     totalRevenue: 0,
     monthlyRevenue: 0,
@@ -22,21 +24,21 @@ export default function DashboardFinance() {
   const fetchFinancialData = async () => {
     try {
       setLoading(true);
+      setError(null);
       const token = localStorage.getItem('token');
-      
-      // TODO: Create this endpoint in backend
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/dashboard/finance`, {
+      const response = await fetch(`${getApiUrl()}/dashboard/finance`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
-
-      if (response.ok) {
-        const data = await response.json();
+      const data = await response.json();
+      if (response.ok && data.success && data.data) {
         setFinancialData(data.data);
+      } else {
+        setError(data.error || data.message || 'Failed to load financial data');
       }
-    } catch (error) {
-      console.error('Failed to fetch financial data:', error);
+    } catch (err) {
+      setError('Could not load financial data. Check that the backend is running.');
     } finally {
       setLoading(false);
     }
@@ -48,6 +50,16 @@ export default function DashboardFinance() {
         <div className="text-center py-5">
           <div className="spinner-border text-primary"></div>
           <p className="mt-2">Loading financial data...</p>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (error) {
+    return (
+      <Layout pageTitle="Finance Dashboard">
+        <div className="alert alert-danger mx-3 mt-3" role="alert">
+          <strong>Error:</strong> {error}
         </div>
       </Layout>
     );

@@ -8,10 +8,9 @@ import { useCategories, useBrands, useCreateProduct } from '@/hooks/useApi';
 import { formatCurrency } from '@/utils/currencyHelper';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import ConfirmDialog from '@/components/organisms/ConfirmDialog';
+import { getApiUrl } from '@/utils/apiHelper';
 
 export default function ProductAdd() {
-  console.log('🎨 Product Add Page Loaded');
-  
   const router = useRouter();
   const { dialog, showConfirm, handleCancel, handleConfirm } = useConfirmDialog();
   
@@ -219,7 +218,7 @@ export default function ProductAdd() {
         });
 
         const token = localStorage.getItem('token');
-        const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/upload/images`, {
+        const uploadResponse = await fetch(`${getApiUrl()}/upload/images`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,

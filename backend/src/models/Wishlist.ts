@@ -1,15 +1,15 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
-export interface IWishlist extends Document {
+export interface IWishlistItem extends Document {
   userId: string;
   productId: string;
-  size?: string;
   color?: string;
+  size?: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
-const WishlistSchema = new Schema<IWishlist>(
+const WishlistSchema = new Schema<IWishlistItem>(
   {
     userId: {
       type: String,
@@ -19,19 +19,15 @@ const WishlistSchema = new Schema<IWishlist>(
       type: String,
       required: [true, 'Product ID is required'],
     },
-    size: {
-      type: String,
-    },
-    color: {
-      type: String,
-    },
+    color: { type: String },
+    size: { type: String },
   },
   {
     timestamps: true,
   }
 );
 
-// Compound index for user and product
 WishlistSchema.index({ userId: 1, productId: 1 }, { unique: true });
 
-export default mongoose.model<IWishlist>('Wishlist', WishlistSchema);
+export default mongoose.model<IWishlistItem>('Wishlist', WishlistSchema);
+export type IWishlist = IWishlistItem;

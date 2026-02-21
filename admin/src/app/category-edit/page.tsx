@@ -8,6 +8,7 @@ import { categoriesApi } from '@/lib/api';
 import { getCategoryImageUrl } from '@/utils/imageHelper';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import ConfirmDialog from '@/components/organisms/ConfirmDialog';
+import { getApiUrl } from '@/utils/apiHelper';
 
 export default function CategoryEdit() {
   const router = useRouter();
@@ -156,7 +157,7 @@ export default function CategoryEdit() {
         uploadFormData.append('images', newImageFile);
         
         const token = localStorage.getItem('token');
-        const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/upload/images`, {
+        const uploadResponse = await fetch(`${getApiUrl()}/upload/images`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,

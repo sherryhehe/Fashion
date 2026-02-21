@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import images from '../../assets/images';
+import { ONBOARDING_TITLE, ONBOARDING_SUBTITLE, ONBOARDING_MAIN_IMAGE } from '../../config/onboardingConfig';
 import { styles } from './styles';
 
 const { width, height } = Dimensions.get('window');
@@ -67,12 +68,10 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Content Section */}
+        {/* Content Section - edit text in src/config/onboardingConfig.ts */}
         <View style={styles.contentSection}>
-          <Text style={styles.title}>Discover New Clothes</Text>
-          <Text style={styles.description}>
-            Explore our online shopping experience and get everything you needed.
-          </Text>
+          <Text style={styles.title}>{ONBOARDING_TITLE}</Text>
+          <Text style={styles.description}>{ONBOARDING_SUBTITLE}</Text>
         </View>
 
         {/* Start Now Button */}

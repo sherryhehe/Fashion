@@ -7,14 +7,10 @@ const getApiUrlSafe = (): string => {
   return getApiUrl();
 };
 
-// Helper to get auth headers
+const isDev = () => typeof process !== 'undefined' && process.env.NODE_ENV === 'development';
+
 const getAuthHeaders = () => {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  
-  console.log('🔐 Getting auth headers...');
-  console.log('  Token exists:', !!token);
-  console.log('  Token preview:', token ? token.substring(0, 30) + '...' : 'NO TOKEN');
-  
   return {
     'Content-Type': 'application/json',
     ...(token ? { 'Authorization': `Bearer ${token}` } : {})
@@ -26,12 +22,6 @@ const apiRequest = async (endpoint: string, options?: RequestInit) => {
   const headers = getAuthHeaders();
   
   const apiUrl = getApiUrlSafe();
-  
-  console.log('📡 API Request:');
-  console.log('  URL:', `${apiUrl}${endpoint}`);
-  console.log('  Method:', options?.method || 'GET');
-  console.log('  Headers:', headers);
-  
   const response = await fetch(`${apiUrl}${endpoint}`, {
     ...options,
     headers: {
@@ -41,14 +31,10 @@ const apiRequest = async (endpoint: string, options?: RequestInit) => {
   });
 
   const data = await response.json();
-  
-  console.log('📥 API Response:');
-  console.log('  Status:', response.status);
-  console.log('  Data:', data);
 
   if (!response.ok) {
     if (response.status === 401) {
-      console.error('🔐 Unauthorized - clearing token');
+      if (isDev()) console.warn('Unauthorized - redirecting to login');
       localStorage.removeItem('token');
       window.location.href = '/login';
     }
@@ -79,16 +65,12 @@ export const useProduct = (id: string | null) => {
 
 export const useCreateProduct = () => {
   return useMutation({
-    mutationFn: (productData: any) => {
-      console.log('📤 CREATE PRODUCT MUTATION');
-      console.log('  Data:', productData);
-      return apiRequest('/products', {
+    mutationFn: (productData: any) =>
+      apiRequest('/products', {
         method: 'POST',
         body: JSON.stringify(productData),
-      });
-    },
+      }),
     onSuccess: () => {
-      console.log('✅ Product created - invalidating queries');
       queryClient.invalidateQueries({ queryKey: ['products'] });
     },
   });
@@ -96,17 +78,12 @@ export const useCreateProduct = () => {
 
 export const useUpdateProduct = () => {
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => {
-      console.log('📤 UPDATE PRODUCT MUTATION');
-      console.log('  ID:', id);
-      console.log('  Data:', data);
-      return apiRequest(`/products/${id}`, {
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      apiRequest(`/products/${id}`, {
         method: 'PUT',
         body: JSON.stringify(data),
-      });
-    },
+      }),
     onSuccess: () => {
-      console.log('✅ Product updated - invalidating queries');
       queryClient.invalidateQueries({ queryKey: ['products'] });
     },
   });
@@ -114,17 +91,8 @@ export const useUpdateProduct = () => {
 
 export const useDeleteProduct = () => {
   return useMutation({
-    mutationFn: (id: string) => {
-      console.log('🗑️ DELETE PRODUCT MUTATION');
-      console.log('  ID:', id);
-      return apiRequest(`/products/${id}`, {
-        method: 'DELETE',
-      });
-    },
-    onSuccess: () => {
-      console.log('✅ Product deleted - invalidating queries');
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-    },
+    mutationFn: (id: string) => apiRequest(`/products/${id}`, { method: 'DELETE' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['products'] }),
   });
 };
 
@@ -149,52 +117,24 @@ export const useCategory = (id: string | null) => {
 
 export const useCreateCategory = () => {
   return useMutation({
-    mutationFn: (categoryData: any) => {
-      console.log('📤 CREATE CATEGORY MUTATION');
-      console.log('  Data:', categoryData);
-      return apiRequest('/categories', {
-        method: 'POST',
-        body: JSON.stringify(categoryData),
-      });
-    },
-    onSuccess: () => {
-      console.log('✅ Category created - invalidating queries');
-      queryClient.invalidateQueries({ queryKey: ['categories'] });
-    },
+    mutationFn: (categoryData: any) =>
+      apiRequest('/categories', { method: 'POST', body: JSON.stringify(categoryData) }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['categories'] }),
   });
 };
 
 export const useUpdateCategory = () => {
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => {
-      console.log('📤 UPDATE CATEGORY MUTATION');
-      console.log('  ID:', id);
-      console.log('  Data:', data);
-      return apiRequest(`/categories/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(data),
-      });
-    },
-    onSuccess: () => {
-      console.log('✅ Category updated - invalidating queries');
-      queryClient.invalidateQueries({ queryKey: ['categories'] });
-    },
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      apiRequest(`/categories/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['categories'] }),
   });
 };
 
 export const useDeleteCategory = () => {
   return useMutation({
-    mutationFn: (id: string) => {
-      console.log('🗑️ DELETE CATEGORY MUTATION');
-      console.log('  ID:', id);
-      return apiRequest(`/categories/${id}`, {
-        method: 'DELETE',
-      });
-    },
-    onSuccess: () => {
-      console.log('✅ Category deleted - invalidating queries');
-      queryClient.invalidateQueries({ queryKey: ['categories'] });
-    },
+    mutationFn: (id: string) => apiRequest(`/categories/${id}`, { method: 'DELETE' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['categories'] }),
   });
 };
 
@@ -208,18 +148,9 @@ export const useStyles = () => {
 
 export const useCreateStyle = () => {
   return useMutation({
-    mutationFn: (styleData: any) => {
-      console.log('📤 CREATE STYLE MUTATION');
-      console.log('  Data:', styleData);
-      return apiRequest('/styles', {
-        method: 'POST',
-        body: JSON.stringify(styleData),
-      });
-    },
-    onSuccess: () => {
-      console.log('✅ Style created - invalidating queries');
-      queryClient.invalidateQueries({ queryKey: ['styles'] });
-    },
+    mutationFn: (styleData: any) =>
+      apiRequest('/styles', { method: 'POST', body: JSON.stringify(styleData) }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['styles'] }),
   });
 };
 
@@ -233,18 +164,9 @@ export const useBrands = () => {
 
 export const useCreateBrand = () => {
   return useMutation({
-    mutationFn: (brandData: any) => {
-      console.log('📤 CREATE BRAND MUTATION');
-      console.log('  Data:', brandData);
-      return apiRequest('/brands', {
-        method: 'POST',
-        body: JSON.stringify(brandData),
-      });
-    },
-    onSuccess: () => {
-      console.log('✅ Brand created - invalidating queries');
-      queryClient.invalidateQueries({ queryKey: ['brands'] });
-    },
+    mutationFn: (brandData: any) =>
+      apiRequest('/brands', { method: 'POST', body: JSON.stringify(brandData) }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['brands'] }),
   });
 };
 
@@ -269,52 +191,24 @@ export const useBanner = (id: string | null) => {
 
 export const useCreateBanner = () => {
   return useMutation({
-    mutationFn: (bannerData: any) => {
-      console.log('📤 CREATE BANNER MUTATION');
-      console.log('  Data:', bannerData);
-      return apiRequest('/banners', {
-        method: 'POST',
-        body: JSON.stringify(bannerData),
-      });
-    },
-    onSuccess: () => {
-      console.log('✅ Banner created - invalidating queries');
-      queryClient.invalidateQueries({ queryKey: ['banners'] });
-    },
+    mutationFn: (bannerData: any) =>
+      apiRequest('/banners', { method: 'POST', body: JSON.stringify(bannerData) }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['banners'] }),
   });
 };
 
 export const useUpdateBanner = () => {
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => {
-      console.log('📤 UPDATE BANNER MUTATION');
-      console.log('  ID:', id);
-      console.log('  Data:', data);
-      return apiRequest(`/banners/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(data),
-      });
-    },
-    onSuccess: () => {
-      console.log('✅ Banner updated - invalidating queries');
-      queryClient.invalidateQueries({ queryKey: ['banners'] });
-    },
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      apiRequest(`/banners/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['banners'] }),
   });
 };
 
 export const useDeleteBanner = () => {
   return useMutation({
-    mutationFn: (id: string) => {
-      console.log('🗑️ DELETE BANNER MUTATION');
-      console.log('  ID:', id);
-      return apiRequest(`/banners/${id}`, {
-        method: 'DELETE',
-      });
-    },
-    onSuccess: () => {
-      console.log('✅ Banner deleted - invalidating queries');
-      queryClient.invalidateQueries({ queryKey: ['banners'] });
-    },
+    mutationFn: (id: string) => apiRequest(`/banners/${id}`, { method: 'DELETE' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['banners'] }),
   });
 };
 

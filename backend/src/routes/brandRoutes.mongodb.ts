@@ -7,6 +7,8 @@ const router = express.Router();
 // Public routes
 router.get('/featured', brandController.getFeaturedBrands);
 router.get('/top', brandController.getTopBrands);
+router.get('/by-name/:name', brandController.getBrandByExactName);
+router.get('/allowed-payment-methods', brandController.getAllowedPaymentMethods);
 
 // Protected routes - require authentication
 router.get('/', authenticate, brandController.getAllBrands);

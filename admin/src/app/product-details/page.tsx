@@ -3,7 +3,7 @@
 import Layout from '@/components/layout/Layout';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useProduct } from '@/hooks/useApi';
 import { productsApi } from '@/lib/api';
@@ -18,21 +18,105 @@ export default function ProductDetails() {
   
   const { data: product, isLoading, error, refetch } = useProduct(productId);
   const [togglingFeatured, setTogglingFeatured] = useState(false);
-  const [deletingReviewKey, setDeletingReviewKey] = useState<string | null>(null);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [togglingPromoted, setTogglingPromoted] = useState(false);
+  const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null);
+  const [duplicating, setDuplicating] = useState(false);
+  const [prevProductId, setPrevProductId] = useState<string | null>(null);
+  const [nextProductId, setNextProductId] = useState<string | null>(null);
   const [isClientMounted, setIsClientMounted] = useState(false);
-  const [duplicatingProduct, setDuplicatingProduct] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
-  const [duplicateSkuPreview, setDuplicateSkuPreview] = useState<string>('');
-  const [reviewToDelete, setReviewToDelete] = useState<{
-    idx: number;
-    key: string;
-    review: any;
-  } | null>(null);
+  const [duplicatingProduct, setDuplicatingProduct] = useState(false);
+  const [duplicateSkuPreview, setDuplicateSkuPreview] = useState('');
+  const [reviewToDelete, setReviewToDelete] = useState<{ idx: number; key: string; review: any } | null>(null);
+  const [deletingReviewKey, setDeletingReviewKey] = useState<string | null>(null);
+
+  // Fetch product list to get prev/next for navigation arrows
+  useEffect(() => {
+    if (!productId) return;
+    let cancelled = false;
+    productsApi.getAll({ limit: 500, page: 1 }).then((res: any) => {
+      if (cancelled) return;
+      const list = Array.isArray(res?.data) ? res.data : (res?.data?.data ?? res?.data ?? []);
+      const ids = (Array.isArray(list) ? list : []).map((p: any) => p._id || p.id).filter(Boolean);
+      const idx = ids.indexOf(productId);
+      if (idx > 0) setPrevProductId(ids[idx - 1]);
+      else setPrevProductId(null);
+      if (idx >= 0 && idx < ids.length - 1) setNextProductId(ids[idx + 1]);
+      else setNextProductId(null);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [productId]);
 
   useEffect(() => {
     setIsClientMounted(true);
   }, []);
+
+  const makeDuplicateSku = (sku?: string) => {
+    const suffix = Date.now().toString().slice(-6);
+    const base = (sku || 'SKU')
+      .toString()
+      .trim()
+      .replace(/\s+/g, '-')
+      .replace(/[^A-Za-z0-9-_]/g, '')
+      .toUpperCase();
+    return `${base}-COPY-${suffix}`;
+  };
+
+  const handleOpenDuplicateModal = () => {
+    if (duplicatingProduct) return;
+    setDuplicateSkuPreview(makeDuplicateSku(product?.sku));
+    setShowDuplicateModal(true);
+  };
+
+  const handleCloseDuplicateModal = () => {
+    if (duplicatingProduct) return;
+    setShowDuplicateModal(false);
+  };
+
+  const handleDuplicateProduct = async () => {
+    try {
+      setDuplicatingProduct(true);
+      const created = await productsApi.duplicate(productId!);
+      const newId = (created as any)?.data?._id || (created as any)?._id;
+      addNotification('success', 'Product duplicated. Redirecting to edit...');
+      if (newId) window.location.href = `/product-edit?id=${newId}`;
+      else await refetch();
+    } catch (e: any) {
+      console.error('Failed to duplicate product:', e);
+      addNotification('error', e?.message || 'Failed to duplicate product');
+    } finally {
+      setDuplicatingProduct(false);
+    }
+  };
+
+  const handleOpenDeleteModal = (review: any, idx: number) => {
+    const key = review?.id ? String(review.id) : String(idx);
+    setReviewToDelete({ review, idx, key });
+    setShowDeleteModal(true);
+  };
+
+  const handleCloseDeleteModal = () => {
+    if (deletingReviewKey) return;
+    setShowDeleteModal(false);
+    setReviewToDelete(null);
+  };
+
+  const handleConfirmDeleteReview = async () => {
+    if (!reviewToDelete) return;
+    try {
+      setDeletingReviewKey(reviewToDelete.key);
+      await productsApi.deleteReview(productId!, reviewToDelete.key);
+      setShowDeleteModal(false);
+      setReviewToDelete(null);
+      await refetch();
+    } catch (err) {
+      console.error('Failed to delete review:', err);
+      addNotification('error', 'Failed to delete review. Please try again.');
+    } finally {
+      setDeletingReviewKey(null);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -76,133 +160,54 @@ export default function ProductDetails() {
   const handleToggleFeatured = async () => {
     try {
       setTogglingFeatured(true);
-      console.log('🌟 Toggling featured status for product:', productId);
-      console.log('Current featured status:', product.featured);
-      console.log('New featured status:', !product.featured);
-      
-      const response = await productsApi.update(productId!, {
-        ...product,
-        featured: !product.featured
-      });
-      
-      console.log('✅ Featured status updated:', response);
-      
-      // Refetch product to get updated data
+      await productsApi.setFeatured(productId!, !product.featured);
       await refetch();
-      
-      console.log('✅ Product data refreshed');
     } catch (error) {
-      console.error('❌ Failed to update featured status:', error);
+      console.error('Failed to update featured status:', error);
     } finally {
       setTogglingFeatured(false);
     }
   };
 
-  const makeDuplicateSku = (sku?: string) => {
-    const suffix = Date.now().toString().slice(-6);
-    const base = (sku || 'SKU')
-      .toString()
-      .trim()
-      .replace(/\s+/g, '-')
-      .replace(/[^A-Za-z0-9-_]/g, '')
-      .toUpperCase();
-    return `${base}-COPY-${suffix}`;
-  };
-
-  const handleOpenDuplicateModal = () => {
-    if (duplicatingProduct) return;
-    setDuplicateSkuPreview(makeDuplicateSku(product?.sku));
-    setShowDuplicateModal(true);
-  };
-
-  const handleCloseDuplicateModal = () => {
-    if (duplicatingProduct) return;
-    setShowDuplicateModal(false);
-  };
-
-  const handleDuplicateProduct = async () => {
+  // Toggle promoted status
+  const handleTogglePromoted = async () => {
     try {
-      setDuplicatingProduct(true);
-
-      const payload: any = {
-        name: `${product.name || 'Product'} (Copy)`,
-        description: product.description || '',
-        price: product.price || 0,
-        originalPrice: product.originalPrice,
-        discount: product.discount,
-        category: product.category || '',
-        brand: product.brand,
-        style: product.style,
-        sku: duplicateSkuPreview || makeDuplicateSku(product.sku),
-        stock: product.stock ?? 0,
-        images: Array.isArray(product.images) ? product.images : [],
-        features: Array.isArray(product.features) ? product.features : [],
-        tags: Array.isArray(product.tags) ? product.tags : [],
-        specifications: product.specifications || {},
-        variations: product.variations || [],
-        seo: product.seo || {},
-        featured: false,
-        status: 'draft',
-        reviews: [],
-        reviewCount: 0,
-        rating: 0,
-        salesCount: 0,
-        views: 0,
-      };
-
-      const createdResp = await productsApi.create(payload);
-      const created: any = createdResp.data;
-
-      addNotification('success', 'Product duplicated. Redirecting to edit...');
-      window.location.href = `/product-edit?id=${created._id || created.id}`;
-    } catch (e: any) {
-      console.error('Failed to duplicate product:', e);
-      addNotification('error', e?.message || 'Failed to duplicate product');
+      setTogglingPromoted(true);
+      await productsApi.setPromoted(productId!, !(product as any).promoted);
+      await refetch();
+    } catch (error) {
+      console.error('Failed to update promoted status:', error);
     } finally {
-      setDuplicatingProduct(false);
+      setTogglingPromoted(false);
     }
   };
 
-  const handleOpenDeleteModal = (review: any, idx: number) => {
-    const key = review?.id ? String(review.id) : String(idx);
-    setReviewToDelete({ review, idx, key });
-    setShowDeleteModal(true);
-  };
-
-  const handleCloseDeleteModal = () => {
-    if (deletingReviewKey) return;
-    setShowDeleteModal(false);
-    setReviewToDelete(null);
-  };
-
-  // Delete review (confirm inside modal)
-  const handleConfirmDeleteReview = async () => {
-    if (!reviewToDelete) return;
-
+  // Duplicate product
+  const handleDuplicate = async () => {
     try {
-      setDeletingReviewKey(reviewToDelete.key);
-      console.log('🗑️ Deleting review:', reviewToDelete);
+      setDuplicating(true);
+      const created = await productsApi.duplicate(productId!);
+      const newId = (created as any)?.data?._id || (created as any)?._id;
+      if (newId) window.location.href = `/product-edit?id=${newId}`;
+      else await refetch();
+    } catch (error) {
+      console.error('Failed to duplicate product:', error);
+    } finally {
+      setDuplicating(false);
+    }
+  };
 
-      const updatedReviews = product.reviews.filter((r: any, i: number) => {
-        // Prefer ID-based delete when available; fallback to index delete
-        if (reviewToDelete.review?.id) return r.id !== reviewToDelete.review.id;
-        return i !== reviewToDelete.idx;
-      });
-
-      await productsApi.update(productId!, {
-        ...product,
-        reviews: updatedReviews,
-      });
-
-      console.log('✅ Review deleted successfully');
-      setShowDeleteModal(false);
-      setReviewToDelete(null);
+  // Delete a review
+  const handleDeleteReview = async (reviewId: string) => {
+    if (!confirm('Delete this review? This cannot be undone.')) return;
+    try {
+      setDeletingReviewId(reviewId);
+      await productsApi.deleteReview(productId!, reviewId);
       await refetch();
     } catch (error) {
-      console.error('❌ Failed to delete review:', error);
-      alert('Failed to delete review. Please try again.');
+      console.error('Failed to delete review:', error);
     } finally {
-      setDeletingReviewKey(null);
+      setDeletingReviewId(null);
     }
   };
 
@@ -344,14 +349,26 @@ export default function ProductDetails() {
       <div className="container-fluid">
         {/* Breadcrumb */}
         <div className="row mb-3">
-          <div className="col-12">
+          <div className="col-12 d-flex justify-content-between align-items-center flex-wrap gap-2">
             <nav aria-label="breadcrumb">
-              <ol className="breadcrumb">
+              <ol className="breadcrumb mb-0">
                 <li className="breadcrumb-item"><Link href="/">Home</Link></li>
                 <li className="breadcrumb-item"><Link href="/product-list">Products</Link></li>
                 <li className="breadcrumb-item active" aria-current="page">{product.name}</li>
               </ol>
             </nav>
+            <div className="d-flex gap-2">
+              {prevProductId && (
+                <Link href={`/product-details?id=${prevProductId}`} className="btn btn-sm btn-outline-primary">
+                  <i className="mdi mdi-arrow-left me-1" /> Previous
+                </Link>
+              )}
+              {nextProductId && (
+                <Link href={`/product-details?id=${nextProductId}`} className="btn btn-sm btn-outline-primary">
+                  Next <i className="mdi mdi-arrow-right ms-1" />
+                </Link>
+              )}
+            </div>
           </div>
         </div>
 
@@ -473,24 +490,6 @@ export default function ProductDetails() {
                         <i className="mdi mdi-pencil me-1"></i>
                         Edit Product
                       </Link>
-                      <button
-                        className="btn btn-outline-secondary btn-featured"
-                        onClick={handleOpenDuplicateModal}
-                        disabled={duplicatingProduct}
-                        style={{ minWidth: '200px' }}
-                      >
-                        {duplicatingProduct ? (
-                          <>
-                            <span className="spinner-border spinner-border-sm me-1"></span>
-                            Duplicating...
-                          </>
-                        ) : (
-                          <>
-                            <i className="mdi mdi-content-copy me-1"></i>
-                            Duplicate Product
-                          </>
-                        )}
-                      </button>
                       <button 
                         className={`btn btn-featured ${product.featured ? 'btn-warning text-white' : 'btn-outline-warning'}`}
                         onClick={handleToggleFeatured}
@@ -498,15 +497,48 @@ export default function ProductDetails() {
                         style={{ minWidth: '200px' }}
                       >
                         {togglingFeatured ? (
-                          <>
-                            <span className="spinner-border spinner-border-sm me-1"></span>
-                            Updating...
-                          </>
+                          <><span className="spinner-border spinner-border-sm me-1"></span>Updating...</>
                         ) : (
-                          <>
-                            <i className={`mdi ${product.featured ? 'mdi-star' : 'mdi-star-outline'} me-1`}></i>
-                            {product.featured ? 'Remove from Featured' : 'Add to Featured'}
-                          </>
+                          <><i className={`mdi ${product.featured ? 'mdi-star' : 'mdi-star-outline'} me-1`}></i>{product.featured ? 'Remove from Featured' : 'Add to Featured'}</>
+                        )}
+                      </button>
+                      <button 
+                        className={`btn btn-featured ${(product as any).promoted ? 'btn-info text-white' : 'btn-outline-info'}`}
+                        onClick={handleTogglePromoted}
+                        disabled={togglingPromoted}
+                        style={{ minWidth: '160px' }}
+                        title="Promoted products appear first in search, homepage, categories"
+                      >
+                        {togglingPromoted ? (
+                          <><span className="spinner-border spinner-border-sm me-1"></span>Updating...</>
+                        ) : (
+                          <><i className="mdi mdi-arrow-up-bold me-1"></i>{(product as any).promoted ? 'Unpromote' : 'Promote'}</>
+                        )}
+                      </button>
+                      <button 
+                        className="btn btn-outline-secondary btn-featured"
+                        onClick={handleOpenDuplicateModal}
+                        disabled={duplicatingProduct}
+                        style={{ minWidth: '140px' }}
+                        title="Duplicate this product (preview SKU)"
+                      >
+                        {duplicatingProduct ? (
+                          <><span className="spinner-border spinner-border-sm me-1"></span>Copying...</>
+                        ) : (
+                          <><i className="bx bx-copy me-1"></i>Duplicate</>
+                        )}
+                      </button>
+                      <button 
+                        className="btn btn-outline-secondary btn-featured"
+                        onClick={handleDuplicate}
+                        disabled={duplicating}
+                        style={{ minWidth: '120px' }}
+                        title="Quick duplicate (no preview)"
+                      >
+                        {duplicating ? (
+                          <><span className="spinner-border spinner-border-sm me-1"></span>...</>
+                        ) : (
+                          <><i className="mdi mdi-content-copy me-1"></i>Quick copy</>
                         )}
                       </button>
                       <Link href="/product-list" className="btn btn-outline-secondary btn-featured">
@@ -629,8 +661,11 @@ export default function ProductDetails() {
               </div>
               <div className="card-body">
                 {product.reviews && Array.isArray(product.reviews) && product.reviews.length > 0 ? (
-                  product.reviews.map((review: any, idx: number) => (
-                    <div key={review.id || idx} className="border-bottom pb-3 mb-3">
+                  product.reviews.map((review: any, idx: number) => {
+                    const reviewIdForDelete = review._id ?? review.id ?? String(idx);
+                    const reviewIdStr = typeof reviewIdForDelete === 'string' ? reviewIdForDelete : String(reviewIdForDelete);
+                    return (
+                    <div key={reviewIdStr} className="border-bottom pb-3 mb-3">
                       <div className="d-flex justify-content-between align-items-start">
                         <div className="flex-grow-1">
                           <div className="d-flex align-items-center mb-2">
@@ -652,20 +687,20 @@ export default function ProductDetails() {
                         </div>
                         <button
                           type="button"
-                          className="btn btn-sm btn-outline-danger"
+                          className="btn btn-sm btn-outline-danger ms-2"
                           onClick={() => handleOpenDeleteModal(review, idx)}
-                          disabled={deletingReviewKey === (review?.id ? String(review.id) : String(idx))}
-                          title="Delete Review"
+                          disabled={deletingReviewKey === reviewIdStr}
+                          title="Delete review"
                         >
-                          {deletingReviewKey === (review?.id ? String(review.id) : String(idx)) ? (
-                            <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                          {deletingReviewKey === reviewIdStr ? (
+                            <span className="spinner-border spinner-border-sm" />
                           ) : (
-                            <i className="bx bx-trash"></i>
+                            <i className="bx bx-trash" />
                           )}
                         </button>
                       </div>
                     </div>
-                  ))
+                  ); })
                 ) : (
                   <div className="text-center py-4">
                     <i className="bx bx-message-rounded-dots display-4 text-muted"></i>
@@ -755,200 +790,126 @@ export default function ProductDetails() {
       </div>
 
       {/* Delete Review Modal */}
-      {showDeleteModal && (
-        isClientMounted && typeof document !== 'undefined'
-          ? createPortal(
-              <>
-                <div className="review-modal-backdrop" />
-                <div
-                  className="review-modal-container"
-                  role="dialog"
-                  aria-modal="true"
-                  aria-label="Delete review"
+      {showDeleteModal && isClientMounted && typeof document !== 'undefined' && createPortal(
+        <>
+          <div className="review-modal-backdrop" onClick={handleCloseDeleteModal} />
+          <div className="review-modal-container" role="dialog" aria-modal="true" aria-label="Delete review">
+            <div className="review-modal">
+              <div className="review-modal__header">
+                <h5 className="review-modal__title">
+                  <i className="bx bx-trash" />
+                  Delete Review
+                </h5>
+                <button
+                  type="button"
+                  className="review-modal__close"
+                  onClick={handleCloseDeleteModal}
+                  disabled={!!deletingReviewKey}
+                  aria-label="Close"
                 >
-                  <div className="review-modal">
-                    <div className="review-modal__header">
-                      <h5 className="review-modal__title">
-                        <i className="bx bx-trash" />
-                        Delete Review
-                      </h5>
-                      <button
-                        type="button"
-                        className="review-modal__close"
-                        onClick={handleCloseDeleteModal}
-                        disabled={!!deletingReviewKey}
-                        aria-label="Close"
-                        title="Close"
-                      >
-                        ×
-                      </button>
-                    </div>
-
-                    <div className="review-modal__body">
-                      <div className="alert alert-warning d-flex align-items-center" role="alert">
-                        <i className="bx bx-error-circle fs-20 me-2"></i>
-                        <div>
-                          <strong>Warning!</strong> This action cannot be undone.
+                  ×
+                </button>
+              </div>
+              <div className="review-modal__body">
+                <div className="alert alert-warning d-flex align-items-center" role="alert">
+                  <i className="bx bx-error-circle fs-20 me-2" />
+                  <div><strong>Warning!</strong> This action cannot be undone.</div>
+                </div>
+                <p className="mb-3">Are you sure you want to delete this review?</p>
+                {reviewToDelete?.review && (
+                  <div className="card bg-light mb-0">
+                    <div className="card-body">
+                      <div className="d-flex align-items-center mb-2">
+                        <strong className="me-2">{reviewToDelete.review.name}</strong>
+                        <div className="rating">
+                          {[...Array(5)].map((_, i) => (
+                            <i
+                              key={i}
+                              className={`bx ${i < (reviewToDelete!.review.rating || 0) ? 'bxs-star text-warning' : 'bx-star text-muted'}`}
+                            />
+                          ))}
                         </div>
                       </div>
-
-                      <p className="mb-3">Are you sure you want to delete this review?</p>
-
-                      {reviewToDelete?.review && (
-                        <div className="card bg-light mb-0">
-                          <div className="card-body">
-                            <div className="d-flex align-items-center mb-2">
-                              <strong className="me-2">{reviewToDelete.review.name}</strong>
-                              <div className="rating">
-                                {[...Array(5)].map((_, i) => (
-                                  <i
-                                    key={i}
-                                    className={`bx ${
-                                      i < (reviewToDelete.review.rating || 0)
-                                        ? 'bxs-star text-warning'
-                                        : 'bx-star text-muted'
-                                    }`}
-                                  ></i>
-                                ))}
-                              </div>
-                            </div>
-                            <p className="mb-2 text-muted small">{reviewToDelete.review.comment}</p>
-                            <small className="text-muted">
-                              <i className="mdi mdi-calendar me-1"></i>
-                              {reviewToDelete.review.date
-                                ? new Date(reviewToDelete.review.date).toLocaleDateString()
-                                : '-'}
-                            </small>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="review-modal__footer">
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        onClick={handleCloseDeleteModal}
-                        disabled={!!deletingReviewKey}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-danger"
-                        onClick={handleConfirmDeleteReview}
-                        disabled={!!deletingReviewKey}
-                      >
-                        {deletingReviewKey ? (
-                          <>
-                            <span
-                              className="spinner-border spinner-border-sm me-2"
-                              role="status"
-                              aria-hidden="true"
-                            ></span>
-                            Deleting...
-                          </>
-                        ) : (
-                          'Delete Review'
-                        )}
-                      </button>
+                      <p className="mb-2 text-muted small">{reviewToDelete.review.comment}</p>
+                      <small className="text-muted">
+                        {reviewToDelete.review.date ? new Date(reviewToDelete.review.date).toLocaleDateString() : '-'}
+                      </small>
                     </div>
                   </div>
-                </div>
-              </>,
-              document.body
-            )
-          : null
+                )}
+              </div>
+              <div className="review-modal__footer">
+                <button type="button" className="btn btn-secondary" onClick={handleCloseDeleteModal} disabled={!!deletingReviewKey}>
+                  Cancel
+                </button>
+                <button type="button" className="btn btn-danger" onClick={handleConfirmDeleteReview} disabled={!!deletingReviewKey}>
+                  {deletingReviewKey ? <span className="spinner-border spinner-border-sm me-2" /> : null}
+                  Delete Review
+                </button>
+              </div>
+            </div>
+          </div>
+        </>,
+        document.body
       )}
 
       {/* Duplicate Product Modal */}
-      {showDuplicateModal &&
-        isClientMounted &&
-        typeof document !== 'undefined' &&
-        createPortal(
-          <>
-            <div className="review-modal-backdrop" />
-            <div className="review-modal-container" role="dialog" aria-modal="true" aria-label="Duplicate product">
-              <div className="review-modal">
-                <div className="review-modal__header review-modal__header--secondary">
-                  <h5 className="review-modal__title">
-                    <i className="mdi mdi-content-copy" />
-                    Duplicate Product
-                  </h5>
-                  <button
-                    type="button"
-                    className="review-modal__close"
-                    onClick={handleCloseDuplicateModal}
-                    disabled={duplicatingProduct}
-                    aria-label="Close"
-                    title="Close"
-                  >
-                    ×
-                  </button>
+      {showDuplicateModal && isClientMounted && typeof document !== 'undefined' && createPortal(
+        <>
+          <div className="review-modal-backdrop" onClick={handleCloseDuplicateModal} />
+          <div className="review-modal-container" role="dialog" aria-modal="true" aria-label="Duplicate product">
+            <div className="review-modal">
+              <div className="review-modal__header review-modal__header--secondary">
+                <h5 className="review-modal__title">
+                  <i className="mdi mdi-content-copy" />
+                  Duplicate Product
+                </h5>
+                <button
+                  type="button"
+                  className="review-modal__close"
+                  onClick={handleCloseDuplicateModal}
+                  disabled={duplicatingProduct}
+                  aria-label="Close"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="review-modal__body">
+                <div className="alert alert-primary d-flex align-items-center" role="alert">
+                  <i className="mdi mdi-information-outline fs-20 me-2" />
+                  <div>Creates a <strong>Draft</strong> copy with a new <strong>SKU</strong> and opens it in Edit.</div>
                 </div>
-
-                <div className="review-modal__body">
-                  <div className="alert alert-primary d-flex align-items-center" role="alert">
-                    <i className="mdi mdi-information-outline fs-20 me-2"></i>
-                    <div>
-                      Creates a <strong>Draft</strong> copy with a new <strong>SKU</strong> and opens it in Edit.
-                    </div>
+                <div className="dup-kv mb-3">
+                  <div className="dup-kv__item">
+                    <div className="dup-kv__label">Source</div>
+                    <div className="dup-kv__value">{product.name}</div>
                   </div>
-
-                  <div className="dup-kv mb-3">
-                    <div className="dup-kv__item">
-                      <div className="dup-kv__label">Source</div>
-                      <div className="dup-kv__value">{product.name}</div>
-                    </div>
-                    <div className="dup-kv__item">
-                      <div className="dup-kv__label">Current SKU</div>
-                      <div className="dup-kv__value">{product.sku}</div>
-                    </div>
-                    <div className="dup-kv__item">
-                      <div className="dup-kv__label">New SKU</div>
-                      <div className="dup-kv__value">{duplicateSkuPreview}</div>
-                    </div>
+                  <div className="dup-kv__item">
+                    <div className="dup-kv__label">Current SKU</div>
+                    <div className="dup-kv__value">{product.sku}</div>
                   </div>
-
-                  <div className="dup-hint">
-                    Not copied: reviews, rating, sales count, views.
+                  <div className="dup-kv__item">
+                    <div className="dup-kv__label">New SKU (preview)</div>
+                    <div className="dup-kv__value">{duplicateSkuPreview}</div>
                   </div>
                 </div>
-
-                <div className="review-modal__footer">
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={handleCloseDuplicateModal}
-                    disabled={duplicatingProduct}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={async () => {
-                      if (duplicatingProduct) return;
-                      setShowDuplicateModal(false);
-                      await handleDuplicateProduct();
-                    }}
-                    disabled={duplicatingProduct}
-                  >
-                    {duplicatingProduct ? (
-                      <>
-                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                        Duplicating...
-                      </>
-                    ) : (
-                      'Duplicate'
-                    )}
-                  </button>
-                </div>
+                <div className="dup-hint">Not copied: reviews, rating, sales count, views.</div>
+              </div>
+              <div className="review-modal__footer">
+                <button type="button" className="btn btn-secondary" onClick={handleCloseDuplicateModal} disabled={duplicatingProduct}>
+                  Cancel
+                </button>
+                <button type="button" className="btn btn-primary" onClick={handleDuplicateProduct} disabled={duplicatingProduct}>
+                  {duplicatingProduct ? <span className="spinner-border spinner-border-sm me-2" /> : null}
+                  Duplicate
+                </button>
               </div>
             </div>
-          </>,
-          document.body
-        )}
+          </div>
+        </>,
+        document.body
+      )}
+
     </Layout>
   );
 }

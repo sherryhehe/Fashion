@@ -6,20 +6,22 @@ import {
   TouchableOpacity,
   TextInput,
   StyleSheet,
-  Alert,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { CartStackParamList } from '../../navigation/HomeNavigator';
 import { SafeView, ShimmerLoader } from '../../components';
-import { icons } from '../../assets/icons';
 
 // API Hooks
 import { useCart } from '../../hooks/useCart';
 import { useCreateOrder } from '../../hooks/useOrders';
 import authService from '../../services/auth.service';
+import brandService from '../../services/brand.service';
 import { showToast } from '../../utils/toast';
-// Static platform fee - matches cart screen (100 PKR)
-const PLATFORM_FEE = 100;
+
+// Platform fee: 200 PKR on every order (matches backend)
+const PLATFORM_FEE_PKR = 200;
+// Card transaction fee: 5% when payment method is card
+const CARD_FEE_PERCENT = 0.05;
 import { requireAuthOrPromptLogin } from '../../utils/guestHelper';
 
 type CheckoutScreenNavigationProp = StackNavigationProp<CartStackParamList, 'Checkout'>;
@@ -40,11 +42,41 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
   const [address, setAddress] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [saveInfoChecked, setSaveInfoChecked] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState('card');
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'cod'>('card');
+  const [allowedPaymentMethods, setAllowedPaymentMethods] = useState<string[]>(['card', 'cash']);
 
   // Fetch cart and user profile
   const { data: cartData, isLoading: cartLoading } = useCart();
   const createOrderMutation = useCreateOrder();
+
+  const cartItems = cartData?.data || [];
+
+  // Fetch allowed payment methods based on brands in cart (card/cash; COD = cash)
+  const cartBrandNames = [...new Set(
+    cartItems.map((item: any) => item?.product?.brand || item?.brand).filter(Boolean)
+  )].sort().join(',');
+  useEffect(() => {
+    const brandNames = cartBrandNames ? cartBrandNames.split(',') : [];
+    if (brandNames.length === 0) {
+      setAllowedPaymentMethods(['card', 'cash']);
+      return;
+    }
+    let cancelled = false;
+    brandService.getAllowedPaymentMethods(brandNames).then(({ allowedPaymentMethods: allowed }) => {
+      if (!cancelled) setAllowedPaymentMethods(allowed);
+    }).catch(() => {
+      if (!cancelled) setAllowedPaymentMethods(['card', 'cash']);
+    });
+    return () => { cancelled = true; };
+  }, [cartBrandNames]);
+
+  // Default payment to first allowed if current is not allowed
+  useEffect(() => {
+    const allowCard = allowedPaymentMethods.includes('card');
+    const allowCash = allowedPaymentMethods.includes('cash');
+    if (paymentMethod === 'card' && !allowCard && allowCash) setPaymentMethod('cod');
+    if (paymentMethod === 'cod' && !allowCash && allowCard) setPaymentMethod('card');
+  }, [allowedPaymentMethods]);
 
   // Load user profile data
   useEffect(() => {
@@ -63,8 +95,6 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
     };
     loadUserProfile();
   }, []);
-
-  const cartItems = cartData?.data || [];
 
   const handleSubmitOrder = async () => {
     // Check if user is guest and prompt login
@@ -149,10 +179,11 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
         };
       });
 
-    // Calculate totals - match cart screen calculation exactly
+    // Calculate totals - match backend: subtotal + 200 PKR + 5% if card
     const subtotal = orderItems.reduce((sum: number, item: any) => sum + item.total, 0);
-    // Use platform fee (100 PKR) instead of tax + shipping
-    const total = subtotal + PLATFORM_FEE;
+    const isCard = (paymentMethod || '').toLowerCase() === 'card';
+    const cardFee = isCard ? Math.round(subtotal * CARD_FEE_PERCENT) : 0;
+    const total = subtotal + PLATFORM_FEE_PKR + cardFee;
 
     // Prepare shipping address
     const shippingAddress = {
@@ -166,15 +197,19 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
     };
 
     try {
-      await createOrderMutation.mutateAsync({
+      const response = await createOrderMutation.mutateAsync({
         items: orderItems,
         shippingAddress,
-        paymentMethod,
+        paymentMethod: paymentMethod === 'cod' ? 'cash' : paymentMethod,
         notes: saveInfoChecked ? 'Save information for next time' : undefined,
       });
 
-      // Navigate to orders screen after successful order
-      navigation.getParent()?.navigate('Orders');
+      const orderId = response?.data?._id || response?.data?.orderNumber;
+      if (orderId) {
+        navigation.replace('OrderSuccess', { orderId });
+      } else {
+        navigation.getParent()?.navigate('Orders');
+      }
     } catch (error: any) {
       console.log('Error creating order:', error);
       // Error is already handled by the mutation hook
@@ -313,34 +348,73 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
           </View>
         </View>
 
-        {/* Payment Method Section */}
+        {/* Payment Method Section - only show options allowed by all brands in cart */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Payment Method</Text>
           <View style={[styles.formWrapper,styles.paymentMethodWrapper]} >
-          <TouchableOpacity 
-            style={styles.paymentOption}
-            onPress={() => setPaymentMethod('card')}
-          >
-            <View style={styles.paymentOptionLeft}>
-              {renderRadioButton(paymentMethod === 'card')}
-              <Text style={styles.paymentOptionText}>Debit- Credit Card</Text>
-            </View>
-            <View style={styles.mastercardLogo}>
-              <Text style={styles.mastercardText}>MC</Text>
-            </View>
-          </TouchableOpacity>
-<View style={styles.lineSeparator} />
-          <TouchableOpacity 
-            style={styles.paymentOption}
-            onPress={() => setPaymentMethod('cod')}
-          >
-            <View style={styles.paymentOptionLeft}>
-              {renderRadioButton(paymentMethod === 'cod')}
-              <Text style={styles.paymentOptionText}>Cash on Delivery (COD)</Text>
-            </View>
-          </TouchableOpacity>
+          {allowedPaymentMethods.includes('card') && (
+            <TouchableOpacity 
+              style={styles.paymentOption}
+              onPress={() => setPaymentMethod('card')}
+            >
+              <View style={styles.paymentOptionLeft}>
+                {renderRadioButton(paymentMethod === 'card')}
+                <Text style={styles.paymentOptionText}>Debit- Credit Card</Text>
+              </View>
+              <View style={styles.mastercardLogo}>
+                <Text style={styles.mastercardText}>MC</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+          {allowedPaymentMethods.includes('card') && allowedPaymentMethods.includes('cash') && <View style={styles.lineSeparator} />}
+          {allowedPaymentMethods.includes('cash') && (
+            <TouchableOpacity 
+              style={styles.paymentOption}
+              onPress={() => setPaymentMethod('cod')}
+            >
+              <View style={styles.paymentOptionLeft}>
+                {renderRadioButton(paymentMethod === 'cod')}
+                <Text style={styles.paymentOptionText}>Cash on Delivery (COD)</Text>
+              </View>
+            </TouchableOpacity>
+          )}
         </View>
         </View>
+
+        {/* Order Summary - show platform fee and card fee before place order (rounding matches backend) */}
+        {(() => {
+          const subtotalSum = Math.round(cartItems.reduce((sum: number, item: any) => {
+            const p = item.product;
+            const price = item.productPrice ?? (p?.price ?? 0);
+            return sum + price * (item.quantity || 0);
+          }, 0));
+          const isCard = (paymentMethod || '').toLowerCase() === 'card';
+          const cardFeeSum = isCard ? Math.round(subtotalSum * CARD_FEE_PERCENT) : 0;
+          const totalSum = subtotalSum + PLATFORM_FEE_PKR + cardFeeSum;
+          return (
+            <View style={styles.orderSummarySection}>
+              <Text style={styles.sectionTitle}>Order Summary</Text>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Subtotal</Text>
+                <Text style={styles.summaryValue}>PKR {subtotalSum.toLocaleString()}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Platform fee</Text>
+                <Text style={styles.summaryValue}>PKR {PLATFORM_FEE_PKR.toLocaleString()}</Text>
+              </View>
+              {isCard && cardFeeSum > 0 && (
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Card fee (5%)</Text>
+                  <Text style={styles.summaryValue}>PKR {cardFeeSum.toLocaleString()}</Text>
+                </View>
+              )}
+              <View style={[styles.summaryRow, styles.summaryTotalRow]}>
+                <Text style={styles.summaryTotalLabel}>Total</Text>
+                <Text style={styles.summaryTotalValue}>PKR {totalSum.toLocaleString()}</Text>
+              </View>
+            </View>
+          );
+        })()}
 
         {/* Submit Order Button */}
         <TouchableOpacity 
@@ -564,6 +638,23 @@ borderColor: '#E8ECF4',
   marginBottom: {
     marginBottom: 16,
   },
+  orderSummarySection: {
+    marginHorizontal: 20,
+    marginTop: 8,
+    padding: 16,
+    backgroundColor: '#F2F2F7',
+    borderRadius: 12,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  summaryLabel: { fontSize: 15, color: '#2C2C2E' },
+  summaryValue: { fontSize: 15, color: '#2C2C2E' },
+  summaryTotalRow: { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#E5E5E7' },
+  summaryTotalLabel: { fontSize: 17, fontWeight: 'bold', color: '#2C2C2E' },
+  summaryTotalValue: { fontSize: 17, fontWeight: 'bold', color: '#2C2C2E' },
 });
 
 export default CheckoutScreen;

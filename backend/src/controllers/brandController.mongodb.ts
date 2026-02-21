@@ -4,6 +4,72 @@ import Product from '../models/Product';
 import { successResponse, errorResponse } from '../utils/responseHelper';
 
 /**
+ * Get brand by exact name (public - for product detail brand link)
+ * Must be defined before getAllBrands so route /by-name/:name is matched first
+ */
+export const getBrandByExactName = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const name = decodeURIComponent((req.params.name || '').trim());
+    if (!name) {
+      errorResponse(res, 'Brand name is required', 400);
+      return;
+    }
+    const nameRegex = new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+    const brand = await Brand.findOne({ name: nameRegex })
+      .select('-bankInfo')
+      .sort({ _id: 1 })
+      .lean();
+    if (!brand) {
+      errorResponse(res, 'Brand not found', 404);
+      return;
+    }
+    successResponse(res, brand);
+  } catch (error) {
+    console.error('Get brand by name error:', error);
+    errorResponse(res, 'Failed to fetch brand', 500);
+  }
+};
+
+/**
+ * Get allowed payment methods for a list of brand names (intersection).
+ * Used at checkout to show only payment options allowed by all brands in cart.
+ */
+export const getAllowedPaymentMethods = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const names = req.query.names || req.body?.brandNames;
+    const brandNames = typeof names === 'string'
+      ? names.split(',').map((n: string) => n.trim()).filter(Boolean)
+      : Array.isArray(names)
+        ? names.map((n: string) => String(n).trim()).filter(Boolean)
+        : [];
+    if (brandNames.length === 0) {
+      successResponse(res, { allowedPaymentMethods: ['card', 'cash'] });
+      return;
+    }
+    const brands = await Brand.find({
+      $or: brandNames.map((n: string) => ({ name: new RegExp(`^${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') })),
+    })
+      .select('allowedPaymentMethods')
+      .lean();
+    let allowed: string[] = ['card', 'cash'];
+    for (const b of brands) {
+      const methods = (b as any).allowedPaymentMethods;
+      if (Array.isArray(methods) && methods.length > 0) {
+        const normalized = methods.map((m: string) => String(m).toLowerCase());
+        allowed = allowed.filter((m) => normalized.includes(m));
+      }
+    }
+    if (allowed.length === 0) {
+      allowed = ['card', 'cash'];
+    }
+    successResponse(res, { allowedPaymentMethods: allowed });
+  } catch (error) {
+    console.error('Get allowed payment methods error:', error);
+    errorResponse(res, 'Failed to get allowed payment methods', 500);
+  }
+};
+
+/**
  * Get all brands
  */
 export const getAllBrands = async (req: Request, res: Response): Promise<void> => {
@@ -144,6 +210,14 @@ export const createBrand = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
+    // Allowed payment methods: card and/or cash (default both)
+    const allowedPaymentMethods = Array.isArray(req.body.allowedPaymentMethods)
+      ? req.body.allowedPaymentMethods.filter((m: string) => ['card', 'cash'].includes(String(m).toLowerCase()))
+      : ['card', 'cash'];
+    if (allowedPaymentMethods.length === 0) {
+      allowedPaymentMethods.push('card', 'cash');
+    }
+
     // Create brand
     const brandData: any = {
       name,
@@ -159,6 +233,7 @@ export const createBrand = async (req: Request, res: Response): Promise<void> =>
       country,
       zipCode,
       status: status || 'pending',
+      allowedPaymentMethods,
       commission: commission || 10,
       socialMedia,
       businessInfo,
@@ -225,9 +300,15 @@ export const updateBrand = async (req: Request, res: Response): Promise<void> =>
       }
     }
 
-    // Build update data, explicitly handling banner
+    // Build update data, explicitly handling banner and allowedPaymentMethods
     const finalUpdateData = { ...updateData };
-    
+    if (updateData.allowedPaymentMethods !== undefined) {
+      const allowed = Array.isArray(updateData.allowedPaymentMethods)
+        ? updateData.allowedPaymentMethods.filter((m: string) => ['card', 'cash'].includes(String(m).toLowerCase()))
+        : ['card', 'cash'];
+      finalUpdateData.allowedPaymentMethods = allowed.length > 0 ? allowed : ['card', 'cash'];
+    }
+
     // Explicitly handle banner field
     if (updateData.banner !== undefined) {
       if (updateData.banner && updateData.banner.trim() !== '') {

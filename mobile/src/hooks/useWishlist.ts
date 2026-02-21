@@ -102,13 +102,12 @@ export const useAddToWishlist = () => {
       }
     },
     onError: (error: any, variables, context) => {
-      // Rollback on error
       if (context?.previousWishlist) {
         queryClient.setQueryData(['wishlist'], context.previousWishlist);
       }
       queryClient.setQueryData(['wishlist', 'check', variables.productId], { data: false, success: true });
-      console.log('Add to wishlist error:', error);
-      showToast.error(error.message || 'Failed to add to wishlist');
+      const msg = error?.data?.message || error?.message || 'Failed to add to wishlist';
+      showToast.error(msg);
     },
   });
 };
@@ -159,13 +158,12 @@ export const useRemoveFromWishlist = () => {
       }
     },
     onError: (error: any, productId, context) => {
-      // Rollback on error
       if (context?.previousWishlist) {
         queryClient.setQueryData(['wishlist'], context.previousWishlist);
       }
       queryClient.setQueryData(['wishlist', 'check', productId], { data: true, success: true });
-      console.log('Remove from wishlist error:', error);
-      showToast.error(error.message || 'Failed to remove from wishlist');
+      const msg = error?.data?.message || error?.message || 'Failed to remove from wishlist';
+      showToast.error(msg);
     },
   });
 };

@@ -14,12 +14,31 @@ export const getDashboardStats = async (req: AuthRequest, res: Response): Promis
     const totalOrders = await Order.countDocuments();
     const totalCategories = await Category.countDocuments();
 
-    // Get revenue (sum of all paid orders)
+    // Revenue: sum of all paid orders (orders get paymentStatus 'paid' when placed)
     const revenueData = await Order.aggregate([
-      { $match: { paymentStatus: 'paid' } },
-      { $group: { _id: null, total: { $sum: '$total' } } }
+      { $match: { paymentStatus: 'paid', status: { $ne: 'cancelled' } } },
+      { $group: { _id: null, total: { $sum: '$total' }, count: { $sum: 1 } } }
     ]);
-    const totalRevenue = revenueData[0]?.total || 0;
+    const totalRevenue = revenueData[0]?.total ?? 0;
+    const paidOrderCount = revenueData[0]?.count ?? 0;
+    const aov = paidOrderCount > 0 ? Math.round(totalRevenue / paidOrderCount) : 0;
+
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - 7);
+    const [todayData, weeklyData] = await Promise.all([
+      Order.aggregate([
+        { $match: { paymentStatus: 'paid', status: { $ne: 'cancelled' }, createdAt: { $gte: startOfToday } } },
+        { $group: { _id: null, total: { $sum: '$total' }, count: { $sum: 1 } } }
+      ]),
+      Order.aggregate([
+        { $match: { paymentStatus: 'paid', status: { $ne: 'cancelled' }, createdAt: { $gte: startOfWeek } } },
+        { $group: { _id: null, total: { $sum: '$total' }, count: { $sum: 1 } } }
+      ])
+    ]);
+    const todaySales = todayData[0]?.total ?? 0;
+    const weeklySales = weeklyData[0]?.total ?? 0;
 
     // Get paid orders count for AOV calculation
     const paidOrdersCount = await Order.countDocuments({ paymentStatus: 'paid' });
@@ -50,11 +69,13 @@ export const getDashboardStats = async (req: AuthRequest, res: Response): Promis
     const stats = {
       overview: {
         totalRevenue: totalRevenue,
-        totalOrders: totalOrders,
-        totalCustomers: totalUsers,
-        totalProducts: totalProducts,
-        averageOrderValue: averageOrderValue,
-        paidOrders: paidOrdersCount,
+        totalOrders: totalOrders.toString(),
+        totalCustomers: totalUsers.toString(),
+        totalProducts: totalProducts.toString(),
+        aov,
+        paidOrderCount,
+        todaySales,
+        weeklySales,
       },
       orders: {
         pending: pendingOrders,
@@ -132,6 +153,52 @@ export const getSalesChartData = async (req: AuthRequest, res: Response): Promis
   } catch (error) {
     console.error('Get sales chart error:', error);
     errorResponse(res, 'Failed to get sales data', 500);
+  }
+};
+
+/**
+ * Get finance dashboard data (revenue, profit, etc.)
+ */
+export const getFinanceData = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+
+    const [allRevenue, monthlyRevenueData, lastMonthData] = await Promise.all([
+      Order.aggregate([
+        { $match: { paymentStatus: 'paid', status: { $ne: 'cancelled' } } },
+        { $group: { _id: null, total: { $sum: '$total' } } }
+      ]),
+      Order.aggregate([
+        { $match: { paymentStatus: 'paid', status: { $ne: 'cancelled' }, createdAt: { $gte: startOfMonth } } },
+        { $group: { _id: null, total: { $sum: '$total' } } }
+      ]),
+      Order.aggregate([
+        { $match: { paymentStatus: 'paid', status: { $ne: 'cancelled' }, createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth } } },
+        { $group: { _id: null, total: { $sum: '$total' } } }
+      ])
+    ]);
+
+    const totalRevenue = allRevenue[0]?.total ?? 0;
+    const monthlyRevenue = monthlyRevenueData[0]?.total ?? 0;
+    const lastMonthRevenue = lastMonthData[0]?.total ?? 0;
+    const growthRate = lastMonthRevenue > 0
+      ? Math.round(((monthlyRevenue - lastMonthRevenue) / lastMonthRevenue) * 100)
+      : (monthlyRevenue > 0 ? 100 : 0);
+
+    successResponse(res, {
+      totalRevenue,
+      monthlyRevenue,
+      profit: totalRevenue,
+      expenses: 0,
+      profitMargin: 100,
+      growthRate,
+    });
+  } catch (error) {
+    console.error('Get finance data error:', error);
+    errorResponse(res, 'Failed to get finance data', 500);
   }
 };
 

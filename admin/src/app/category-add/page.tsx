@@ -9,7 +9,6 @@ import { useNotificationContext } from '@/contexts/NotificationContext';
 import { uploadImage } from '@/utils/uploadHelper';
 
 export default function CategoryAdd() {
-  console.log('🎨 Category Add Page Loaded');
   
   const router = useRouter();
   const createCategory = useCreateCategory();

@@ -4,26 +4,27 @@ import { successResponse, errorResponse } from '../utils/responseHelper';
 import { AuthRequest } from '../middleware/auth';
 
 /**
- * Get user's wishlist
+ * Get current user's wishlist with product details (batch load for performance)
  */
 export const getWishlist = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const wishlistItems = await Wishlist.find({ userId: req.user!.id })
-      .sort({ createdAt: -1 })
-      .lean();
+    const userId = req.user!.id;
+    const items = await Wishlist.find({ userId }).sort({ createdAt: -1 }).lean();
 
-    // Populate product details
-    const wishlistWithProducts = await Promise.all(
-      wishlistItems.map(async (item) => {
-        const product = await Product.findById(item.productId).lean();
-        return {
-          ...item,
-          product,
-        };
-      })
-    );
+    const productIds = [...new Set(items.map((i: any) => i.productId))];
+    const products = await Product.find({ _id: { $in: productIds } }).lean();
+    const productMap = new Map(products.map((p: any) => [String(p._id), p]));
 
-    successResponse(res, wishlistWithProducts);
+    const data = items.map((item: any) => ({
+      _id: item._id,
+      productId: item.productId,
+      product: productMap.get(item.productId) || null,
+      color: item.color,
+      size: item.size,
+      addedAt: item.createdAt,
+    }));
+
+    successResponse(res, data);
   } catch (error) {
     console.error('Get wishlist error:', error);
     errorResponse(res, 'Failed to get wishlist', 500);
@@ -31,60 +32,55 @@ export const getWishlist = async (req: AuthRequest, res: Response): Promise<void
 };
 
 /**
- * Add product to wishlist
+ * Add product to wishlist (or update color/size if already in wishlist)
  */
 export const addToWishlist = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { productId, color, size } = req.body;
+    const userId = req.user!.id;
+    const rawProductId = req.body.productId;
+    const productId = rawProductId != null ? String(rawProductId).trim() : '';
+    const { color, size } = req.body;
 
     if (!productId) {
       errorResponse(res, 'Product ID is required', 400);
       return;
     }
 
-    // Check if product exists
-    const product = await Product.findById(productId);
+    const product = await Product.findById(productId).select('_id').lean();
     if (!product) {
       errorResponse(res, 'Product not found', 404);
       return;
     }
 
-    // Check if item already in wishlist
-    const existingItem = await Wishlist.findOne({
-      userId: req.user!.id,
-      productId,
-    });
+    const existingItem = await Wishlist.findOne({ userId, productId });
 
     if (existingItem) {
-      // Update color/size if provided
-      if (color) existingItem.color = color;
-      if (size) existingItem.size = size;
+      if (color !== undefined) existingItem.color = color;
+      if (size !== undefined) existingItem.size = size;
       await existingItem.save();
-      
       const itemWithProduct = {
         ...existingItem.toObject(),
         product,
       };
-      
       successResponse(res, itemWithProduct, 'Wishlist updated successfully');
-    } else {
-      const wishlistItem = await Wishlist.create({
-        userId: req.user!.id,
-        productId,
-        size,
-        color,
-      });
-      
-      const itemWithProduct = {
-        ...wishlistItem.toObject(),
-        product,
-      };
-      
-      successResponse(res, itemWithProduct, 'Added to wishlist successfully', 201);
+      return;
     }
-  } catch (error) {
+
+    const item = await Wishlist.create({
+      userId,
+      productId,
+      color: color || undefined,
+      size: size || undefined,
+    });
+
+    successResponse(res, { ...item.toObject(), product }, 'Added to wishlist successfully', 201);
+  } catch (error: any) {
+    if (error.code === 11000) {
+      successResponse(res, null, 'Already in wishlist');
+      return;
+    }
     console.error('Add to wishlist error:', error);
-    errorResponse(res, 'Failed to add to wishlist', 500);
+    errorResponse(res, error.message || 'Failed to add to wishlist', 500);
   }
 };
 
@@ -93,15 +89,17 @@ export const addToWishlist = async (req: AuthRequest, res: Response): Promise<vo
  */
 export const removeFromWishlist = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { productId } = req.params;
+    const userId = req.user!.id;
+    const productId = (req.params.productId != null ? String(req.params.productId).trim() : '') || '';
+    if (!productId) {
+      errorResponse(res, 'Product ID is required', 400);
+      return;
+    }
 
-    const wishlistItem = await Wishlist.findOneAndDelete({
-      productId,
-      userId: req.user!.id,
-    });
+    const wishlistItem = await Wishlist.findOneAndDelete({ userId, productId });
 
     if (!wishlistItem) {
-      errorResponse(res, 'Wishlist item not found', 404);
+      successResponse(res, null, 'Item not in wishlist');
       return;
     }
 
@@ -117,14 +115,11 @@ export const removeFromWishlist = async (req: AuthRequest, res: Response): Promi
  */
 export const checkWishlist = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    const userId = req.user!.id;
     const { productId } = req.params;
 
-    const wishlistItem = await Wishlist.findOne({
-      userId: req.user!.id,
-      productId,
-    });
-
-    successResponse(res, !!wishlistItem);
+    const item = await Wishlist.findOne({ userId, productId });
+    successResponse(res, !!item);
   } catch (error) {
     console.error('Check wishlist error:', error);
     errorResponse(res, 'Failed to check wishlist', 500);

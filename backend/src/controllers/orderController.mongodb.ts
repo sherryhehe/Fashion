@@ -1,18 +1,22 @@
 import { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import { Order, Product, Cart, User } from '../models';
+import Brand from '../models/Brand';
 import { successResponse, errorResponse } from '../utils/responseHelper';
 import { AuthRequest } from '../middleware/auth';
+import { PLATFORM_FEE_PKR, CARD_FEE_PERCENT } from '../constants/orderFees';
 
 export const getAllOrders = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { page = 1, limit = 10, status } = req.query;
+    const { page = 1, limit = 10, status, userId } = req.query;
 
     const query: any = {};
     
     // If not admin, only show own orders
     if (req.user!.role !== 'admin') {
       query.userId = req.user!.id;
+    } else if (userId) {
+      query.userId = userId;
     }
     
     if (status) {
@@ -147,7 +151,11 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
       return;
     }
 
-    // Calculate totals
+    // Resolve payment method (normalize to lowercase for validation)
+    const selectedMethod = (paymentMethod || 'cash').toLowerCase();
+    const isCardPayment = selectedMethod === 'card';
+
+    // Calculate totals and validate payment method against each product's brand
     let subtotal = 0;
     const orderItems = await Promise.all(
       items.map(async (item: any) => {
@@ -155,40 +163,63 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
         if (!product) {
           throw new Error(`Product ${item.productId} not found`);
         }
-        const itemTotal = product.price * item.quantity;
+        // Validate payment method for this product's brand
+        if (product.brand) {
+          const brand = await Brand.findOne({ name: new RegExp(`^${String(product.brand).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }).lean();
+          if (brand && Array.isArray((brand as any).allowedPaymentMethods) && (brand as any).allowedPaymentMethods.length > 0) {
+            const allowed = (brand as any).allowedPaymentMethods.map((m: string) => String(m).toLowerCase());
+            if (!allowed.includes(selectedMethod)) {
+              throw new Error(`Brand "${product.brand}" does not accept ${selectedMethod} payment. Allowed: ${allowed.join(', ')}`);
+            }
+          }
+        }
+        // Use price from request (what customer saw) or fallback to product price
+        const unitPrice = typeof item.price === 'number' && item.price >= 0 ? item.price : product.price;
+        const itemTotal = unitPrice * item.quantity;
         subtotal += itemTotal;
+        // Store first product image so order history shows correct image per item
+        const productImage = Array.isArray((product as any).images) && (product as any).images.length > 0
+          ? String((product as any).images[0])
+          : undefined;
         return {
           productId: String(product._id),
           productName: product.name,
           quantity: item.quantity,
-          price: product.price,
+          price: unitPrice,
           total: itemTotal,
           size: item.size,
           color: item.color,
+          productImage,
         };
       })
     );
 
-    const tax = subtotal * 0.1; // 10% tax
-    const shippingCost = subtotal > 100 ? 0 : 10;
-    const total = subtotal + tax + shippingCost;
+    const tax = 0;
+    // Use integer subtotal for consistent fee calculation (match mobile Cart/Checkout)
+    const subtotalRounded = Math.round(subtotal);
+    const shippingCost = PLATFORM_FEE_PKR; // 200 PKR platform fee (consistent)
+    const transactionFee = isCardPayment ? Math.round(subtotalRounded * CARD_FEE_PERCENT) : 0;
+    const total = subtotalRounded + shippingCost + transactionFee;
 
     // Generate order number
     const orderCount = await Order.countDocuments();
     const orderNumber = `ORD-${Date.now()}-${orderCount + 1}`;
+
+    // Order is placed → treat as paid for revenue (dashboard)
+    const paymentStatus = 'paid';
 
     // Create order
     const order = await Order.create({
       userId: req.user!.id,
       orderNumber,
       items: orderItems,
-      subtotal,
+      subtotal: subtotalRounded,
       tax,
       shippingCost,
       total,
       status: 'pending',
       paymentMethod: paymentMethod || 'cash',
-      paymentStatus: 'pending',
+      paymentStatus,
       shippingAddress,
       notes,
       timeline: [

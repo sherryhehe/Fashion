@@ -2,56 +2,15 @@
  * Image Helper Utilities for Admin Panel
  * Converts backend image paths to full URLs
  */
+import { getApiUrl } from './apiHelper';
 
-// Get the base URL for images (API URL without /api)
 const getApiBaseUrl = (): string => {
-  // First, try to get from dedicated image base URL environment variable
   if (process.env.NEXT_PUBLIC_IMAGE_BASE_URL) {
-    return process.env.NEXT_PUBLIC_IMAGE_BASE_URL;
+    return process.env.NEXT_PUBLIC_IMAGE_BASE_URL.replace(/\/$/, '');
   }
-  
-  // Then, try to get from API URL environment variable
-  let apiUrl = process.env.NEXT_PUBLIC_API_URL;
-  
-  // If not set, detect production environment
-  if (!apiUrl) {
-    // Check if we're in browser and can detect hostname
-    if (typeof window !== 'undefined') {
-      const hostname = window.location.hostname;
-      const protocol = window.location.protocol;
-      
-      // Check for production domain
-      if (hostname === 'admin.buyshopo.com' || hostname.includes('buyshopo.com')) {
-        // Use admin.buyshopo.com for both API and images
-        apiUrl = 'https://admin.buyshopo.com/api';
-      } else if (process.env.NODE_ENV === 'production') {
-        // Fallback for production builds without hostname detection
-        apiUrl = 'https://admin.buyshopo.com/api';
-      } else {
-        // Development - use current origin or localhost
-        apiUrl = `${protocol}//${hostname}:8000/api`;
-      }
-    } else {
-      // Server-side rendering
-      if (process.env.NODE_ENV === 'production') {
-        apiUrl = 'https://admin.buyshopo.com/api';
-      } else {
-        apiUrl = 'http://localhost:8000/api';
-      }
-    }
-  }
-  
-  // Remove /api from the end if present to get base URL for static files
-  // The backend serves /uploads at the root, not under /api
-  let baseUrl = apiUrl;
-  if (apiUrl.endsWith('/api')) {
-    baseUrl = apiUrl.replace(/\/api$/, '');
-  }
-  
-  // Ensure no trailing slash
-  baseUrl = baseUrl.replace(/\/$/, '');
-  
-  return baseUrl;
+  const apiUrl = getApiUrl();
+  let baseUrl = apiUrl.endsWith('/api') ? apiUrl.replace(/\/api$/, '') : apiUrl;
+  return baseUrl.replace(/\/$/, '');
 };
 
 /**

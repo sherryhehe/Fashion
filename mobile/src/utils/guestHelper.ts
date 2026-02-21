@@ -32,7 +32,7 @@ export const requireAuthOrPromptLogin = async (
     // User is a guest, show login prompt
     Alert.alert(
       'Login Required',
-      `Please login to ${featureName}. You can continue browsing as a guest, but you'll need to login to use this feature.`,
+      'Please login to perform this action.',
       [
         {
           text: 'Cancel',
