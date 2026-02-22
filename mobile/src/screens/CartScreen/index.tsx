@@ -17,7 +17,7 @@ import { styles } from './styles';
 import { icons } from '../../assets/icons';
 import { getFirstImageSource } from '../../utils/imageHelper';
 
-// Static platform fee - always 100 PKR regardless of cart value
+// Platform fee: 100 PKR on every order (matches backend)
 const PLATFORM_FEE = 100;
 
 // API Hooks
@@ -112,7 +112,7 @@ const CartScreen: React.FC<CartScreenProps> = ({ navigation }) => {
       return sum;
     }, 0);
     
-    // Platform fee is static at 100 PKR for all products (defined at top level)
+    // Platform fee: 100 PKR on every order (matches backend)
     // Calculate total
     const calculatedTotal = calculatedSubtotal + PLATFORM_FEE;
     

@@ -12,8 +12,9 @@ router.get('/:id', orderController.getOrderById);
 router.post('/', orderController.createOrder);
 router.put('/:id/cancel', orderController.cancelOrder);
 
-// Admin only routes
+// Admin only routes (accept both PUT and PATCH for status updates)
 router.put('/:id/status', requireAdmin, orderController.updateOrderStatus);
+router.patch('/:id/status', requireAdmin, orderController.updateOrderStatus);
 
 export default router;
 

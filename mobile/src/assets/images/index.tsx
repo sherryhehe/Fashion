@@ -9,6 +9,9 @@ const images = {
     
     // Auth images
     authHeader: require('./authHeader.png'),
+
+    // Onboarding
+    discoverNewClothes: require('./discover-new-clothes.jpeg'),
     
     // Home slider images
     homesliderimage: require('./homesliderimage.jpeg'),

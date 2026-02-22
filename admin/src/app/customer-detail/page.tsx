@@ -2,84 +2,149 @@
 
 import Layout from '@/components/layout/Layout';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import { formatCurrency } from '@/utils/currencyHelper';
 
+import { getApiUrl } from '@/utils/apiHelper';
+
 export default function CustomerDetail() {
-  const customer = {
-    id: 'CUST-001',
-    name: 'John Doe',
-    email: 'john@example.com',
-    phone: '+1 (555) 123-4567',
-    status: 'Active',
-    joinDate: '2023-06-15',
-    lastOrder: '2024-01-15',
-    totalOrders: 47,
-    totalSpent: 4299.99,
-    avatar: '/assets/images/users/avatar-1.jpg',
-    address: {
-      street: '123 Main Street',
-      city: 'New York',
-      state: 'NY',
-      zip: '10001',
-      country: 'United States'
-    },
-    preferences: {
-      newsletter: true,
-      sms: false,
-      email: true
-    },
-    recentOrders: [
-      {
-        id: 'ORD-001',
-        date: '2024-01-15',
-        status: 'Delivered',
-        total: 299.99,
-        items: 3
-      },
-      {
-        id: 'ORD-002',
-        date: '2024-01-10',
-        status: 'Processing',
-        total: 129.99,
-        items: 1
-      },
-      {
-        id: 'ORD-003',
-        date: '2024-01-05',
-        status: 'Delivered',
-        total: 89.99,
-        items: 2
+  const searchParams = useSearchParams();
+  const customerId = searchParams.get('id');
+
+  const [customer, setCustomer] = useState<any>(null);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [prevCustomerId, setPrevCustomerId] = useState<string | null>(null);
+  const [nextCustomerId, setNextCustomerId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!customerId) {
+      setError('Customer ID is required');
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    const token = localStorage.getItem('token');
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+
+    (async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const base = getApiUrl();
+        const res = await fetch(`${base}/users/${customerId}`, { headers });
+        const data = await res.json();
+        if (!res.ok) {
+          if (!cancelled) setError(data.message || data.error || 'Failed to load customer');
+          return;
+        }
+        const user = data.data || data;
+        if (!cancelled) setCustomer(user);
+
+        const ordersRes = await fetch(`${base}/orders?userId=${customerId}&limit=20`, { headers });
+        const ordersData = await ordersRes.json();
+        const orderList = ordersData.data ?? ordersData ?? [];
+        if (!cancelled) setOrders(Array.isArray(orderList) ? orderList : []);
+      } catch (e: any) {
+        if (!cancelled) setError(e?.message || 'Failed to load customer');
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-    ],
-    notes: [
-      {
-        id: 1,
-        date: '2024-01-15',
-        author: 'Admin',
-        note: 'Customer requested expedited shipping for latest order.'
-      },
-      {
-        id: 2,
-        date: '2024-01-10',
-        author: 'Support',
-        note: 'Resolved billing inquiry regarding order ORD-002.'
-      }
-    ]
-  };
+    })();
+    return () => { cancelled = true; };
+  }, [customerId]);
+
+  useEffect(() => {
+    if (!customerId) return;
+    let cancelled = false;
+    const token = localStorage.getItem('token');
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+    fetch(`${getApiUrl()}/users?role=customer&limit=500`, { headers })
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        const list = data.data ?? data ?? [];
+        const ids = list.map((u: any) => u._id || u.id).filter(Boolean);
+        const idx = ids.indexOf(customerId);
+        if (idx > 0) setPrevCustomerId(ids[idx - 1]);
+        else setPrevCustomerId(null);
+        if (idx >= 0 && idx < ids.length - 1) setNextCustomerId(ids[idx + 1]);
+        else setNextCustomerId(null);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [customerId]);
+
+  if (loading && !customer) {
+    return (
+      <Layout pageTitle="Customer Detail">
+        <div className="container-fluid">
+          <div className="text-center py-5">
+            <div className="spinner-border text-primary" />
+            <p className="mt-2">Loading customer...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (error || !customer) {
+    return (
+      <Layout pageTitle="Customer Detail">
+        <div className="container-fluid">
+          <div className="text-center py-5">
+            <p className="text-danger">{error || 'Customer not found'}</p>
+            <Link href="/customer-list" className="btn btn-primary mt-2">Back to Customers</Link>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  const joinDate = customer.createdAt ? new Date(customer.createdAt).toLocaleDateString() : 'N/A';
+  const totalOrders = orders.length;
+  const totalSpent = orders.reduce((sum, o) => sum + (o.total || 0), 0);
+  const avgOrder = totalOrders > 0 ? totalSpent / totalOrders : 0;
+  const lastOrderDate = orders.length > 0 && orders[0].createdAt
+    ? new Date(orders[0].createdAt).toLocaleDateString()
+    : null;
+  const daysSinceLastOrder = lastOrderDate && orders[0].createdAt
+    ? Math.floor((Date.now() - new Date(orders[0].createdAt).getTime()) / (24 * 60 * 60 * 1000))
+    : null;
 
   return (
     <Layout pageTitle="Customer Detail">
       <div className="container-fluid">
-        {/* Breadcrumb */}
+        {/* Breadcrumb + Prev/Next */}
         <div className="row mb-3">
-          <div className="col-12">
+          <div className="col-12 d-flex justify-content-between align-items-center flex-wrap gap-2">
             <nav aria-label="breadcrumb">
-              <ol className="breadcrumb">
+              <ol className="breadcrumb mb-0">
                 <li className="breadcrumb-item"><Link href="/">Home</Link></li>
                 <li className="breadcrumb-item"><Link href="/customer-list">Customers</Link></li>
                 <li className="breadcrumb-item active" aria-current="page">{customer.name}</li>
               </ol>
             </nav>
+            <div className="d-flex gap-2">
+              {prevCustomerId && (
+                <Link href={`/customer-detail?id=${prevCustomerId}`} className="btn btn-sm btn-outline-primary">
+                  <i className="mdi mdi-arrow-left me-1" /> Previous
+                </Link>
+              )}
+              {nextCustomerId && (
+                <Link href={`/customer-detail?id=${nextCustomerId}`} className="btn btn-sm btn-outline-primary">
+                  Next <i className="mdi mdi-arrow-right ms-1" />
+                </Link>
+              )}
+            </div>
           </div>
         </div>
 
@@ -90,18 +155,18 @@ export default function CustomerDetail() {
               <div className="card-body">
                 <div className="d-flex justify-content-between align-items-start">
                   <div className="d-flex align-items-center">
-                    <img src={customer.avatar} alt={customer.name} className="avatar-lg me-3" />
+                    <div className="avatar-lg me-3 rounded-circle bg-light d-flex align-items-center justify-content-center text-primary fw-bold" style={{ width: 56, height: 56, fontSize: 24 }}>
+                      {(customer.name || '?').charAt(0).toUpperCase()}
+                    </div>
                     <div>
                       <h4 className="card-title mb-1">{customer.name}</h4>
                       <p className="text-muted mb-0">{customer.email}</p>
-                      <small className="text-muted">Customer since {customer.joinDate}</small>
+                      <small className="text-muted">Customer since {joinDate}</small>
                     </div>
                   </div>
-                  <div className="text-end">
-                    <span className={`badge ${customer.status === 'Active' ? 'bg-success' : 'bg-danger'} fs-6`}>
-                      {customer.status}
-                    </span>
-                  </div>
+                  <span className={`badge ${(customer.status || '').toLowerCase() === 'active' ? 'bg-success' : 'bg-secondary'} fs-6`}>
+                    {(customer.status || 'N/A')}
+                  </span>
                 </div>
               </div>
             </div>
@@ -109,13 +174,9 @@ export default function CustomerDetail() {
         </div>
 
         <div className="row">
-          {/* Customer Information */}
           <div className="col-lg-8">
-            {/* Personal Information */}
             <div className="card">
-              <div className="card-header">
-                <h5 className="card-title mb-0">Personal Information</h5>
-              </div>
+              <div className="card-header"><h5 className="card-title mb-0">Personal Information</h5></div>
               <div className="card-body">
                 <div className="row">
                   <div className="col-md-6 mb-3">
@@ -128,202 +189,90 @@ export default function CustomerDetail() {
                   </div>
                   <div className="col-md-6 mb-3">
                     <label className="form-label fw-semibold">Phone</label>
-                    <p className="mb-0">{customer.phone}</p>
+                    <p className="mb-0">{customer.phone || 'N/A'}</p>
                   </div>
                   <div className="col-md-6 mb-3">
                     <label className="form-label fw-semibold">Customer ID</label>
-                    <p className="mb-0">{customer.id}</p>
-                  </div>
-                  <div className="col-12 mb-3">
-                    <label className="form-label fw-semibold">Address</label>
-                    <p className="mb-0">
-                      {customer.address.street}<br />
-                      {customer.address.city}, {customer.address.state} {customer.address.zip}<br />
-                      {customer.address.country}
-                    </p>
+                    <p className="mb-0">{customer._id || customer.id}</p>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Recent Orders */}
             <div className="card mt-3">
-              <div className="card-header">
-                <h5 className="card-title mb-0">Recent Orders</h5>
-              </div>
+              <div className="card-header"><h5 className="card-title mb-0">Recent Orders</h5></div>
               <div className="card-body">
-                <div className="table-responsive">
-                  <table className="table table-striped">
-                    <thead>
-                      <tr>
-                        <th>Order ID</th>
-                        <th>Date</th>
-                        <th>Items</th>
-                        <th>Total</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {customer.recentOrders.map((order) => (
-                        <tr key={order.id}>
-                          <td><Link href="/order-detail" className="text-primary">{order.id}</Link></td>
-                          <td>{order.date}</td>
-                          <td><span className="badge bg-primary">{order.items}</span></td>
-                          <td>{formatCurrency(order.total)}</td>
-                          <td>
-                            <span className={`badge ${order.status === 'Delivered' ? 'bg-success' : order.status === 'Processing' ? 'bg-info' : 'bg-warning'}`}>
-                              {order.status}
-                            </span>
-                          </td>
-                          <td>
-                            <button className="btn btn-sm btn-outline-primary">
-                              <i className="bx bx-show"></i>
-                            </button>
-                          </td>
+                {orders.length === 0 ? (
+                  <p className="text-muted mb-0">No orders yet.</p>
+                ) : (
+                  <div className="table-responsive">
+                    <table className="table table-striped">
+                      <thead>
+                        <tr>
+                          <th>Order</th>
+                          <th>Date</th>
+                          <th>Items</th>
+                          <th>Total</th>
+                          <th>Status</th>
+                          <th></th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            {/* Customer Notes */}
-            <div className="card mt-3">
-              <div className="card-header">
-                <h5 className="card-title mb-0">Customer Notes</h5>
-              </div>
-              <div className="card-body">
-                {customer.notes.map((note) => (
-                  <div key={note.id} className="border-bottom pb-3 mb-3">
-                    <div className="d-flex justify-content-between align-items-start">
-                      <div>
-                        <h6 className="mb-1">{note.note}</h6>
-                        <small className="text-muted">By {note.author} on {note.date}</small>
-                      </div>
-                    </div>
+                      </thead>
+                      <tbody>
+                        {orders.map((order: any) => (
+                          <tr key={order._id || order.orderNumber}>
+                            <td><Link href={`/order-detail?id=${order._id}`} className="text-primary">{order.orderNumber || order._id}</Link></td>
+                            <td>{order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}</td>
+                            <td><span className="badge bg-primary">{(order.items || []).length}</span></td>
+                            <td>{formatCurrency(order.total || 0)}</td>
+                            <td>
+                              <span className={`badge ${order.status === 'delivered' ? 'bg-success' : order.status === 'processing' ? 'bg-info' : 'bg-warning'}`}>
+                                {order.status || 'N/A'}
+                              </span>
+                            </td>
+                            <td>
+                              <Link href={`/order-detail?id=${order._id}`} className="btn btn-sm btn-outline-primary"><i className="bx bx-show" /></Link>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                ))}
-                <div className="mt-3">
-                  <div className="input-group">
-                    <input type="text" className="form-control" placeholder="Add a note..." />
-                    <button className="btn btn-primary text-nowrap" type="button" style={{ minWidth: '120px' }}>
-                      <i className="bx bx-plus"></i> Add Note
-                    </button>
-                  </div>
-                </div>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Customer Summary */}
           <div className="col-lg-4">
-            {/* Customer Stats */}
             <div className="card">
-              <div className="card-header">
-                <h5 className="card-title mb-0">Customer Statistics</h5>
-              </div>
+              <div className="card-header"><h5 className="card-title mb-0">Statistics</h5></div>
               <div className="card-body">
                 <div className="row text-center">
-                  <div className="col-6">
-                    <div className="border-end">
-                      <h4 className="text-primary mb-1">{customer.totalOrders}</h4>
-                      <p className="text-muted mb-0">Total Orders</p>
-                    </div>
+                  <div className="col-6 border-end">
+                    <h4 className="text-primary mb-1">{totalOrders}</h4>
+                    <p className="text-muted mb-0 small">Total Orders</p>
                   </div>
                   <div className="col-6">
-                    <h4 className="text-success mb-1">{formatCurrency(customer.totalSpent)}</h4>
-                    <p className="text-muted mb-0">Total Spent</p>
+                    <h4 className="text-success mb-1">{formatCurrency(totalSpent)}</h4>
+                    <p className="text-muted mb-0 small">Total Spent</p>
                   </div>
                 </div>
                 <hr />
                 <div className="row text-center">
-                  <div className="col-6">
-                    <div className="border-end">
-                      <h4 className="text-info mb-1">{formatCurrency(91.49)}</h4>
-                      <p className="text-muted mb-0">Avg Order</p>
-                    </div>
+                  <div className="col-6 border-end">
+                    <h4 className="text-info mb-1">{formatCurrency(avgOrder)}</h4>
+                    <p className="text-muted mb-0 small">Avg Order</p>
                   </div>
                   <div className="col-6">
-                    <h4 className="text-warning mb-1">7</h4>
-                    <p className="text-muted mb-0">Days Since Last Order</p>
+                    <h4 className="text-warning mb-1">{daysSinceLastOrder != null ? daysSinceLastOrder : '—'}</h4>
+                    <p className="text-muted mb-0 small">Days Since Last Order</p>
                   </div>
                 </div>
               </div>
             </div>
-
-            {/* Communication Preferences */}
-            <div className="card mt-3">
-              <div className="card-header">
-                <h5 className="card-title mb-0">Communication Preferences</h5>
-              </div>
-              <div className="card-body">
-                <div className="form-check mb-2">
-                  <input className="form-check-input" type="checkbox" id="newsletter" checked={customer.preferences.newsletter} />
-                  <label className="form-check-label" htmlFor="newsletter">
-                    Newsletter Subscription
-                  </label>
-                </div>
-                <div className="form-check mb-2">
-                  <input className="form-check-input" type="checkbox" id="email" checked={customer.preferences.email} />
-                  <label className="form-check-label" htmlFor="email">
-                    Email Notifications
-                  </label>
-                </div>
-                <div className="form-check">
-                  <input className="form-check-input" type="checkbox" id="sms" checked={customer.preferences.sms} />
-                  <label className="form-check-label" htmlFor="sms">
-                    SMS Notifications
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="card mt-3">
-              <div className="card-header">
-                <h5 className="card-title mb-0">Quick Actions</h5>
-              </div>
-              <div className="card-body">
-                <div className="d-grid gap-2">
-                  <button className="btn btn-primary">
-                    <i className="bx bx-edit me-1"></i>Edit Customer
-                  </button>
-                  <button className="btn btn-outline-info">
-                    <i className="bx bx-envelope me-1"></i>Send Email
-                  </button>
-                  <button className="btn btn-outline-success">
-                    <i className="bx bx-phone me-1"></i>Call Customer
-                  </button>
-                  <button className="btn btn-outline-warning">
-                    <i className="bx bx-plus me-1"></i>Create Order
-                  </button>
-                  <button className="btn btn-outline-secondary">
-                    <i className="bx bx-printer me-1"></i>Print Details
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Customer Tags */}
-            <div className="card mt-3">
-              <div className="card-header">
-                <h5 className="card-title mb-0">Customer Tags</h5>
-              </div>
-              <div className="card-body">
-                <div className="d-flex flex-wrap gap-2 mb-3">
-                  <span className="badge bg-primary">VIP</span>
-                  <span className="badge bg-success">Loyal</span>
-                  <span className="badge bg-info">High Value</span>
-                </div>
-                <div className="input-group">
-                  <input type="text" className="form-control" placeholder="Add tag..." />
-                  <button className="btn btn-outline-primary" type="button">
-                    <i className="bx bx-plus"></i>
-                  </button>
-                </div>
-              </div>
+            <div className="mt-3">
+              <Link href="/customer-list" className="btn btn-outline-secondary w-100">
+                <i className="mdi mdi-arrow-left me-1" /> Back to Customers
+              </Link>
             </div>
           </div>
         </div>

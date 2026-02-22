@@ -1,9 +1,12 @@
 import { Request, Response } from 'express';
+import mongoose from 'mongoose';
 import Product from '../models/Product';
 import Brand from '../models/Brand';
 import Category from '../models/Category';
 import Style from '../models/Style';
 import Review from '../models/Review';
+import Cart from '../models/Cart';
+import Wishlist from '../models/Wishlist';
 import { successResponse, errorResponse } from '../utils/responseHelper';
 import { AuthRequest } from '../middleware/auth';
 
@@ -56,9 +59,9 @@ export const getAllProducts = async (req: Request, res: Response): Promise<void>
     const limitNum = parseInt(limit as string);
     const skip = (pageNum - 1) * limitNum;
 
-    // Sort
+    // Sort: promoted products first, then by requested sort
     const sortOrder = order === 'asc' ? 1 : -1;
-    const sortObj: any = { [sortBy as string]: sortOrder };
+    const sortObj: any = { promoted: -1, [sortBy as string]: sortOrder };
 
     // Debug: Log query parameters and final query
     console.log('Product query params:', { style, category, brand, status, search });
@@ -326,6 +329,7 @@ export const searchProducts = async (req: Request, res: Response): Promise<void>
       status: 'active',
     })
       .limit(parseInt(limit as string))
+      .sort({ promoted: -1, createdAt: -1 })
       .select('name price images category sku');
 
     successResponse(res, products);
@@ -347,12 +351,62 @@ export const getFeaturedProducts = async (req: Request, res: Response): Promise<
       status: 'active',
     })
       .limit(parseInt(limit as string))
-      .sort({ createdAt: -1 });
+      .sort({ promoted: -1, createdAt: -1 });
 
     successResponse(res, products);
   } catch (error) {
     console.error('Get featured products error:', error);
     errorResponse(res, 'Failed to get featured products', 500);
+  }
+};
+
+/**
+ * Get personalized products for the current user (cart + wishlist first, then featured).
+ * Requires authentication.
+ */
+export const getPersonalizedProducts = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { limit = 10 } = req.query;
+    const limitNum = Math.min(parseInt(limit as string) || 10, 50);
+    const userId = req.user!.id;
+
+    const [cartItems, wishlistItems] = await Promise.all([
+      Cart.find({ userId }).select('productId').lean(),
+      Wishlist.find({ userId }).select('productId').lean(),
+    ]);
+    const personalIds = [...new Set([
+      ...cartItems.map((i: any) => String(i.productId)),
+      ...wishlistItems.map((i: any) => String(i.productId)),
+    ])].filter(Boolean);
+
+    let products: any[] = [];
+    if (personalIds.length > 0) {
+      products = await Product.find({
+        _id: { $in: personalIds },
+        status: 'active',
+      })
+        .sort({ promoted: -1, createdAt: -1 })
+        .limit(limitNum)
+        .lean();
+    }
+
+    const haveIds = new Set(products.map((p: any) => String(p._id)));
+    if (products.length < limitNum) {
+      const featured = await Product.find({
+        featured: true,
+        status: 'active',
+        _id: { $nin: Array.from(haveIds) },
+      })
+        .sort({ promoted: -1, createdAt: -1 })
+        .limit(limitNum - products.length)
+        .lean();
+      products = [...products, ...featured];
+    }
+
+    successResponse(res, products);
+  } catch (error) {
+    console.error('Get personalized products error:', error);
+    errorResponse(res, 'Failed to get personalized products', 500);
   }
 };
 
@@ -410,6 +464,125 @@ export const toggleFeatured = async (req: Request, res: Response): Promise<void>
   } catch (error) {
     console.error('Toggle featured error:', error);
     errorResponse(res, 'Failed to update featured status', 500);
+  }
+};
+
+/**
+ * Toggle product promoted status (appears first in search, homepage, categories)
+ */
+export const togglePromoted = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { promoted } = req.body;
+
+    const product = await Product.findByIdAndUpdate(
+      id,
+      { promoted: !!promoted },
+      { new: true, runValidators: true }
+    );
+
+    if (!product) {
+      errorResponse(res, 'Product not found', 404);
+      return;
+    }
+
+    successResponse(res, product, `Product ${promoted ? 'promoted' : 'unpromoted'} successfully`);
+  } catch (error) {
+    console.error('Toggle promoted error:', error);
+    errorResponse(res, 'Failed to update promoted status', 500);
+  }
+};
+
+/**
+ * Duplicate product (creates a copy with new SKU and "Copy" in name)
+ */
+export const duplicateProduct = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    const source = await Product.findById(id).lean();
+    if (!source) {
+      errorResponse(res, 'Product not found', 404);
+      return;
+    }
+
+    const { _id, __v, createdAt, updatedAt, sku, name, ...rest } = source as any;
+    const baseSku = (sku || 'COPY').replace(/\s*\(copy\)$/i, '');
+    let newSku = `${baseSku}-copy-${Date.now()}`;
+    let attempts = 0;
+    while (await Product.findOne({ sku: newSku }) && attempts < 10) {
+      newSku = `${baseSku}-copy-${Date.now()}-${++attempts}`;
+    }
+
+    const copy = await Product.create({
+      ...rest,
+      name: (name || 'Product').trim().replace(/\s*\(copy\)\s*$/i, '').trim() + ' (Copy)',
+      sku: newSku,
+      promoted: false,
+    });
+
+    successResponse(res, copy, 'Product duplicated successfully', 201);
+  } catch (error: any) {
+    console.error('Duplicate product error:', error);
+    errorResponse(res, error.message || 'Failed to duplicate product', 500);
+  }
+};
+
+/**
+ * Delete a single review from a product.
+ * Handles both: (1) reviews from Review collection (by ObjectId), (2) embedded reviews (by id/_id or numeric index).
+ */
+export const deleteProductReview = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { id: productId, reviewId } = req.params;
+    const product = await Product.findById(productId);
+    if (!product) {
+      errorResponse(res, 'Product not found', 404);
+      return;
+    }
+
+    const embeddedReviews = Array.isArray(product.reviews) ? [...product.reviews] : [];
+
+    if (mongoose.Types.ObjectId.isValid(reviewId) && String(new mongoose.Types.ObjectId(reviewId)) === reviewId) {
+      const reviewDoc = await Review.findOne({ _id: reviewId, productId });
+      if (reviewDoc) {
+        await Review.findByIdAndDelete(reviewId);
+        const remainingReviewDocs = await Review.find({ productId }).lean();
+        const fromEmbedded = embeddedReviews.map((r: any) => (r.rating || 0));
+        const fromCollection = remainingReviewDocs.map((r: any) => r.rating || 0);
+        const allRatings = [...fromEmbedded, ...fromCollection];
+        product.reviewCount = Math.max(0, allRatings.length);
+        product.rating = allRatings.length > 0 ? allRatings.reduce((a, b) => a + b, 0) / allRatings.length : 0;
+        await product.save();
+        successResponse(res, product, 'Review deleted successfully');
+        return;
+      }
+    }
+
+    let idx = embeddedReviews.findIndex(
+      (r: any) => String(r.id) === reviewId || String(r._id) === reviewId
+    );
+    if (idx === -1 && /^\d+$/.test(reviewId)) {
+      idx = parseInt(reviewId, 10);
+      if (idx < 0 || idx >= embeddedReviews.length) idx = -1;
+    }
+    if (idx === -1) {
+      errorResponse(res, 'Review not found', 404);
+      return;
+    }
+
+    embeddedReviews.splice(idx, 1);
+    product.reviews = embeddedReviews;
+    product.reviewCount = Math.max(0, (product.reviewCount || 0) - 1);
+    product.rating =
+      embeddedReviews.length > 0
+        ? embeddedReviews.reduce((sum: number, r: any) => sum + (r.rating || 0), 0) / embeddedReviews.length
+        : 0;
+    await product.save();
+    successResponse(res, product, 'Review deleted successfully');
+  } catch (error) {
+    console.error('Delete product review error:', error);
+    errorResponse(res, 'Failed to delete review', 500);
   }
 };
 

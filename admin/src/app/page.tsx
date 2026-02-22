@@ -12,6 +12,7 @@ export default function Home() {
   const [timeFilter, setTimeFilter] = useState<TimeFilterOption>('1Y');
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
@@ -28,22 +29,22 @@ export default function Home() {
   const fetchDashboardStats = async () => {
     try {
       setLoading(true);
+      setError(null);
       const token = localStorage.getItem('token');
-      
       const response = await fetch(`${getApiUrl()}/dashboard/stats`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
-
       const data = await response.json();
-      
       if (data.success) {
         setStats(data.data);
+      } else {
+        setError(data.error || 'Failed to load dashboard');
       }
-    } catch (error) {
-      console.error('Failed to fetch dashboard stats:', error);
+    } catch (err) {
+      setError('Could not load dashboard. Check that the backend is running and try again.');
     } finally {
       setLoading(false);
     }
@@ -66,7 +67,17 @@ export default function Home() {
           <div className="spinner-border text-primary" role="status">
             <span className="visually-hidden">Loading...</span>
           </div>
-          <p className="mt-2">Loading dashboard data from MongoDB...</p>
+          <p className="mt-2">Loading dashboard data...</p>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (error) {
+    return (
+      <Layout pageTitle="Dashboard">
+        <div className="alert alert-danger mx-3 mt-3" role="alert">
+          <strong>Error:</strong> {error}
         </div>
       </Layout>
     );

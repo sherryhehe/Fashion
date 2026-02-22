@@ -3,18 +3,20 @@
  * Single source of truth for API URLs and configuration
  */
 
-// Change this to your local machine's IP address for development
-// Find your IP with: ifconfig | grep "inet " | grep -v 127.0.0.1
+// Local backend via devtunnels (exposes your local server)
+const DEV_BACKEND_URL = 'https://960wd305-5000.inc1.devtunnels.ms';
+
+// Fallback: local machine IP for development (if not using devtunnels)
 const LOCAL_IP = '192.168.1.17';
 
 // FORCE PRODUCTION API - Set to true to always use production API
-// Set to false to use local backend for testing
-const FORCE_PRODUCTION_API = true; // ✅ Production mode enabled
+// Set to false to use local/devtunnels backend for testing
+const FORCE_PRODUCTION_API = false; // Use devtunnels backend
 
 // Base URL configuration
 const getBaseURL = (): string => {
   if (__DEV__ && !FORCE_PRODUCTION_API) {
-    return `http://${LOCAL_IP}:5000`;
+    return DEV_BACKEND_URL;
   }
   // Production API URL
   return 'https://admin.buyshopo.com';
@@ -39,6 +41,7 @@ export const API_CONFIG = {
   headers: {
     'Content-Type': 'application/json',
   },
+  devBackendUrl: DEV_BACKEND_URL,
   localIP: LOCAL_IP,
   forceProduction: FORCE_PRODUCTION_API,
   isDevelopment: __DEV__,
@@ -52,7 +55,7 @@ if (__DEV__) {
   console.log('   API URL:', API_CONFIG.baseURL);
   console.log('   Image URL:', API_CONFIG.imageBaseURL);
   if (API_CONFIG.mode === 'DEVELOPMENT') {
-    console.log('   Local IP:', API_CONFIG.localIP);
+    console.log('   Backend:', API_CONFIG.devBackendUrl);
   }
 }
 

@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { bannersApi, type Banner } from '@/lib/api/banners';
 import { useUpdateBanner } from '@/hooks/useApi';
 import { getImageUrl } from '@/utils/imageHelper';
+import { getApiUrl } from '@/utils/apiHelper';
 
 export default function BannerEdit() {
   const router = useRouter();
@@ -115,7 +116,7 @@ export default function BannerEdit() {
         uploadFormData.append('images', newImageFile);
         
         const token = localStorage.getItem('token');
-        const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/upload/images`, {
+        const uploadResponse = await fetch(`${getApiUrl()}/upload/images`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,

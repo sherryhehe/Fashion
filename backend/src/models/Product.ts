@@ -13,6 +13,8 @@ export interface IProduct extends Document {
   stock: number;
   images: string[];
   featured: boolean;
+  /** When true, product appears first in search, homepage, categories */
+  promoted: boolean;
   status: 'active' | 'inactive' | 'draft';
   specifications: Record<string, any>;
   variations: any[];
@@ -94,6 +96,10 @@ const ProductSchema = new Schema<IProduct>(
       type: Boolean,
       default: false,
     },
+    promoted: {
+      type: Boolean,
+      default: false,
+    },
     status: {
       type: String,
       enum: ['active', 'inactive', 'draft'],
@@ -167,6 +173,7 @@ ProductSchema.index({ name: 'text', description: 'text' });
 ProductSchema.index({ category: 1 });
 ProductSchema.index({ status: 1 });
 ProductSchema.index({ featured: 1 });
+ProductSchema.index({ promoted: 1 });
 ProductSchema.index({ sku: 1 });
 
 export default mongoose.model<IProduct>('Product', ProductSchema);
