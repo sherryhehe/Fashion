@@ -15,7 +15,6 @@ import styleRoutes from './routes/styleRoutes.mongodb';
 import brandRoutes from './routes/brandRoutes.mongodb';
 import notificationRoutes from './routes/notificationRoutes.mongodb';
 import cartRoutes from './routes/cartRoutes.mongodb';
-import wishlistRoutes from './routes/wishlistRoutes.mongodb';
 import orderRoutes from './routes/orderRoutes.mongodb';
 import dashboardRoutes from './routes/dashboardRoutes.mongodb';
 import userRoutes from './routes/userRoutes.mongodb';
