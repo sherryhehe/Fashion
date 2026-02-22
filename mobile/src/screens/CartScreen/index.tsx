@@ -17,8 +17,8 @@ import { styles } from './styles';
 import { icons } from '../../assets/icons';
 import { getFirstImageSource } from '../../utils/imageHelper';
 
-// Platform fee: 200 PKR on every order (matches backend)
-const PLATFORM_FEE = 200;
+// Platform fee: 100 PKR on every order (matches backend)
+const PLATFORM_FEE = 100;
 
 // API Hooks
 import { useCart, useUpdateCartItem, useRemoveFromCart } from '../../hooks/useCart';
@@ -112,7 +112,7 @@ const CartScreen: React.FC<CartScreenProps> = ({ navigation }) => {
       return sum;
     }, 0);
     
-    // Platform fee: 200 PKR on every order (matches backend)
+    // Platform fee: 100 PKR on every order (matches backend)
     // Calculate total
     const calculatedTotal = calculatedSubtotal + PLATFORM_FEE;
     

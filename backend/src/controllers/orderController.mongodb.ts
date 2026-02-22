@@ -197,7 +197,7 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
     const tax = 0;
     // Use integer subtotal for consistent fee calculation (match mobile Cart/Checkout)
     const subtotalRounded = Math.round(subtotal);
-    const shippingCost = PLATFORM_FEE_PKR; // 200 PKR platform fee (consistent)
+    const shippingCost = PLATFORM_FEE_PKR; // 100 PKR platform fee (consistent)
     const transactionFee = isCardPayment ? Math.round(subtotalRounded * CARD_FEE_PERCENT) : 0;
     const total = subtotalRounded + shippingCost + transactionFee;
 

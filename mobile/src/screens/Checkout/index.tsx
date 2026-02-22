@@ -18,8 +18,8 @@ import authService from '../../services/auth.service';
 import brandService from '../../services/brand.service';
 import { showToast } from '../../utils/toast';
 
-// Platform fee: 200 PKR on every order (matches backend)
-const PLATFORM_FEE_PKR = 200;
+// Platform fee: 100 PKR on every order (matches backend)
+const PLATFORM_FEE_PKR = 100;
 // Card transaction fee: 5% when payment method is card
 const CARD_FEE_PERCENT = 0.05;
 import { requireAuthOrPromptLogin } from '../../utils/guestHelper';
@@ -179,7 +179,7 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
         };
       });
 
-    // Calculate totals - match backend: subtotal + 200 PKR + 5% if card
+    // Calculate totals - match backend: subtotal + 100 PKR + 5% if card
     const subtotal = orderItems.reduce((sum: number, item: any) => sum + item.total, 0);
     const isCard = (paymentMethod || '').toLowerCase() === 'card';
     const cardFee = isCard ? Math.round(subtotal * CARD_FEE_PERCENT) : 0;
