@@ -108,7 +108,19 @@ export default function OrdersList() {
 
   return (
     <Layout pageTitle="Orders">
-      <div className="row">
+      <div className="container-fluid">
+        {/* Breadcrumb */}
+        <div className="row mb-3">
+          <div className="col-12">
+            <nav aria-label="breadcrumb">
+              <ol className="breadcrumb mb-0">
+                <li className="breadcrumb-item"><Link href="/">Home</Link></li>
+                <li className="breadcrumb-item active" aria-current="page">Orders</li>
+              </ol>
+            </nav>
+          </div>
+        </div>
+        <div className="row">
         <div className="col-12">
           <div className="card">
             <div className="card-header d-flex justify-content-between align-items-center">
@@ -159,6 +171,7 @@ export default function OrdersList() {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </Layout>
   );

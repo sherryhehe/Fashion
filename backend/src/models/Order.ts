@@ -23,6 +23,8 @@ export interface IOrder extends Document {
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   paymentMethod: string;
   paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded';
+  /** Stripe PaymentIntent id when payment method is card (for webhook/confirm) */
+  paymentIntentId?: string;
   shippingAddress: Record<string, any>;
   notes?: string;
   timeline: Array<{
@@ -91,6 +93,7 @@ const OrderSchema = new Schema<IOrder>(
       enum: ['pending', 'paid', 'failed', 'refunded'],
       default: 'pending',
     },
+    paymentIntentId: { type: String },
     shippingAddress: {
       type: Schema.Types.Mixed,
       required: [true, 'Shipping address is required'],

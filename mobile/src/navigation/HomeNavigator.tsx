@@ -20,7 +20,7 @@ export type HomeStackParamList = {
 export type CartStackParamList = {
   Cart: undefined;
   Checkout: undefined;
-  OrderSuccess: { orderId: string };
+  OrderSuccess: { orderId: string; clientSecret?: string };
 };
 
 export type SettingsStackParamList = {

@@ -1,10 +1,14 @@
 import { Request, Response } from 'express';
 import mongoose from 'mongoose';
+import Stripe from 'stripe';
 import { Order, Product, Cart, User } from '../models';
 import Brand from '../models/Brand';
 import { successResponse, errorResponse } from '../utils/responseHelper';
 import { AuthRequest } from '../middleware/auth';
 import { PLATFORM_FEE_PKR, CARD_FEE_PERCENT } from '../constants/orderFees';
+
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+const stripe = stripeSecretKey ? new Stripe(stripeSecretKey, { apiVersion: '2023-10-16' }) : null;
 
 export const getAllOrders = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -155,13 +159,20 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
     const selectedMethod = (paymentMethod || 'cash').toLowerCase();
     const isCardPayment = selectedMethod === 'card';
 
-    // Calculate totals and validate payment method against each product's brand
+    // Calculate totals, validate payment method and stock
     let subtotal = 0;
     const orderItems = await Promise.all(
       items.map(async (item: any) => {
         const product = await Product.findById(item.productId);
         if (!product) {
           throw new Error(`Product ${item.productId} not found`);
+        }
+        const qty = Math.max(1, Number(item.quantity) || 1);
+        const availableStock = product.stock ?? 0;
+        if (availableStock < qty) {
+          throw new Error(
+            `Insufficient stock for "${product.name}". Available: ${availableStock}, requested: ${qty}.`
+          );
         }
         // Validate payment method for this product's brand
         if (product.brand) {
@@ -175,16 +186,15 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
         }
         // Use price from request (what customer saw) or fallback to product price
         const unitPrice = typeof item.price === 'number' && item.price >= 0 ? item.price : product.price;
-        const itemTotal = unitPrice * item.quantity;
+        const itemTotal = unitPrice * qty;
         subtotal += itemTotal;
-        // Store first product image so order history shows correct image per item
         const productImage = Array.isArray((product as any).images) && (product as any).images.length > 0
           ? String((product as any).images[0])
           : undefined;
         return {
           productId: String(product._id),
           productName: product.name,
-          quantity: item.quantity,
+          quantity: qty,
           price: unitPrice,
           total: itemTotal,
           size: item.size,
@@ -195,21 +205,18 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
     );
 
     const tax = 0;
-    // Use integer subtotal for consistent fee calculation (match mobile Cart/Checkout)
     const subtotalRounded = Math.round(subtotal);
-    const shippingCost = PLATFORM_FEE_PKR; // 100 PKR platform fee (consistent)
+    const shippingCost = PLATFORM_FEE_PKR;
     const transactionFee = isCardPayment ? Math.round(subtotalRounded * CARD_FEE_PERCENT) : 0;
     const total = subtotalRounded + shippingCost + transactionFee;
 
-    // Generate order number
     const orderCount = await Order.countDocuments();
     const orderNumber = `ORD-${Date.now()}-${orderCount + 1}`;
 
-    // Order is placed → treat as paid for revenue (dashboard)
-    const paymentStatus = 'paid';
+    const useStripe = isCardPayment && stripe !== null;
+    const paymentStatus = useStripe ? 'pending' : 'paid';
 
-    // Create order
-    const order = await Order.create({
+    const orderData: any = {
       userId: req.user!.id,
       orderNumber,
       items: orderItems,
@@ -223,18 +230,43 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
       shippingAddress,
       notes,
       timeline: [
-        {
-          status: 'pending',
-          date: new Date().toISOString(),
-          description: 'Order placed',
-        },
+        { status: 'pending', date: new Date().toISOString(), description: 'Order placed' },
       ],
-    });
+    };
 
-    // Clear cart
+    let paymentIntentId: string | undefined;
+    if (useStripe && stripe) {
+      const currency = (process.env.STRIPE_CURRENCY || 'pkr').toLowerCase();
+      const amountInSmallestUnit = currency === 'pkr' ? total * 100 : Math.round(total * 100);
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amountInSmallestUnit,
+        currency,
+        metadata: { orderNumber, userId: req.user!.id },
+        automatic_payment_methods: { enabled: true },
+      });
+      paymentIntentId = paymentIntent.id;
+      orderData.paymentIntentId = paymentIntentId;
+    }
+
+    const order = await Order.create(orderData);
+
+    if (!useStripe) {
+      for (const item of orderItems) {
+        await Product.findByIdAndUpdate(item.productId, {
+          $inc: { stock: -item.quantity },
+        });
+      }
+    }
+
     await Cart.deleteMany({ userId: req.user!.id });
 
-    successResponse(res, order, 'Order created successfully', 201);
+    if (useStripe && paymentIntentId && stripe) {
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      const orderObj = order.toObject();
+      successResponse(res, { order: orderObj, clientSecret: paymentIntent.client_secret ?? undefined }, 'Order created. Complete payment with Stripe.', 201);
+    } else {
+      successResponse(res, order, 'Order created successfully', 201);
+    }
   } catch (error: any) {
     console.error('Create order error:', error);
     errorResponse(res, error.message || 'Failed to create order', 500);
@@ -271,6 +303,55 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
   } catch (error) {
     console.error('Update order status error:', error);
     errorResponse(res, 'Failed to update order status', 500);
+  }
+};
+
+/**
+ * Mark order as paid and decrement product stock. Used after Stripe payment succeeds.
+ */
+async function markOrderPaidAndDecrementStock(order: any): Promise<void> {
+  if (order.paymentStatus === 'paid') return;
+  order.paymentStatus = 'paid';
+  order.timeline.push({
+    status: 'paid',
+    date: new Date().toISOString(),
+    description: 'Payment confirmed',
+  });
+  await order.save();
+  const items = order.items || [];
+  for (const item of items) {
+    await Product.findByIdAndUpdate(item.productId, { $inc: { stock: -item.quantity } });
+  }
+}
+
+export const confirmOrderPayment = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const order = await Order.findById(id);
+    if (!order) {
+      errorResponse(res, 'Order not found', 404);
+      return;
+    }
+    if (order.paymentStatus !== 'pending' || !(order as any).paymentIntentId) {
+      errorResponse(res, 'Order is not pending card payment', 400);
+      return;
+    }
+    if (order.userId !== req.user!.id && req.user!.role !== 'admin') {
+      errorResponse(res, 'Access denied', 403);
+      return;
+    }
+    if (stripe) {
+      const pi = await stripe.paymentIntents.retrieve((order as any).paymentIntentId);
+      if (pi.status !== 'succeeded') {
+        errorResponse(res, 'Payment not completed yet', 400);
+        return;
+      }
+    }
+    await markOrderPaidAndDecrementStock(order);
+    successResponse(res, order, 'Payment confirmed');
+  } catch (error: any) {
+    console.error('Confirm order payment error:', error);
+    errorResponse(res, error?.message || 'Failed to confirm payment', 500);
   }
 };
 

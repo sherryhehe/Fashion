@@ -68,6 +68,17 @@ export default function BannerControl() {
 	return (
 		<Layout pageTitle="Banner Control Management">
 			<div className="container-fluid">
+				{/* Breadcrumb */}
+				<div className="row mb-3">
+					<div className="col-12">
+						<nav aria-label="breadcrumb">
+							<ol className="breadcrumb mb-0">
+								<li className="breadcrumb-item"><Link href="/">Home</Link></li>
+								<li className="breadcrumb-item active" aria-current="page">Banners</li>
+							</ol>
+						</nav>
+					</div>
+				</div>
 				{/* Metrics */}
 				<div className="row mb-4">
 					<div className="col-md-3">

@@ -1,11 +1,25 @@
 'use client';
 
 import Layout from '@/components/layout/Layout';
+import Link from 'next/link';
 
 export default function NotificationHistory() {
   return (
     <Layout pageTitle="Notification History">
-      <div className="row">
+      <div className="container-fluid">
+        {/* Breadcrumb */}
+        <div className="row mb-3">
+          <div className="col-12">
+            <nav aria-label="breadcrumb">
+              <ol className="breadcrumb mb-0">
+                <li className="breadcrumb-item"><Link href="/">Home</Link></li>
+                <li className="breadcrumb-item"><Link href="/notification-list">Notifications</Link></li>
+                <li className="breadcrumb-item active" aria-current="page">History</li>
+              </ol>
+            </nav>
+          </div>
+        </div>
+        <div className="row">
         <div className="col-12">
           <div className="card">
             <div className="card-header">
@@ -20,6 +34,7 @@ export default function NotificationHistory() {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </Layout>
   );

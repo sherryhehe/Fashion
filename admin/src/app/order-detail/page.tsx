@@ -413,7 +413,31 @@ export default function OrderDetail() {
                     <h4 className="card-title mb-1">Order #{order.orderNumber || order.id}</h4>
                     <p className="text-muted mb-0">Placed on {order.date || (order.createdAt ? new Date(order.createdAt).toLocaleString() : 'N/A')}</p>
                   </div>
-                  <div className="text-end">
+                  <div className="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+                    <label htmlFor="order-status-inline" className="mb-0 text-muted small">Change status:</label>
+                    <select
+                      id="order-status-inline"
+                      className="form-select form-select-sm"
+                      style={{ width: 'auto', minWidth: '140px' }}
+                      value={order.status || 'pending'}
+                      onChange={async (e) => {
+                        const status = e.target.value;
+                        if (!order._id || status === (order.status || '')) return;
+                        try {
+                          await ordersApi.updateStatus(order._id, status);
+                          setOrder(prev => prev ? { ...prev, status } : null);
+                          await fetchOrder();
+                        } catch (err: any) {
+                          alert(err?.message || 'Failed to update status');
+                        }
+                      }}
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="processing">Processing</option>
+                      <option value="shipped">Shipped</option>
+                      <option value="delivered">Delivered</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
                     <span className={`badge ${
                       order.status === 'processing' ? 'bg-info' : 
                       order.status === 'delivered' ? 'bg-success' : 

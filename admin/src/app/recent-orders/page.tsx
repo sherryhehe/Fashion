@@ -2,8 +2,10 @@
 
 import Layout from '@/components/layout/Layout';
 import { InteractiveTable } from '@/components';
+import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { ordersApi } from '@/lib/api';
+import { formatCurrency } from '@/utils/currencyHelper';
 
 export default function RecentOrders() {
   const [orders, setOrders] = useState<any[]>([]);
@@ -55,7 +57,19 @@ export default function RecentOrders() {
 
   return (
     <Layout pageTitle="Recent Orders">
-      <div className="row">
+      <div className="container-fluid">
+        <div className="row mb-3">
+          <div className="col-12">
+            <nav aria-label="breadcrumb">
+              <ol className="breadcrumb mb-0">
+                <li className="breadcrumb-item"><Link href="/">Home</Link></li>
+                <li className="breadcrumb-item"><Link href="/orders-list">Orders</Link></li>
+                <li className="breadcrumb-item active" aria-current="page">Recent</li>
+              </ol>
+            </nav>
+          </div>
+        </div>
+        <div className="row">
         <div className="col-12">
           <div className="card">
             <div className="card-header">
@@ -78,6 +92,7 @@ export default function RecentOrders() {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </Layout>
   );

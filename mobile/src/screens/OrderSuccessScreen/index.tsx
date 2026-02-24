@@ -13,7 +13,7 @@ import { CartStackParamList } from '../../navigation/HomeNavigator';
 import { SafeView } from '../../components';
 import { useOrder } from '../../hooks/useOrders';
 
-export type OrderSuccessScreenParams = { orderId: string };
+export type OrderSuccessScreenParams = { orderId: string; clientSecret?: string };
 
 type OrderSuccessNavigationProp = StackNavigationProp<CartStackParamList, 'OrderSuccess'>;
 
@@ -25,10 +25,15 @@ interface OrderSuccessScreenProps {
 const OrderSuccessScreen: React.FC<OrderSuccessScreenProps> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const orderId = route.params?.orderId || '';
+  const clientSecret = route.params?.clientSecret;
   const { data: orderResponse, isLoading } = useOrder(orderId);
   const order = orderResponse?.data;
 
   const formatPrice = (n: number) => `PKR ${(n || 0).toLocaleString()}`;
+  const title = clientSecret ? 'Order Created' : 'Order Successful!';
+  const subtitle = clientSecret
+    ? 'Complete payment with your card to confirm this order. You can also do this later from your order details.'
+    : "Thank you for shopping with us. You'll receive updates about your delivery shortly.";
 
   return (
     <SafeView>
@@ -43,45 +48,42 @@ const OrderSuccessScreen: React.FC<OrderSuccessScreenProps> = ({ navigation, rou
             <Text style={styles.checkmark}>✓</Text>
           </View>
         </View>
-        <Text style={styles.title}>Order Successful!</Text>
-        <Text style={styles.subtitle}>
-          Thank you for shopping with us. You'll receive updates about your delivery shortly.
-        </Text>
+        <Text style={styles.title}>{title}</Text>
+        <Text style={styles.subtitle}>{subtitle}</Text>
 
-        {isLoading ? (
+        {isLoading && (
           <ActivityIndicator size="large" color="#34C759" style={styles.loader} />
-        ) : order ? (
-          <>
-            <View style={styles.orderCard}>
-              <View style={styles.orderCardHeader}>
-                <Text style={styles.orderLabel}>Order Number</Text>
-                <Text style={styles.orderNumber}>#{order.orderNumber || order._id?.slice(-6)}</Text>
-                <Text style={styles.orderMeta}>
-                  {order.items?.length || 0} Items · {formatPrice(order.total)}
-                </Text>
-              </View>
-              {order.items?.length > 0 && (
-                <View style={styles.itemsList}>
-                  {order.items.slice(0, 5).map((item: any, idx: number) => (
-                    <View key={`${item.productId}-${idx}`} style={styles.itemRow}>
-                      <View style={styles.itemImagePlaceholder} />
-                      <View style={styles.itemDetails}>
-                        <Text style={styles.itemName} numberOfLines={1}>{item.productName}</Text>
-                        <Text style={styles.itemMeta}>
-                          Qty: {item.quantity} · {formatPrice(item.total)}
-                        </Text>
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              )}
-              <View style={styles.deliveryBar}>
-                <Text style={styles.deliveryLabel}>Expected Delivery</Text>
-                <Text style={styles.deliveryValue}>2-4 Business Days</Text>
-              </View>
+        )}
+        {!isLoading && order && (
+          <View style={styles.orderCard}>
+            <View style={styles.orderCardHeader}>
+              <Text style={styles.orderLabel}>Order Number</Text>
+              <Text style={styles.orderNumber}>#{order.orderNumber || order._id?.slice(-6)}</Text>
+              <Text style={styles.orderMeta}>
+                {order.items?.length || 0} Items · {formatPrice(order.total)}
+              </Text>
             </View>
-          </>
-        ) : null}
+            {order.items?.length > 0 && (
+              <View style={styles.itemsList}>
+                {order.items.slice(0, 5).map((item: any, idx: number) => (
+                  <View key={`${item.productId}-${idx}`} style={styles.itemRow}>
+                    <View style={styles.itemImagePlaceholder} />
+                    <View style={styles.itemDetails}>
+                      <Text style={styles.itemName} numberOfLines={1}>{item.productName}</Text>
+                      <Text style={styles.itemMeta}>
+                        Qty: {item.quantity} · {formatPrice(item.total)}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+            <View style={styles.deliveryBar}>
+              <Text style={styles.deliveryLabel}>Expected Delivery</Text>
+              <Text style={styles.deliveryValue}>2-4 Business Days</Text>
+            </View>
+          </View>
+        )}
 
         <Text style={styles.emailNote}>A confirmation email has been sent to your inbox.</Text>
 

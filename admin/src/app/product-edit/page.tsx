@@ -636,15 +636,27 @@ export default function ProductEdit() {
                     </div>
                     <div className="col-md-6 mb-3">
                       <label htmlFor="inventory" className="form-label">Inventory Quantity</label>
-                      <input 
-                        type="number" 
-                        className="form-control" 
-                        id="inventory" 
-                        name="inventory"
-                        value={formData.inventory}
-                        onChange={handleChange}
-                        min="0" 
-                      />
+                      <div className="d-flex align-items-center gap-2">
+                        <input 
+                          type="number" 
+                          className="form-control" 
+                          id="inventory" 
+                          name="inventory"
+                          value={formData.inventory}
+                          onChange={handleChange}
+                          min="0" 
+                          style={{ maxWidth: '120px' }}
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-outline-danger btn-sm"
+                          onClick={() => setFormData(prev => ({ ...prev, inventory: '0' }))}
+                          title="Mark this product out of stock (set quantity to 0)"
+                        >
+                          Mark out of stock
+                        </button>
+                      </div>
+                      <small className="text-muted">Set to 0 to show as out of stock to customers.</small>
                     </div>
                     <div className="col-12 mb-3">
                       <label htmlFor="description" className="form-label">Description</label>

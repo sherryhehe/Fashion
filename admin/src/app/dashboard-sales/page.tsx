@@ -1,6 +1,7 @@
 'use client';
 
 import Layout from '@/components/layout/Layout';
+import Link from 'next/link';
 import { getApiUrl } from '@/utils/apiHelper';
 import { useState, useEffect } from 'react';
 import { formatCurrencyNoDecimals, formatCurrency } from '@/utils/currencyHelper';
@@ -77,6 +78,17 @@ export default function DashboardSales() {
 
   return (
     <Layout pageTitle="Sales Dashboard">
+      <div className="container-fluid">
+        <div className="row mb-3">
+          <div className="col-12">
+            <nav aria-label="breadcrumb">
+              <ol className="breadcrumb mb-0">
+                <li className="breadcrumb-item"><Link href="/">Home</Link></li>
+                <li className="breadcrumb-item active" aria-current="page">Sales Dashboard</li>
+              </ol>
+            </nav>
+          </div>
+        </div>
       <div className="row">
         {/* Total Sales */}
         <div className="col-md-6 col-xl-3">
@@ -206,6 +218,7 @@ export default function DashboardSales() {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </Layout>
   );

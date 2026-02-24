@@ -6,13 +6,16 @@ import {
   TouchableOpacity,
   TextInput,
   StyleSheet,
+  Image,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { CartStackParamList } from '../../navigation/HomeNavigator';
 import { SafeView, ShimmerLoader } from '../../components';
+import { getFirstImageSource } from '../../utils/imageHelper';
+import images from '../../assets/images';
 
 // API Hooks
-import { useCart } from '../../hooks/useCart';
+import { useCart, useRemoveFromCart } from '../../hooks/useCart';
 import { useCreateOrder } from '../../hooks/useOrders';
 import authService from '../../services/auth.service';
 import brandService from '../../services/brand.service';
@@ -48,6 +51,7 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
   // Fetch cart and user profile
   const { data: cartData, isLoading: cartLoading } = useCart();
   const createOrderMutation = useCreateOrder();
+  const removeFromCartMutation = useRemoveFromCart();
 
   const cartItems = cartData?.data || [];
 
@@ -204,9 +208,15 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
         notes: saveInfoChecked ? 'Save information for next time' : undefined,
       });
 
-      const orderId = response?.data?._id || response?.data?.orderNumber;
+      const data = response?.data as any;
+      const order = data?.order ?? data;
+      const orderId = order?._id || order?.orderNumber || data?._id || data?.orderNumber;
+      const clientSecret = data?.clientSecret;
+      if (clientSecret) {
+        showToast.success('Order created. Complete payment in the next step.');
+      }
       if (orderId) {
-        navigation.replace('OrderSuccess', { orderId });
+        navigation.replace('OrderSuccess', { orderId, clientSecret: clientSecret || undefined });
       } else {
         navigation.getParent()?.navigate('Orders');
       }
@@ -264,6 +274,54 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
+
+        {/* What you're buying - overview with option to remove items */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>What you're buying</Text>
+          <View style={styles.formWrapper}>
+            {cartItems.length === 0 ? (
+              <Text style={styles.emptyCartText}>Your cart is empty</Text>
+            ) : (
+              cartItems.map((item: any) => {
+                const product = item.product || {};
+                const productPrice = item.productPrice ?? product?.price ?? 0;
+                const qty = item.quantity || 0;
+                const lineTotal = Math.round(productPrice * qty);
+                const productImage = product?.images?.[0];
+                const imageSource = getFirstImageSource(
+                  productImage ? [productImage] : [],
+                  images?.image1 || images?.velvetShawl
+                );
+                const cartItemId = item._id || item.id;
+                return (
+                  <View key={cartItemId} style={styles.cartItemRow}>
+                    <Image
+                      source={imageSource || images?.velvetShawl || images?.image1}
+                      style={styles.cartItemImage}
+                      resizeMode="cover"
+                    />
+                    <View style={styles.cartItemDetails}>
+                      <Text style={styles.cartItemName} numberOfLines={2}>
+                        {product?.name || item.productName || 'Product'}
+                      </Text>
+                      <Text style={styles.cartItemMeta}>
+                        {qty} × PKR {productPrice.toLocaleString()} = PKR {lineTotal.toLocaleString()}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.removeItemButton, removeFromCartMutation.isPending && styles.removeItemButtonDisabled]}
+                      onPress={() => cartItemId && removeFromCartMutation.mutate(cartItemId)}
+                      disabled={removeFromCartMutation.isPending}
+                      accessibilityLabel="Remove from order"
+                    >
+                      <Text style={styles.removeItemText}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })
+            )}
+          </View>
+        </View>
 
         {/* Contact Section */}
         <View style={styles.section}>
@@ -481,6 +539,56 @@ const styles = StyleSheet.create({
   section: {
     paddingHorizontal: 20,
     paddingVertical: 24,
+  },
+  emptyCartText: {
+    fontSize: 16,
+    color: '#8E8E93',
+    textAlign: 'center',
+    paddingVertical: 16,
+  },
+  cartItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E8ECF4',
+  },
+  cartItemImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 8,
+    backgroundColor: '#F2F2F7',
+  },
+  cartItemDetails: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  cartItemName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#2C2C2E',
+    marginBottom: 4,
+  },
+  cartItemMeta: {
+    fontSize: 13,
+    color: '#8E8E93',
+  },
+  removeItemButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FF3B30',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  removeItemButtonDisabled: {
+    opacity: 0.6,
+  },
+  removeItemText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   sectionTitle: {
     fontSize: 20,
