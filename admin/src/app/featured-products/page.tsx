@@ -217,7 +217,6 @@ export default function FeaturedProducts() {
           </div>
         </div>
       </div>
-      </div>
 
       {/* Confirm Dialog */}
       <ConfirmDialog
