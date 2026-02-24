@@ -1,6 +1,7 @@
 'use client';
 
 import Layout from '@/components/layout/Layout';
+import Link from 'next/link';
 import { getApiUrl } from '@/utils/apiHelper';
 import { useState, useEffect } from 'react';
 
@@ -56,6 +57,17 @@ export default function DashboardUserLocation() {
 
   return (
     <Layout pageTitle="User Location Dashboard">
+      <div className="container-fluid">
+        <div className="row mb-3">
+          <div className="col-12">
+            <nav aria-label="breadcrumb">
+              <ol className="breadcrumb mb-0">
+                <li className="breadcrumb-item"><Link href="/">Home</Link></li>
+                <li className="breadcrumb-item active" aria-current="page">User Location</li>
+              </ol>
+            </nav>
+          </div>
+        </div>
       <div className="row">
         {/* Total Users */}
         <div className="col-md-6 col-xl-3">
@@ -198,6 +210,7 @@ export default function DashboardUserLocation() {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </Layout>
   );

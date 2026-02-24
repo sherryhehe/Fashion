@@ -1,6 +1,7 @@
 'use client';
 
 import Layout from '@/components/layout/Layout';
+import Link from 'next/link';
 import { getApiUrl } from '@/utils/apiHelper';
 import { useState, useEffect } from 'react';
 
@@ -106,7 +107,18 @@ export default function ProfilePage() {
 
   return (
     <Layout pageTitle="My Profile">
-      <div className="row">
+      <div className="container-fluid">
+        <div className="row mb-3">
+          <div className="col-12">
+            <nav aria-label="breadcrumb">
+              <ol className="breadcrumb mb-0">
+                <li className="breadcrumb-item"><Link href="/">Home</Link></li>
+                <li className="breadcrumb-item active" aria-current="page">Profile</li>
+              </ol>
+            </nav>
+          </div>
+        </div>
+        <div className="row">
         <div className="col-lg-8 mx-auto">
           <div className="card">
             <div className="card-header">
@@ -236,6 +248,7 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </Layout>
   );

@@ -1,11 +1,23 @@
 'use client';
 
 import Layout from '@/components/layout/Layout';
+import Link from 'next/link';
 
 export default function Settings() {
   return (
     <Layout pageTitle="Settings">
       <div className="container-fluid">
+        {/* Breadcrumb */}
+        <div className="row mb-3">
+          <div className="col-12">
+            <nav aria-label="breadcrumb">
+              <ol className="breadcrumb mb-0">
+                <li className="breadcrumb-item"><Link href="/">Home</Link></li>
+                <li className="breadcrumb-item active" aria-current="page">Settings</li>
+              </ol>
+            </nav>
+          </div>
+        </div>
         {/* Settings Management */}
         <div className="row">
           <div className="col-md-6">

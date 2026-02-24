@@ -132,7 +132,19 @@ export default function FeaturedProducts() {
 
   return (
     <Layout pageTitle="Featured Products">
-      <div className="row">
+      <div className="container-fluid">
+        <div className="row mb-3">
+          <div className="col-12">
+            <nav aria-label="breadcrumb">
+              <ol className="breadcrumb mb-0">
+                <li className="breadcrumb-item"><Link href="/">Home</Link></li>
+                <li className="breadcrumb-item"><Link href="/product-list">Products</Link></li>
+                <li className="breadcrumb-item active" aria-current="page">Featured</li>
+              </ol>
+            </nav>
+          </div>
+        </div>
+        <div className="row">
         <div className="col-xl-12">
           <div className="card">
             <div className="card-header d-flex justify-content-between align-items-center">
@@ -201,8 +213,10 @@ export default function FeaturedProducts() {
                 />
               )}
             </div>
+            </div>
           </div>
         </div>
+      </div>
       </div>
 
       {/* Confirm Dialog */}

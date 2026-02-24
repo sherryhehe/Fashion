@@ -357,6 +357,12 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
   const handleAddToCart = async () => {
     if (!productId || !product) return;
 
+    const stock = product?.stock ?? 0;
+    if (stock <= 0) {
+      Alert.alert('Out of stock', 'This product is currently out of stock.');
+      return;
+    }
+
     // Check if user is guest and prompt login
     const isAuthenticated = await requireAuthOrPromptLogin(
       'add items to cart',
@@ -406,6 +412,12 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
   // Handle buy now - add to cart and redirect to checkout
   const handleBuyNow = async () => {
     if (!productId || !product) return;
+
+    const stock = product?.stock ?? 0;
+    if (stock <= 0) {
+      Alert.alert('Out of stock', 'This product is currently out of stock.');
+      return;
+    }
 
     // Check if user is guest and prompt login
     const isAuthenticated = await requireAuthOrPromptLogin(
@@ -1074,10 +1086,18 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
 
         {/* Bottom Action Bar */}
         <View style={styles.bottomActionBar}>
+          {(product?.stock ?? 0) <= 0 && (
+            <View style={styles.outOfStockBanner}>
+              <Text style={styles.outOfStockBannerText}>Out of stock</Text>
+            </View>
+          )}
           <TouchableOpacity 
-            style={[styles.cartButton, addToCartMutation.isPending && styles.cartButtonDisabled]}
+            style={[
+              styles.cartButton,
+              (addToCartMutation.isPending || (product?.stock ?? 0) <= 0) && styles.cartButtonDisabled,
+            ]}
             onPress={handleAddToCart}
-            disabled={addToCartMutation.isPending}
+            disabled={addToCartMutation.isPending || (product?.stock ?? 0) <= 0}
           >
             {addToCartMutation.isPending ? (
               <ActivityIndicator size="small" color="#2C2C2E" />
@@ -1086,12 +1106,19 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
             )}
           </TouchableOpacity>
           <TouchableOpacity 
-            style={styles.checkoutButton}
+            style={[
+              styles.checkoutButton,
+              (product?.stock ?? 0) <= 0 && styles.checkoutButtonDisabled,
+            ]}
             onPress={handleBuyNow}
-            disabled={addToCartMutation.isPending}
+            disabled={addToCartMutation.isPending || (product?.stock ?? 0) <= 0}
           >
             <Text style={styles.checkoutButtonText}>
-              {addToCartMutation.isPending ? 'Processing...' : 'Buy Now'}
+              {(product?.stock ?? 0) <= 0
+                ? 'Out of stock'
+                : addToCartMutation.isPending
+                  ? 'Processing...'
+                  : 'Buy Now'}
             </Text>
           </TouchableOpacity>
         </View>

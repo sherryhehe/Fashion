@@ -1,6 +1,7 @@
 'use client';
 
 import Layout from '@/components/layout/Layout';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { productsApi, dashboardApi } from '@/lib/api';
 import { formatCurrency, formatCurrencyNoDecimals } from '@/utils/currencyHelper';
@@ -32,6 +33,16 @@ export default function TopSellingProducts() {
   return (
     <Layout pageTitle="Top Selling Products">
       <div className="container-fluid">
+        <div className="row mb-3">
+          <div className="col-12">
+            <nav aria-label="breadcrumb">
+              <ol className="breadcrumb mb-0">
+                <li className="breadcrumb-item"><Link href="/">Home</Link></li>
+                <li className="breadcrumb-item active" aria-current="page">Top Selling Products</li>
+              </ol>
+            </nav>
+          </div>
+        </div>
         <div className="row mb-4">
           <div className="col-md-3">
             <div className="card overflow-hidden metric-card">

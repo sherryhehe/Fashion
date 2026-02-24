@@ -11,6 +11,7 @@ router.get('/', orderController.getAllOrders);
 router.get('/:id', orderController.getOrderById);
 router.post('/', orderController.createOrder);
 router.put('/:id/cancel', orderController.cancelOrder);
+router.patch('/:id/confirm-payment', orderController.confirmOrderPayment);
 
 // Admin only routes (accept both PUT and PATCH for status updates)
 router.put('/:id/status', requireAdmin, orderController.updateOrderStatus);

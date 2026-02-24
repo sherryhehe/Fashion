@@ -34,10 +34,15 @@ export const addToCart = async (req: AuthRequest, res: Response): Promise<void> 
       return;
     }
 
-    // Check if product exists
+    // Check if product exists and is in stock
     const product = await Product.findById(productId);
     if (!product) {
       errorResponse(res, 'Product not found', 404);
+      return;
+    }
+    const availableStock = product.stock ?? 0;
+    if (availableStock <= 0) {
+      errorResponse(res, 'This product is out of stock', 400);
       return;
     }
 
@@ -50,10 +55,19 @@ export const addToCart = async (req: AuthRequest, res: Response): Promise<void> 
     });
 
     if (existingItem) {
-      existingItem.quantity += quantity;
+      const newQty = existingItem.quantity + quantity;
+      if (newQty > availableStock) {
+        errorResponse(res, `Only ${availableStock} unit(s) available`, 400);
+        return;
+      }
+      existingItem.quantity = newQty;
       await existingItem.save();
       successResponse(res, existingItem, 'Cart updated successfully');
     } else {
+      if (quantity > availableStock) {
+        errorResponse(res, `Only ${availableStock} unit(s) available`, 400);
+        return;
+      }
       const cartItem = await Cart.create({
         userId: req.user!.id,
         productId,

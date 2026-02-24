@@ -147,7 +147,19 @@ export default function CategoryList() {
 
   return (
     <Layout pageTitle="Categories">
-                <div className="row">
+      <div className="container-fluid">
+        {/* Breadcrumb */}
+        <div className="row mb-3">
+          <div className="col-12">
+            <nav aria-label="breadcrumb">
+              <ol className="breadcrumb mb-0">
+                <li className="breadcrumb-item"><Link href="/">Home</Link></li>
+                <li className="breadcrumb-item active" aria-current="page">Categories</li>
+              </ol>
+            </nav>
+          </div>
+        </div>
+        <div className="row">
         <div className="col-xl-12">
           <div className="card">
             <div className="card-header d-flex justify-content-between align-items-center">
@@ -209,6 +221,7 @@ export default function CategoryList() {
             </div>
           </div>
         </div>
+      </div>
       </div>
 
       {/* Confirm Dialog */}

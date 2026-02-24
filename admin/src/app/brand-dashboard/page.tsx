@@ -31,7 +31,19 @@ export default function BrandDashboard() {
   }, []);
   return (
     <Layout pageTitle="Brand Dashboard">
-      <div className="row">
+      <div className="container-fluid">
+        <div className="row mb-3">
+          <div className="col-12">
+            <nav aria-label="breadcrumb">
+              <ol className="breadcrumb mb-0">
+                <li className="breadcrumb-item"><Link href="/">Home</Link></li>
+                <li className="breadcrumb-item"><Link href="/brand-list">Brands</Link></li>
+                <li className="breadcrumb-item active" aria-current="page">Dashboard</li>
+              </ol>
+            </nav>
+          </div>
+        </div>
+        <div className="row">
         <div className="col-12">
           <div className="card">
             <div className="card-header d-flex justify-content-between align-items-center">
@@ -112,6 +124,7 @@ export default function BrandDashboard() {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </Layout>
   );

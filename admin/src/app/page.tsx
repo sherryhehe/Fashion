@@ -1,6 +1,7 @@
 'use client';
 
 import { Layout } from '@/components';
+import Link from 'next/link';
 import TimeFilter, { TimeFilterOption } from '@/components/molecules/TimeFilter';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -85,6 +86,16 @@ export default function Home() {
 
   return (
     <Layout pageTitle="Dashboard">
+      <div className="container-fluid">
+        <div className="row mb-3">
+          <div className="col-12">
+            <nav aria-label="breadcrumb">
+              <ol className="breadcrumb mb-0">
+                <li className="breadcrumb-item active" aria-current="page">Home</li>
+              </ol>
+            </nav>
+          </div>
+        </div>
       {/* Stats Cards */}
       <div className="row">
         <div className="col-md-6 col-xl-3">
@@ -338,6 +349,7 @@ export default function Home() {
           </div>
         </div>
       )}
+      </div>
     </Layout>
   );
 }

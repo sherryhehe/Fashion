@@ -628,6 +628,18 @@ const styles = StyleSheet.create({
     borderTopColor: '#F2F2F7',
     marginTop: 20,
   },
+  outOfStockBanner: {
+    backgroundColor: '#FF3B30',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginRight: 12,
+  },
+  outOfStockBannerText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
   cartButton: {
     width: 50,
     height: 50,
@@ -652,6 +664,10 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  checkoutButtonDisabled: {
+    backgroundColor: '#8E8E93',
+    opacity: 0.8,
   },
   checkoutButtonText: {
     fontSize: 16,
