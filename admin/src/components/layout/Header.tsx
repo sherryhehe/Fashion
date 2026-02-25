@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { GlobalSearch } from '@/components/molecules';
 import { useSidebar } from '@/contexts/SidebarContext';
 
@@ -10,6 +10,7 @@ interface HeaderProps {
 
 export default function Header({ pageTitle }: HeaderProps) {
   const { isOpen, toggleSidebar } = useSidebar();
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 
   useEffect(() => {
     // Initialize theme toggle functionality
@@ -146,6 +147,37 @@ export default function Header({ pageTitle }: HeaderProps) {
           >
             <GlobalSearch />
           </div>
+
+          {/* Mobile Search Toggle - Icon only, opens search on click */}
+          <button
+            type="button"
+            className="d-lg-none"
+            onClick={() => setMobileSearchOpen((v) => !v)}
+            aria-label={mobileSearchOpen ? 'Close search' : 'Open search'}
+            title={mobileSearchOpen ? 'Close search' : 'Search'}
+            style={{
+              minWidth: '40px',
+              minHeight: '40px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '8px',
+              transition: 'all 0.2s ease',
+              color: '#1f2937',
+              border: 'none',
+              backgroundColor: 'transparent',
+              cursor: 'pointer',
+              padding: '8px'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.08)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            <iconify-icon icon="solar:magnifer-linear" className="fs-20"></iconify-icon>
+          </button>
 
           {/* Theme Toggle */}
           <button 
@@ -356,16 +388,42 @@ export default function Header({ pageTitle }: HeaderProps) {
         </div>
       </div>
 
-      {/* Mobile Search Bar */}
-      <div 
-        className="d-lg-none" 
-        style={{ 
-          padding: '0 1.5rem 1rem 1.5rem',
-          marginTop: '0.5rem'
-        }}
-      >
-        <GlobalSearch />
-      </div>
+      {/* Mobile Search Bar - only visible when search icon is clicked */}
+      {mobileSearchOpen && (
+        <div 
+          className="d-lg-none d-flex align-items-center gap-2" 
+          style={{ 
+            padding: '0 1.5rem 1rem 1.5rem',
+            marginTop: '0.5rem',
+            width: '100%'
+          }}
+        >
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <GlobalSearch onMobileClose={() => setMobileSearchOpen(false)} />
+          </div>
+          <button
+            type="button"
+            onClick={() => setMobileSearchOpen(false)}
+            aria-label="Close search"
+            style={{
+              minWidth: '40px',
+              minHeight: '40px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '8px',
+              color: '#1f2937',
+              border: 'none',
+              backgroundColor: 'transparent',
+              cursor: 'pointer',
+              padding: '8px',
+              flexShrink: 0
+            }}
+          >
+            <iconify-icon icon="solar:close-circle-bold" className="fs-22"></iconify-icon>
+          </button>
+        </div>
+      )}
     </header>
   );
 }
