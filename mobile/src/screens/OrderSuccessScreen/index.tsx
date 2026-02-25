@@ -79,8 +79,8 @@ const OrderSuccessScreen: React.FC<OrderSuccessScreenProps> = ({ navigation, rou
               </View>
             )}
             <View style={styles.deliveryBar}>
-              <Text style={styles.deliveryLabel}>Expected Delivery</Text>
-              <Text style={styles.deliveryValue}>2-4 Business Days</Text>
+              <Text style={styles.deliveryLabel}>Note</Text>
+              <Text style={styles.deliveryValue}>We'll send you a confirmation message.</Text>
             </View>
           </View>
         )}

@@ -14,9 +14,11 @@ interface GlobalSearchResult {
 
 interface GlobalSearchProps {
   className?: string;
+  /** Called when search should close on mobile (e.g. after submit or navigate) */
+  onMobileClose?: () => void;
 }
 
-export default function GlobalSearch({ className = '' }: GlobalSearchProps) {
+export default function GlobalSearch({ className = '', onMobileClose }: GlobalSearchProps) {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [results, setResults] = useState<GlobalSearchResult>({
@@ -35,12 +37,13 @@ export default function GlobalSearch({ className = '' }: GlobalSearchProps) {
     const handleClickOutside = (event: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
         setShowResults(false);
+        onMobileClose?.();
       }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [onMobileClose]);
 
   // Search with debounce
   useEffect(() => {
@@ -88,6 +91,7 @@ export default function GlobalSearch({ className = '' }: GlobalSearchProps) {
       router.push(`/product-list?search=${encodeURIComponent(searchQuery.trim())}`);
       setShowResults(false);
       setSearchQuery('');
+      onMobileClose?.();
     }
   };
 
@@ -101,6 +105,7 @@ export default function GlobalSearch({ className = '' }: GlobalSearchProps) {
     }
     setShowResults(false);
     setSearchQuery('');
+    onMobileClose?.();
   };
 
   const totalResults = results.products.length + results.orders.length + results.customers.length;

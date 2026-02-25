@@ -6,16 +6,23 @@
     display: flex;
     flex-direction: column;
     min-height: 100vh;
+    min-height: 100dvh;
+    height: 100%;
     position: relative;
+    overflow: hidden;
   }
 
-  /* Page content adjustments */
+  /* Page content adjustments - allow vertical scroll on mobile */
   .page-content {
     width: 100%;
     min-width: 0;
     margin-left: 0 !important;
     padding: 1rem;
-    flex: 1;
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
     transition: none;
   }
 
@@ -242,15 +249,31 @@
   }
 }
 
-/* Prevent overscroll on mobile */
+/* Prevent overscroll on mobile - page-content is the scroll container */
 @media (max-width: 1140px) {
+  html,
   body {
     overscroll-behavior-y: none;
+    height: 100%;
+    overflow: hidden;
   }
 
-  /* Improve scroll performance */
+  /* Improve scroll performance - page-content is the scroll container */
   .page-content {
     -webkit-overflow-scrolling: touch;
+    overflow-y: auto;
+  }
+
+  /* Tables and data grids: ensure they can scroll horizontally and don't block page scroll */
+  .table-responsive,
+  .gridjs-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+  }
+
+  .gridjs-wrapper {
+    touch-action: pan-x pan-y;
   }
 }
 
