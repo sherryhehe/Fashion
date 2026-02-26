@@ -247,24 +247,25 @@ export default function InteractiveTable({
         </table>
       </div>
 
-      {/* Pagination */}
-      {showPagination && totalPages > 1 && (
-        <div className="d-flex justify-content-between align-items-center mt-3">
+      {/* Pagination - always show entry count and controls (arrows + page list) when there's data, so product list matches category list */}
+      {showPagination && data.length > 0 && (
+        <div className="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2">
           <div className="text-muted">
             Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, data.length)} of {data.length} entries
           </div>
           
-          <div className="d-flex gap-1">
+          <div className="d-flex gap-1 align-items-center">
             <InteractiveButton
               variant="outline-secondary"
               size="sm"
               onClick={prevPage}
               disabled={!hasPrevPage}
+              aria-label="Previous page"
             >
               <i className="bx bx-chevron-left"></i>
             </InteractiveButton>
             
-            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+            {Array.from({ length: Math.min(5, Math.max(1, totalPages)) }, (_, i) => {
               const page = i + 1;
               return (
                 <InteractiveButton
@@ -283,6 +284,7 @@ export default function InteractiveTable({
               size="sm"
               onClick={nextPage}
               disabled={!hasNextPage}
+              aria-label="Next page"
             >
               <i className="bx bx-chevron-right"></i>
             </InteractiveButton>
