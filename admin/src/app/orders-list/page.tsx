@@ -18,7 +18,7 @@ export default function OrdersList() {
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const params: any = {};
+      const params: any = { limit: 10000 };
       if (statusFilter) params.status = statusFilter;
 
       const response = await ordersApi.getAll(params);

@@ -25,7 +25,7 @@ export default function BrandList() {
   const fetchBrands = async () => {
     try {
       setLoading(true);
-      const params: any = {};
+      const params: any = { limit: 10000 };
       if (statusFilter) params.status = statusFilter;
       if (searchQuery) params.search = searchQuery;
 

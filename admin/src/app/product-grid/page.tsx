@@ -22,7 +22,7 @@ export default function ProductGrid() {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const params: any = {};
+      const params: any = { limit: 10000 };
       if (categoryFilter) params.category = categoryFilter;
       if (statusFilter) params.status = statusFilter;
       if (sortBy) {

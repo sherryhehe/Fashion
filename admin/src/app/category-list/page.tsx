@@ -23,7 +23,7 @@ export default function CategoryList() {
   const fetchCategories = async () => {
     try {
       setLoading(true);
-      const response = await categoriesApi.getAll();
+      const response = await categoriesApi.getAll({ limit: 10000 });
       let data = response.data || [];
       
       // Apply filters
