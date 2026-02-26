@@ -58,7 +58,7 @@ export default function ProductList() {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const params: any = {};
+      const params: any = { limit: 10000 };
       if (statusFilter) params.status = statusFilter;
       if (categoryFilter) params.category = categoryFilter;
 
@@ -352,6 +352,7 @@ export default function ProductList() {
                   onDelete={handleDeleteAction}
                   itemsPerPage={10}
                   showSearch={false}
+                  showPagination={true}
                 />
               )}
             </div>

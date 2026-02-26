@@ -23,7 +23,7 @@ export default function NotificationList() {
   const fetchNotifications = async () => {
     try {
       setLoading(true);
-      const params: any = {};
+      const params: any = { limit: 10000 };
       if (statusFilter) params.status = statusFilter;
       if (typeFilter) params.type = typeFilter;
 

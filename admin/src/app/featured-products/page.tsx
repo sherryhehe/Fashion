@@ -26,7 +26,7 @@ export default function FeaturedProducts() {
   const fetchFeaturedProducts = async () => {
     try {
       setLoading(true);
-      const params: any = { featured: true };
+      const params: any = { featured: true, limit: 10000 };
       if (statusFilter) params.status = statusFilter;
       if (categoryFilter) params.category = categoryFilter;
 

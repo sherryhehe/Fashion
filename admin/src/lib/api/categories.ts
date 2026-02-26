@@ -8,8 +8,8 @@ export const categoriesApi = {
   /**
    * Get all categories
    */
-  getAll: () => 
-    apiClient.get<Category[]>('/categories'),
+  getAll: (params?: Record<string, any>) =>
+    apiClient.get<Category[]>('/categories', params),
 
   /**
    * Get category by ID
