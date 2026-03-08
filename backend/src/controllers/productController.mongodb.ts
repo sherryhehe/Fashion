@@ -586,3 +586,63 @@ export const deleteProductReview = async (req: AuthRequest, res: Response): Prom
   }
 };
 
+/**
+ * Bulk add reviews to a product (admin). Adds N reviews in one request.
+ * Body: { count: number, name?: string, rating?: number, comment?: string }
+ */
+export const addBulkReviews = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { id: productId } = req.params;
+    const { count = 0, name: defaultName, rating: defaultRating, comment: defaultComment } = req.body || {};
+    const num = Math.min(Math.max(parseInt(String(count), 10) || 0, 0), 5000);
+    if (num === 0) {
+      errorResponse(res, 'Count must be between 1 and 5000', 400);
+      return;
+    }
+
+    const product = await Product.findById(productId);
+    if (!product) {
+      errorResponse(res, 'Product not found', 404);
+      return;
+    }
+
+    const existingReviews = Array.isArray(product.reviews) ? [...product.reviews] : [];
+    let nextId = existingReviews.length > 0
+      ? Math.max(...existingReviews.map((r: any) => (typeof r.id === 'number' ? r.id : 0)), 0) + 1
+      : 1;
+    const name = (defaultName && String(defaultName).trim()) || 'Customer';
+    const rating = Math.min(5, Math.max(1, Number(defaultRating) || 5));
+    const comment = (defaultComment && String(defaultComment).trim()) || 'Great product!';
+    const now = new Date().toISOString();
+
+    const newReviews: any[] = [];
+    for (let i = 0; i < num; i++) {
+      newReviews.push({
+        id: nextId + i,
+        name: name + (num > 1 ? ` ${i + 1}` : ''),
+        rating,
+        comment,
+        date: now,
+        verified: false,
+      });
+    }
+
+    product.reviews = existingReviews.concat(newReviews);
+    product.reviewCount = product.reviews.length;
+    product.rating =
+      product.reviews.length > 0
+        ? product.reviews.reduce((sum: number, r: any) => sum + (r.rating || 0), 0) / product.reviews.length
+        : 0;
+    await product.save();
+
+    successResponse(res, {
+      added: num,
+      totalReviews: product.reviewCount,
+      rating: product.rating,
+    }, `Added ${num} reviews`);
+  } catch (error) {
+    console.error('Bulk add reviews error:', error);
+    errorResponse(res, 'Failed to add bulk reviews', 500);
+  }
+};
+

@@ -15,7 +15,8 @@ import { SafeView, CachedImage } from '../../components';
 import { icons } from '../../assets/icons';
 import images from '../../assets/images';
 import { useProducts } from '../../hooks/useProducts';
-import { getFirstImageSource } from '../../utils/imageHelper';
+import { useStyleByName } from '../../hooks/useStyles';
+import { getFirstImageSource, getImageSource } from '../../utils/imageHelper';
 import { requireAuthOrPromptLogin } from '../../utils/guestHelper';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -31,6 +32,9 @@ interface StyleDetailScreenProps {
 const StyleDetailScreen: React.FC<StyleDetailScreenProps> = ({ navigation, route }) => {
   const styleName = route.params?.styleName || '';
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('grid');
+
+  const { data: styleData } = useStyleByName(styleName);
+  const style = styleData?.data;
 
   const { data: productsData, isLoading } = useProducts({
     style: styleName,
@@ -100,13 +104,13 @@ const StyleDetailScreen: React.FC<StyleDetailScreenProps> = ({ navigation, route
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.banner}>
           <CachedImage
-            source={images.casual}
+            source={style?.image ? getImageSource(style.image) : images.casual}
             style={styles.bannerImage}
             resizeMode="cover"
           />
           <View style={styles.bannerOverlay}>
-            <Text style={styles.bannerTitle}>Latest Picks for You</Text>
-            <Text style={styles.bannerSubtitle}>Curated trends just for you</Text>
+            <Text style={styles.bannerTitle}>{style?.name || styleName || 'Latest Picks for You'}</Text>
+            <Text style={styles.bannerSubtitle}>{style?.description || 'Curated trends just for you'}</Text>
           </View>
         </View>
 

@@ -22,6 +22,8 @@ import uploadRoutes from './routes/uploadRoutes';
 import reviewRoutes from './routes/reviewRoutes.mongodb';
 import bannerRoutes from './routes/bannerRoutes.mongodb';
 import wishlistRoutes from './routes/wishlistRoutes.mongodb';
+import homeCategoryRoutes from './routes/homeCategoryRoutes.mongodb';
+import settingsRoutes from './routes/settingsRoutes.mongodb';
 
 // Load environment variables (prefer local.env if present)
 const localEnvPath = path.join(__dirname, '..', 'local.env');
@@ -98,6 +100,8 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/banners', bannerRoutes);
 app.use('/api/wishlist', wishlistRoutes);
+app.use('/api/home-categories', homeCategoryRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // Serve uploaded files through API route (for reverse proxy compatibility)
 // This must come after all other API routes to avoid conflicts

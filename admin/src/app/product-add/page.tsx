@@ -4,7 +4,7 @@ import Layout from '@/components/layout/Layout';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { useCategories, useBrands, useCreateProduct } from '@/hooks/useApi';
+import { useCategories, useBrands, useStyles, useCreateProduct } from '@/hooks/useApi';
 import { formatCurrency } from '@/utils/currencyHelper';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import ConfirmDialog from '@/components/organisms/ConfirmDialog';
@@ -17,6 +17,7 @@ export default function ProductAdd() {
   // TanStack Query hooks
   const { data: categories = [], isLoading: loadingCategories } = useCategories();
   const { data: brands = [], isLoading: loadingBrands } = useBrands();
+  const { data: styles = [], isLoading: loadingStyles } = useStyles();
   const createProduct = useCreateProduct();
   
   // Product form data
@@ -452,12 +453,12 @@ export default function ProductAdd() {
                         name="style"
                         value={formData.style}
                         onChange={handleChange}
+                        disabled={loadingStyles}
                       >
                         <option value="">Select Style (Optional)</option>
-                        <option value="western">Western</option>
-                        <option value="desi">Desi</option>
-                        <option value="eastern">Eastern</option>
-                        <option value="asian">Asian</option>
+                        {Array.isArray(styles) && styles.map((s: { _id?: string; id?: string; name: string }) => (
+                          <option key={s._id || s.id || s.name} value={s.name}>{s.name}</option>
+                        ))}
                       </select>
                     </div>
                     <div className="col-md-4 mb-3">

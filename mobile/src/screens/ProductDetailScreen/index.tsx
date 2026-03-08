@@ -14,7 +14,7 @@ import {
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RouteProp, CommonActions } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/MainNavigator';
-import { SafeView, LoadingScreen, AddReviewModal, CachedImage, Avatar } from '../../components';
+import { SafeView, LoadingScreen, CachedImage, Avatar } from '../../components';
 import { icons } from '../../assets/icons';
 import images from '../../assets/images';
 import styles from './styles';
@@ -51,7 +51,6 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
   const carouselRef = useRef<FlatList>(null);
   const [quantity, setQuantity] = useState(1);
   const [isFavorite, setIsFavorite] = useState(false);
-  const [showReviewModal, setShowReviewModal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   
   // Reviews pagination state
@@ -341,7 +340,6 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
         comment: reviewData.comment,
         name: userName, // Use authenticated user's name if available
       });
-      setShowReviewModal(false);
       // Refetch reviews and product after adding review
       queryClient.invalidateQueries({ queryKey: ['reviews', 'product', productId] });
       queryClient.invalidateQueries({ queryKey: ['product', productId] });
@@ -366,10 +364,10 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
     // Check if user is guest and prompt login
     const isAuthenticated = await requireAuthOrPromptLogin(
       'add items to cart',
+      navigation,
       async () => {
         // Clear guest mode and logout to force navigation to login
         await authService.logout();
-        // Navigation will be handled by MainNavigator when isAuthenticated becomes false
       }
     );
 
@@ -422,10 +420,9 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
     // Check if user is guest and prompt login
     const isAuthenticated = await requireAuthOrPromptLogin(
       'proceed with checkout',
+      navigation,
       async () => {
-        // Clear guest mode and logout to force navigation to login
         await authService.logout();
-        // Navigation will be handled by MainNavigator when isAuthenticated becomes false
       }
     );
 
@@ -707,12 +704,17 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
                   source={icons.star}
                   style={[
                     styles.starIcon,
-                    star <= product.rating && styles.filledStar
+                    star <= (product.rating ?? 0) && styles.filledStar
                   ]}
                 />
               ))}
             </View>
-            <Text style={styles.ratingText}>{product.rating.toFixed(1)} ({product.reviewCount})</Text>
+            <Text style={styles.ratingText}>
+              {(product.rating ?? 0).toFixed(1)} ({product.reviewCount ?? 0})
+              {(product.salesCount ?? 0) > 0 && (
+                <Text style={styles.soldCountText}> · {(product.salesCount ?? 0).toLocaleString()} sold</Text>
+              )}
+            </Text>
           </View>
 
           {/* Product Name and Price */}
@@ -858,161 +860,6 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
           </Text>
         </View>
 
-        {/* Reviews Section */}
-        <View style={styles.reviewsSection}>
-          <View style={styles.reviewsHeader}>
-            <Text style={styles.sectionTitle}>Reviews ({reviews.length > 0 ? reviews.length : (product?.reviewCount || 0)})</Text>
-            <TouchableOpacity 
-              style={styles.addReviewButton}
-              onPress={() => setShowReviewModal(true)}
-            >
-              <Text style={styles.addReviewText}>Add Review</Text>
-            </TouchableOpacity>
-          </View>
-          
-          {reviewsLoading ? (
-            <View style={{ padding: 20, alignItems: 'center' }}>
-              <ActivityIndicator size="small" color="#2C2C2E" />
-              <Text style={{ fontSize: 14, color: '#8E8E93', marginTop: 10 }}>Loading reviews...</Text>
-            </View>
-          ) : reviewsError ? (
-            <View style={{ padding: 20, alignItems: 'center' }}>
-              <Text style={{ fontSize: 14, color: '#FF3B30', marginBottom: 10 }}>
-                Failed to load reviews
-              </Text>
-              <TouchableOpacity 
-                onPress={() => refetchReviews()}
-                style={{ padding: 10, backgroundColor: '#F2F2F7', borderRadius: 8 }}
-              >
-                <Text style={{ fontSize: 14, color: '#2C2C2E' }}>Retry</Text>
-              </TouchableOpacity>
-            </View>
-          ) : allReviews && allReviews.length > 0 ? (
-            <>
-              {reviews.map((review: any, index: number) => {
-              const isOwnReview = currentUserId && review.userId === currentUserId;
-              const isAdminReview = review.isAdmin;
-              
-              return (
-                <View key={review._id || review.id || index} style={styles.reviewItem}>
-                  <View style={styles.reviewHeader}>
-                    <View style={styles.reviewerInfo}>
-                      <Avatar
-                        name={review.name || 'Anonymous'}
-                        avatar={review.avatar}
-                        size={40}
-                        style={styles.reviewerAvatar}
-                      />
-                      <View style={styles.reviewerDetails}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                          <Text style={styles.reviewerName}>{review.name || 'Anonymous'}</Text>
-                          {isAdminReview && (
-                            <View style={{ marginLeft: 6, flexDirection: 'row', alignItems: 'center' }}>
-                              <Image source={icons.verify} style={{ width: 12, height: 12, marginRight: 4 }} />
-                              <Text style={{ fontSize: 10, color: '#007AFF', fontWeight: '600' }}>Admin</Text>
-                            </View>
-                          )}
-                        </View>
-                        <View style={styles.reviewRating}>
-                          <View style={styles.starsContainer}>
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <Image
-                                key={star}
-                                source={icons.star}
-                                style={[
-                                  styles.starIcon,
-                                  star <= review.rating && styles.filledStar
-                                ]}
-                              />
-                            ))}
-                          </View>
-                          <Text style={styles.reviewRatingText}>{review.rating?.toFixed(1) || '0.0'}</Text>
-                        </View>
-                      </View>
-                    </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={styles.reviewTime}>
-                        {review.date ? new Date(review.date).toLocaleDateString() : 
-                         review.createdAt ? new Date(review.createdAt).toLocaleDateString() : 
-                         'Recently'}
-                      </Text>
-                      {isOwnReview && (
-                        <View style={{ flexDirection: 'row', marginTop: 4, gap: 8 }}>
-                          <TouchableOpacity
-                            onPress={() => {
-                              Alert.alert(
-                                'Edit Review',
-                                'Edit review functionality coming soon',
-                                [{ text: 'OK' }]
-                              );
-                            }}
-                          >
-                            <Text style={{ fontSize: 12, color: '#007AFF' }}>Edit</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            onPress={() => {
-                              Alert.alert(
-                                'Delete Review',
-                                'Are you sure you want to delete this review?',
-                                [
-                                  { text: 'Cancel', style: 'cancel' },
-                                  {
-                                    text: 'Delete',
-                                    style: 'destructive',
-                                    onPress: async () => {
-                                      try {
-                                        await deleteReviewMutation.mutateAsync(review._id || review.id);
-                                        queryClient.invalidateQueries({ queryKey: ['reviews', 'product', productId] });
-                                        queryClient.invalidateQueries({ queryKey: ['product', productId] });
-                                      } catch (error) {
-                                        console.log('Delete review error:', error);
-                                      }
-                                    },
-                                  },
-                                ]
-                              );
-                            }}
-                          >
-                            <Text style={{ fontSize: 12, color: '#FF3B30' }}>Delete</Text>
-                          </TouchableOpacity>
-                        </View>
-                      )}
-                    </View>
-                  </View>
-                  <Text style={styles.reviewText}>
-                    {review.comment || 'No comment provided'}
-                  </Text>
-                  {review.verified && !isAdminReview && (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
-                      <Image source={icons.verify} style={{ width: 14, height: 14, marginRight: 4 }} />
-                      <Text style={{ fontSize: 12, color: '#34C759' }}>Verified Purchase</Text>
-                    </View>
-                  )}
-                </View>
-              );
-              })}
-              {hasMoreReviews && (
-                <View style={styles.loadMoreReviewsContainer}>
-                  <TouchableOpacity
-                    style={styles.loadMoreReviewsButton}
-                    onPress={handleLoadMoreReviews}
-                  >
-                    <Text style={styles.loadMoreReviewsText}>
-                      Load More Reviews ({allReviews.length - displayedReviewsCount} remaining)
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </>
-          ) : (
-            <View style={{ padding: 20, alignItems: 'center' }}>
-              <Text style={{ fontSize: 14, color: '#8E8E93', textAlign: 'center' }}>
-                No reviews yet. Be the first to review this product!
-              </Text>
-            </View>
-          )}
-        </View>
-
         {/* Recommended Products Section */}
         {recommendedData?.data && recommendedData.data.length > 0 && (
           <View style={styles.recommendedSection}>
@@ -1034,7 +881,7 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
                 price: `PKR ${product.price.toLocaleString()}`,
                 rating: `${product.rating.toFixed(1)} (${product.reviewCount})`,
                 brand: product.brand || '',
-                image: getFirstImageSource(product.images, images.buttondownshirt),
+                image: getFirstImageSource(product.images, images.velvetShawl),
               }))}
               renderItem={({ item }) => (
                 <TouchableOpacity 
@@ -1123,15 +970,6 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
           </TouchableOpacity>
         </View>
       </ScrollView>
-
-      {/* Add Review Modal */}
-      <AddReviewModal
-        visible={showReviewModal}
-        onClose={() => setShowReviewModal(false)}
-        onSubmit={handleReviewSubmit}
-        productName={product?.name || 'Product'}
-        isLoading={addReviewMutation.isPending}
-      />
     </SafeView>
   );
 };

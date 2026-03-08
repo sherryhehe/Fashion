@@ -56,6 +56,13 @@ const styleService = {
   getPopular: async (): Promise<StyleResponse> => {
     return apiClient.get('/styles/popular');
   },
+
+  /**
+   * Get style by name (public - for style detail page banner)
+   */
+  getByName: async (name: string): Promise<SingleStyleResponse> => {
+    return apiClient.get(`/styles/by-name/${encodeURIComponent(name)}`);
+  },
 };
 
 export default styleService;

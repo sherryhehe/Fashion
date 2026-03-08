@@ -27,6 +27,7 @@ import { useAddToWishlist, useRemoveFromWishlist, useIsInWishlist, useWishlist }
 import { requireAuthOrPromptLogin } from '../../utils/guestHelper';
 import { useFeaturedStyles, usePopularStyles } from '../../hooks/useStyles';
 import { useBanners } from '../../hooks/useBanners';
+import { useHomeCategoriesForApp } from '../../hooks/useHomeCategories';
 import { getFirstImageSource, getImageSource, preloadImages, getImageUrl } from '../../utils/imageHelper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CommonActions } from '@react-navigation/native';
@@ -106,7 +107,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     refetch: refetchAllProducts,
   } = useInfiniteProducts({ status: 'active' });
   const { data: bannersData, isLoading: bannersLoading, refetch: refetchBanners } = useBanners('homepage', 'active');
+  const { data: brandBannersData } = useBanners('homepage_brand', 'active');
   const { data: allBrandsData, refetch: refetchAllBrands } = useBrands(); // Fetch all brands to get logos
+  const { data: homeCategoriesData } = useHomeCategoriesForApp();
   
   // Wishlist mutations and data
   const addToWishlistMutation = useAddToWishlist();
@@ -115,6 +118,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   // Map API data arrays - now safe to use after API hooks
   const bannersArray = bannersData?.data || [];
+  const brandBannersArray = brandBannersData?.data || [];
   const categoriesArray = categoriesData?.data || [];
   const stylesArray = featuredStylesData?.data || [];
   const recommendedArray = recommendedProductsData?.data || [];
@@ -265,6 +269,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     allProductsLoading,
     bannersLoading,
   ]);
+  // Brand banners (swipable, Shop Now → brand page) - same visual style as main hero
+  const brandCarouselData = (Array.isArray(brandBannersArray) ? brandBannersArray : [])
+    .sort((a: any, b: any) => (a.order ?? 999) - (b.order ?? 999))
+    .map((banner: any, index: number) => ({
+      id: banner.id || banner._id || `brand-banner-${index}`,
+      title: banner.title || '',
+      subtitle: banner.subtitle || '',
+      image: getImageSource(banner.imageUrl || banner.image, images.homesliderimage),
+      linkUrl: banner.linkUrl || banner.link,
+    }));
+
   // Sort banners by order if available, then map to carousel data
   const carouselData = bannersArray.length > 0
     ? bannersArray
@@ -487,6 +502,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       image: getFirstImageSource(product.images, images.silkDupatta),
     }));
   }, [featuredArray]);
+
+  // Custom home categories (from admin) - each has name + products
+  const homeCategoriesArray = homeCategoriesData?.data || [];
 
   // Recently added products: shuffle so order varies each time
   const recentlyAddedArray = recentlyAddedData?.data || [];
@@ -842,6 +860,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         refetchAllProducts(),
         refetchBanners(),
         refetchAllBrands(),
+        queryClient.invalidateQueries({ queryKey: ['home-categories'] }),
       ]);
     } catch (error) {
       console.log('Refresh error:', error);
@@ -980,6 +999,49 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             <View style={{ width: screenWidth, height: 200, backgroundColor: '#F2F2F7', borderRadius: 12, justifyContent: 'center', alignItems: 'center' }}>
               <Text style={{ color: '#8E8E93', fontSize: 14 }}>No banners available</Text>
             </View>
+          </View>
+        )}
+
+        {/* Brand Banners (swipable, Shop Now → brand page) */}
+        {brandCarouselData.length > 0 && (
+          <View style={[styles.heroSection, { marginTop: 16 }]}>
+            <FlatList
+              data={brandCarouselData}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={(item) => item.id}
+              snapToInterval={screenWidth}
+              snapToAlignment="start"
+              decelerationRate="fast"
+              renderItem={({ item }: { item: any }) => {
+                const imageSource = typeof item.image === 'object' && item.image?.uri ? item.image : images.homesliderimage;
+                const storeId = item.linkUrl?.trim?.();
+                return (
+                  <TouchableOpacity
+                    style={[styles.heroImageContainer, { width: screenWidth }]}
+                    activeOpacity={1}
+                    onPress={() => {
+                      if (storeId) navigation.getParent()?.navigate('StoreDetail', { storeId });
+                    }}
+                  >
+                    <CachedImage source={imageSource} style={styles.heroImage} resizeMode="cover" />
+                    <View style={styles.brandBannerOverlay}>
+                      {item.title ? <Text style={styles.brandBannerTitle}>{item.title}</Text> : null}
+                      {item.subtitle ? <Text style={styles.brandBannerSubtitle}>{item.subtitle}</Text> : null}
+                      {storeId ? (
+                        <TouchableOpacity
+                          style={styles.brandBannerCta}
+                          onPress={() => navigation.getParent()?.navigate('StoreDetail', { storeId })}
+                        >
+                          <Text style={styles.brandBannerCtaText}>Shop Now</Text>
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
+                  </TouchableOpacity>
+                );
+              }}
+            />
           </View>
         )}
 
@@ -1129,6 +1191,35 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             </View>
           )}
         </View>
+
+        {/* Custom Home Categories (below Featured) */}
+        {Array.isArray(homeCategoriesArray) && homeCategoriesArray.length > 0 && homeCategoriesArray.map((cat: any) => {
+          const products = (cat.products || []).map((p: any) => ({
+            id: p._id,
+            name: p.name,
+            brand: p.brand || '',
+            price: formatPrice(p.price),
+            rating: formatRating(p.rating ?? 0, p.reviewCount ?? 0),
+            image: getFirstImageSource(p.images, images.velvetShawl),
+          }));
+          if (products.length === 0) return null;
+          return (
+            <View key={cat._id} style={styles.sectionContainer}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>{cat.name}</Text>
+              </View>
+              <FlatList
+                data={products}
+                renderItem={renderRecommendedItem}
+                keyExtractor={(item) => item.id}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.recommendedList}
+                style={styles.horizontalList}
+              />
+            </View>
+          );
+        })}
 
         {/* Recently Added Section */}
         <View style={styles.sectionContainer}>

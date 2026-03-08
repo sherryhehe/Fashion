@@ -145,6 +145,11 @@ const styles = StyleSheet.create({
     color: '#8E8E93',
     fontWeight: '400',
   },
+  soldCountText: {
+    fontSize: 14,
+    color: '#8E8E93',
+    fontWeight: '500',
+  },
 
   // Brand Section Styles
   brandSection: {

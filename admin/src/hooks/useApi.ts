@@ -171,6 +171,48 @@ export const useCreateBrand = () => {
 };
 
 // =====================================================
+// HOME CATEGORIES (custom homepage sections)
+// =====================================================
+
+export const useHomeCategories = () => {
+  return useQuery({
+    queryKey: ['home-categories'],
+    queryFn: () => apiRequest('/home-categories'),
+  });
+};
+
+export const useHomeCategory = (id: string | null) => {
+  return useQuery({
+    queryKey: ['home-category', id],
+    queryFn: () => apiRequest(`/home-categories/${id}`),
+    enabled: !!id,
+  });
+};
+
+export const useCreateHomeCategory = () => {
+  return useMutation({
+    mutationFn: (data: any) =>
+      apiRequest('/home-categories', { method: 'POST', body: JSON.stringify(data) }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['home-categories'] }),
+  });
+};
+
+export const useUpdateHomeCategory = () => {
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      apiRequest(`/home-categories/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['home-categories'] }),
+  });
+};
+
+export const useDeleteHomeCategory = () => {
+  return useMutation({
+    mutationFn: (id: string) => apiRequest(`/home-categories/${id}`, { method: 'DELETE' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['home-categories'] }),
+  });
+};
+
+// =====================================================
 // BANNERS
 // =====================================================
 
@@ -231,6 +273,25 @@ export const useUsers = () => {
   return useQuery({
     queryKey: ['users'],
     queryFn: () => apiRequest('/users'),
+  });
+};
+
+// =====================================================
+// SETTINGS (payment, etc.)
+// =====================================================
+
+export const usePaymentSettings = () => {
+  return useQuery({
+    queryKey: ['settings', 'payment'],
+    queryFn: () => apiRequest('/settings/payment'),
+  });
+};
+
+export const useUpdatePaymentSettings = () => {
+  return useMutation({
+    mutationFn: (data: { currency?: string }) =>
+      apiRequest('/settings/payment', { method: 'PATCH', body: JSON.stringify(data) }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['settings', 'payment'] }),
   });
 };
 

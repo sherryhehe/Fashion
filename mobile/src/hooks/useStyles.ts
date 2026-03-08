@@ -50,3 +50,15 @@ export const usePopularStyles = () => {
     staleTime: 30 * 60 * 1000, // 30 minutes
   });
 };
+
+/**
+ * Hook to get a single style by name (public - for style detail page)
+ */
+export const useStyleByName = (name: string) => {
+  return useQuery({
+    queryKey: ['style', 'name', name],
+    queryFn: () => styleService.getByName(name),
+    enabled: !!name?.trim(),
+    staleTime: 30 * 60 * 1000,
+  });
+};

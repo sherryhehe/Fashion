@@ -25,6 +25,37 @@ export const getAllStyles = async (req: Request, res: Response): Promise<void> =
 };
 
 /**
+ * Get style by name (public - for app style detail page)
+ */
+export const getStyleByName = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const name = decodeURIComponent(req.params.name || '');
+    if (!name) {
+      errorResponse(res, 'Style name is required', 400);
+      return;
+    }
+    const style = await Style.findOne({
+      $or: [{ name: { $regex: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } }, { slug: name.toLowerCase().replace(/\s+/g, '-') }],
+    });
+    if (!style) {
+      errorResponse(res, 'Style not found', 404);
+      return;
+    }
+    const styleObj: any = style.toObject();
+    if (styleObj.image === undefined || styleObj.image === null || styleObj.image === '') {
+      styleObj.image = null;
+    }
+    if (styleObj.icon === undefined || styleObj.icon === null || styleObj.icon === '') {
+      styleObj.icon = null;
+    }
+    successResponse(res, styleObj);
+  } catch (error) {
+    console.error('Get style by name error:', error);
+    errorResponse(res, 'Failed to fetch style', 500);
+  }
+};
+
+/**
  * Get style by ID
  */
 export const getStyleById = async (req: Request, res: Response): Promise<void> => {
