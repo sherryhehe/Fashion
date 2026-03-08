@@ -7,6 +7,7 @@ const router = express.Router();
 // Public routes
 router.get('/featured', styleController.getFeaturedStyles);
 router.get('/popular', styleController.getPopularStyles);
+router.get('/by-name/:name', styleController.getStyleByName);
 
 // Protected routes - require authentication
 router.get('/', authenticate, styleController.getAllStyles);

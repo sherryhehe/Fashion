@@ -171,6 +171,7 @@ export default function BannerControl() {
 										>
 											<option value="all">All Positions</option>
 											<option value="homepage">Homepage</option>
+											<option value="homepage_brand">Homepage (Brand)</option>
 											<option value="header">Header</option>
 											<option value="sidebar">Sidebar</option>
 											<option value="footer">Footer</option>

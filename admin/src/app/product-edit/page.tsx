@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { productsApi, categoriesApi } from '@/lib/api';
-import { useBrands } from '@/hooks/useApi';
+import { useBrands, useStyles } from '@/hooks/useApi';
 import { getProductImageUrl } from '@/utils/imageHelper';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import ConfirmDialog from '@/components/organisms/ConfirmDialog';
@@ -19,6 +19,7 @@ export default function ProductEdit() {
   
   // TanStack Query hooks
   const { data: brands = [], isLoading: loadingBrands } = useBrands();
+  const { data: styles = [], isLoading: loadingStyles } = useStyles();
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -66,6 +67,12 @@ export default function ProductEdit() {
   const [newReview, setNewReview] = useState({ name: '', rating: 5, comment: '' });
   const [showAddReview, setShowAddReview] = useState(false);
   const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null);
+  // Bulk add reviews (e.g. add 700 at once)
+  const [bulkReviewCount, setBulkReviewCount] = useState<string>('100');
+  const [bulkReviewName, setBulkReviewName] = useState<string>('Customer');
+  const [bulkReviewRating, setBulkReviewRating] = useState<number>(5);
+  const [bulkReviewComment, setBulkReviewComment] = useState<string>('Great product!');
+  const [bulkAdding, setBulkAdding] = useState(false);
 
   // Image management
   const [existingImages, setExistingImages] = useState<string[]>([]);
@@ -563,12 +570,12 @@ export default function ProductEdit() {
                         name="style"
                         value={formData.style}
                         onChange={handleChange}
+                        disabled={loadingStyles}
                       >
                         <option value="">Select Style (Optional)</option>
-                        <option value="western">Western</option>
-                        <option value="desi">Desi</option>
-                        <option value="eastern">Eastern</option>
-                        <option value="asian">Asian</option>
+                        {Array.isArray(styles) && styles.map((s: { _id?: string; id?: string; name: string }) => (
+                          <option key={s._id || s.id || s.name} value={s.name}>{s.name}</option>
+                        ))}
                       </select>
                     </div>
                     <div className="col-md-4 mb-3">
@@ -873,6 +880,85 @@ export default function ProductEdit() {
                 </button>
               </div>
               <div className="card-body">
+                {/* Bulk add reviews */}
+                <div className="mb-4 p-3 bg-light rounded">
+                  <h6 className="mb-2">Bulk add reviews</h6>
+                  <p className="small text-muted mb-2">Add many reviews at once (e.g. 700). Same name/rating/comment will be used for all.</p>
+                  <div className="row g-2 align-items-end">
+                    <div className="col-md-2">
+                      <label className="form-label small mb-0">Count</label>
+                      <input
+                        type="number"
+                        className="form-control form-control-sm"
+                        min={1}
+                        max={5000}
+                        value={bulkReviewCount}
+                        onChange={(e) => setBulkReviewCount(e.target.value)}
+                        placeholder="700"
+                      />
+                    </div>
+                    <div className="col-md-2">
+                      <label className="form-label small mb-0">Name</label>
+                      <input
+                        type="text"
+                        className="form-control form-control-sm"
+                        value={bulkReviewName}
+                        onChange={(e) => setBulkReviewName(e.target.value)}
+                        placeholder="Customer"
+                      />
+                    </div>
+                    <div className="col-md-2">
+                      <label className="form-label small mb-0">Rating</label>
+                      <select
+                        className="form-select form-select-sm"
+                        value={bulkReviewRating}
+                        onChange={(e) => setBulkReviewRating(Number(e.target.value))}
+                      >
+                        {[1, 2, 3, 4, 5].map((n) => (
+                          <option key={n} value={n}>{n} Star{n > 1 ? 's' : ''}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="col-md-3">
+                      <label className="form-label small mb-0">Comment</label>
+                      <input
+                        type="text"
+                        className="form-control form-control-sm"
+                        value={bulkReviewComment}
+                        onChange={(e) => setBulkReviewComment(e.target.value)}
+                        placeholder="Great product!"
+                      />
+                    </div>
+                    <div className="col-md-2">
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-success w-100"
+                        disabled={bulkAdding || !productId}
+                        onClick={async () => {
+                          const count = Math.min(5000, Math.max(1, parseInt(bulkReviewCount, 10) || 0));
+                          if (count < 1) return;
+                          setBulkAdding(true);
+                          try {
+                            await productsApi.addBulkReviews(productId!, {
+                              count,
+                              name: bulkReviewName || undefined,
+                              rating: bulkReviewRating,
+                              comment: bulkReviewComment || undefined,
+                            });
+                            await fetchProduct();
+                          } catch (err: any) {
+                            alert(err?.message || 'Failed to add bulk reviews');
+                          } finally {
+                            setBulkAdding(false);
+                          }
+                        }}
+                      >
+                        {bulkAdding ? 'Adding...' : `Add ${bulkReviewCount || 0} reviews`}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 {showAddReview && (
                   <div className="mb-3 p-3 border rounded">
                     <h6>Add New Review</h6>

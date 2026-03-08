@@ -7,7 +7,7 @@ export interface Banner {
 	subtitle?: string;
 	imageUrl: string;
 	linkUrl?: string;
-	position: 'header' | 'sidebar' | 'footer' | 'homepage';
+	position: 'header' | 'sidebar' | 'footer' | 'homepage' | 'homepage_brand';
 	size?: string;
 	status: 'active' | 'inactive' | 'draft';
 	clicks?: number;

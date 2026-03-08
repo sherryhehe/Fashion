@@ -70,5 +70,11 @@ export const productsApi = {
    */
   deleteReview: (productId: string, reviewId: string) =>
     apiClient.delete<void>(`/products/${productId}/reviews/${reviewId}`),
+
+  /**
+   * Bulk add reviews to a product (e.g. add 700 at once)
+   */
+  addBulkReviews: (productId: string, body: { count: number; name?: string; rating?: number; comment?: string }) =>
+    apiClient.post<{ added: number; totalReviews: number; rating: number }>(`/products/${productId}/reviews/bulk`, body),
 };
 

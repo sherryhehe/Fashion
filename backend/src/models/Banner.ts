@@ -5,7 +5,8 @@ export interface BannerDocument extends Document {
 	 subtitle?: string;
 	 imageUrl: string;
 	 linkUrl?: string;
-	 position: 'header' | 'sidebar' | 'footer' | 'homepage';
+	 position: 'header' | 'sidebar' | 'footer' | 'homepage' | 'homepage_brand';
+	 order?: number;
 	 size?: string;
 	 status: 'active' | 'inactive' | 'draft';
 	 clicks: number;
@@ -22,7 +23,8 @@ const BannerSchema = new Schema<BannerDocument>(
 		subtitle: { type: String, trim: true },
 		imageUrl: { type: String, required: true },
 		linkUrl: { type: String },
-		position: { type: String, enum: ['header', 'sidebar', 'footer', 'homepage'], required: true },
+		position: { type: String, enum: ['header', 'sidebar', 'footer', 'homepage', 'homepage_brand'], required: true },
+		order: { type: Number, default: 0 },
 		size: { type: String },
 		status: { type: String, enum: ['active', 'inactive', 'draft'], default: 'active' },
 		clicks: { type: Number, default: 0 },

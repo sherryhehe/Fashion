@@ -2,8 +2,29 @@
 
 import Layout from '@/components/layout/Layout';
 import Link from 'next/link';
+import { useState, useEffect } from 'react';
+import { usePaymentSettings, useUpdatePaymentSettings } from '@/hooks/useApi';
+import { useNotificationContext } from '@/contexts/NotificationContext';
 
 export default function Settings() {
+  const { data: paymentData, isLoading: paymentLoading } = usePaymentSettings();
+  const updatePayment = useUpdatePaymentSettings();
+  const { addNotification } = useNotificationContext();
+  const [paymentCurrency, setPaymentCurrency] = useState<string>('pkr');
+
+  useEffect(() => {
+    if (paymentData?.currency) setPaymentCurrency(paymentData.currency);
+  }, [paymentData?.currency]);
+
+  const handlePaymentSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await updatePayment.mutateAsync({ currency: paymentCurrency });
+      addNotification('success', 'Payment settings saved');
+    } catch (err: any) {
+      addNotification('error', err?.message || 'Failed to save');
+    }
+  };
   return (
     <Layout pageTitle="Settings">
       <div className="container-fluid">
@@ -107,6 +128,52 @@ export default function Settings() {
                   </div>
                   <button type="submit" className="btn btn-primary">Save Changes</button>
                 </form>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Payment Settings */}
+        <div className="row">
+          <div className="col-md-6">
+            <div className="card">
+              <div className="card-body">
+                <h4 className="card-title">Payment Settings</h4>
+                <p className="text-muted small">Configure where payments go. Card payments use Stripe; set <code>STRIPE_SECRET_KEY</code> in backend <code>.env</code> to enable.</p>
+                {paymentLoading ? (
+                  <p className="text-muted">Loading...</p>
+                ) : (
+                  <form onSubmit={handlePaymentSave}>
+                    <div className="mb-3">
+                      <label className="form-label">Stripe status</label>
+                      <div className="form-control bg-light">
+                        {paymentData?.stripeConfigured ? (
+                          <span className="text-success">Configured — payments will go to your Stripe connected account</span>
+                        ) : (
+                          <span className="text-warning">Not configured — set STRIPE_SECRET_KEY in backend .env</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="mb-3">
+                      <label className="form-label">Currency</label>
+                      <select
+                        className="form-select"
+                        value={paymentCurrency}
+                        onChange={(e) => setPaymentCurrency(e.target.value)}
+                      >
+                        <option value="pkr">PKR (Pakistani Rupee)</option>
+                        <option value="usd">USD (US Dollar)</option>
+                        <option value="eur">EUR (Euro)</option>
+                        <option value="gbp">GBP (British Pound)</option>
+                        <option value="inr">INR (Indian Rupee)</option>
+                      </select>
+                      <small className="text-muted">Used for Stripe and display. Save to update.</small>
+                    </div>
+                    <button type="submit" className="btn btn-primary" disabled={updatePayment.isPending}>
+                      {updatePayment.isPending ? 'Saving...' : 'Save payment settings'}
+                    </button>
+                  </form>
+                )}
               </div>
             </div>
           </div>

@@ -20,7 +20,7 @@ router.patch('/:id/status', authenticate, requireAdmin, productController.update
 router.patch('/:id/featured', authenticate, requireAdmin, productController.toggleFeatured);
 router.patch('/:id/promoted', authenticate, requireAdmin, productController.togglePromoted);
 router.post('/:id/duplicate', authenticate, requireAdmin, productController.duplicateProduct);
+router.post('/:id/reviews/bulk', authenticate, requireAdmin, productController.addBulkReviews);
 router.delete('/:id/reviews/:reviewId', authenticate, requireAdmin, productController.deleteProductReview);
 
 export default router;
-

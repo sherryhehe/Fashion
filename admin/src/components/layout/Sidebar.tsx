@@ -94,11 +94,20 @@ export default function Sidebar({ className = '' }: SidebarProps) {
       ]
     },
     {
+      id: 'banners',
+      label: 'Banners',
+      icon: 'solar:gallery-bold-duotone',
+      children: [
+        { id: 'banner-control', label: 'All Banners', href: '/banner-control' },
+        { id: 'banner-add', label: 'Add Banner', href: '/banner-add' },
+      ]
+    },
+    {
       id: 'others',
       label: 'Others',
       icon: 'solar:widget-4-bold-duotone',
       children: [
-        { id: 'banner-control', label: 'Banner Control', href: '/banner-control' },
+        { id: 'home-categories-list', label: 'Home Categories', href: '/home-categories-list' },
       ]
     },
     {

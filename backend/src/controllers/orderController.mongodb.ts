@@ -3,12 +3,13 @@ import mongoose from 'mongoose';
 import Stripe from 'stripe';
 import { Order, Product, Cart, User } from '../models';
 import Brand from '../models/Brand';
+import Setting from '../models/Setting';
 import { successResponse, errorResponse } from '../utils/responseHelper';
 import { AuthRequest } from '../middleware/auth';
 import { PLATFORM_FEE_PKR, CARD_FEE_PERCENT } from '../constants/orderFees';
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-const stripe = stripeSecretKey ? new Stripe(stripeSecretKey, { apiVersion: '2023-10-16' }) : null;
+const stripe = stripeSecretKey ? new Stripe(stripeSecretKey, { apiVersion: '2026-01-28.clover' }) : null;
 
 export const getAllOrders = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -236,7 +237,8 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
 
     let paymentIntentId: string | undefined;
     if (useStripe && stripe) {
-      const currency = (process.env.STRIPE_CURRENCY || 'pkr').toLowerCase();
+      const paymentCurrencyDoc = await Setting.findOne({ key: 'payment_currency' }).lean();
+      const currency = ((paymentCurrencyDoc?.value || process.env.STRIPE_CURRENCY) || 'pkr').toString().toLowerCase();
       const amountInSmallestUnit = currency === 'pkr' ? total * 100 : Math.round(total * 100);
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amountInSmallestUnit,

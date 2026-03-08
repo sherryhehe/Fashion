@@ -23,6 +23,8 @@ export interface Product {
   variations?: any[];
   rating: number;
   reviewCount: number;
+  reviews?: any[];
+  salesCount?: number;
   createdAt: string;
   updatedAt: string;
 }

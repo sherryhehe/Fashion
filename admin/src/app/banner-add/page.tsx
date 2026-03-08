@@ -14,8 +14,9 @@ export default function BannerAdd() {
   const [formData, setFormData] = useState({
     title: '',
     subtitle: '',
-    position: 'homepage' as 'header' | 'sidebar' | 'footer' | 'homepage',
+    position: 'homepage' as 'header' | 'sidebar' | 'footer' | 'homepage' | 'homepage_brand',
     status: 'active' as 'active' | 'inactive' | 'draft',
+    linkUrl: '',
     startDate: '',
     endDate: '',
   });
@@ -106,6 +107,7 @@ export default function BannerAdd() {
         imageUrl: imageUrl,
         position: formData.position,
         status: formData.status,
+        linkUrl: formData.linkUrl?.trim() || undefined,
         clicks: 0,
         ctr: 0,
       };
@@ -267,10 +269,12 @@ export default function BannerAdd() {
                         required
                       >
                         <option value="homepage">Homepage</option>
+                        <option value="homepage_brand">Homepage (Brand) — swipable, Shop Now → brand page</option>
                         <option value="header">Header</option>
                         <option value="sidebar">Sidebar</option>
                         <option value="footer">Footer</option>
                       </select>
+                      <small className="text-muted">Use &quot;Homepage (Brand)&quot; for swipable banner that links to a brand/store page.</small>
                     </div>
 
                     <div className="col-md-6 mb-3">
@@ -287,6 +291,22 @@ export default function BannerAdd() {
                         <option value="inactive">Inactive</option>
                         <option value="draft">Draft</option>
                       </select>
+                    </div>
+                  </div>
+
+                  <div className="row">
+                    <div className="col-12 mb-3">
+                      <label htmlFor="linkUrl" className="form-label">Link URL / Brand ID</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        id="linkUrl"
+                        name="linkUrl"
+                        value={formData.linkUrl}
+                        onChange={handleChange}
+                        placeholder="For Brand banner: enter the brand/store ID (e.g. from Brands list)"
+                      />
+                      <small className="text-muted">For position &quot;Homepage (Brand)&quot;: paste the brand ID so Shop Now opens that brand page.</small>
                     </div>
                   </div>
 
