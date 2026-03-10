@@ -361,6 +361,26 @@ export const getFeaturedProducts = async (req: Request, res: Response): Promise<
 };
 
 /**
+ * Get random products (for homepage "Recommended" / variety - different set each request).
+ */
+export const getRandomProducts = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { limit = 10 } = req.query;
+    const limitNum = Math.min(Math.max(parseInt(limit as string) || 10, 1), 50);
+
+    const products = await Product.aggregate([
+      { $match: { status: 'active' } },
+      { $sample: { size: limitNum } },
+    ]);
+
+    successResponse(res, products);
+  } catch (error) {
+    console.error('Get random products error:', error);
+    errorResponse(res, 'Failed to get random products', 500);
+  }
+};
+
+/**
  * Get personalized products for the current user (cart + wishlist first, then featured).
  * Requires authentication.
  */

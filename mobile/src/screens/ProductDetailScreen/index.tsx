@@ -22,7 +22,6 @@ import styles from './styles';
 // API Hooks
 import { useProduct, useRecommendedProducts } from '../../hooks/useProducts';
 import { useBrandByName, useBrand } from '../../hooks/useBrands';
-import { useAddReview, useProductReviews, useUpdateReview, useDeleteReview } from '../../hooks/useReviews';
 import { useAddToCart } from '../../hooks/useCart';
 import { useAddToWishlist, useRemoveFromWishlist, useIsInWishlist, useWishlist } from '../../hooks/useWishlist';
 import { getFirstImageSource, getImageSource } from '../../utils/imageHelper';
@@ -52,10 +51,6 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
   const [quantity, setQuantity] = useState(1);
   const [isFavorite, setIsFavorite] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  
-  // Reviews pagination state
-  const REVIEWS_PER_PAGE = 5;
-  const [displayedReviewsCount, setDisplayedReviewsCount] = useState(REVIEWS_PER_PAGE);
 
   // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
   // Fetch product data from API
@@ -73,49 +68,6 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
   const { data: exactBrandData, refetch: refetchBrand } = useBrand(brandId);
   const brandFromAPI = exactBrandData?.data || brandFromNameLookup;
 
-  // Review hooks
-  const addReviewMutation = useAddReview();
-  const updateReviewMutation = useUpdateReview();
-  const deleteReviewMutation = useDeleteReview();
-  const { data: reviewsData, isLoading: reviewsLoading, error: reviewsError, refetch: refetchReviews } = useProductReviews(productId || '');
-  // Handle both array response and object with data property
-  // Also check if product has embedded reviews (from admin form)
-  const apiReviews = Array.isArray(reviewsData?.data) 
-    ? reviewsData.data 
-    : Array.isArray(reviewsData) 
-      ? reviewsData 
-      : [];
-  const embeddedReviews = product?.reviews || [];
-  // Combine API reviews with embedded reviews, prioritizing API reviews
-  const allReviews = apiReviews.length > 0 ? apiReviews : embeddedReviews;
-  
-  // Get displayed reviews based on pagination
-  const reviews = allReviews.slice(0, displayedReviewsCount);
-  const hasMoreReviews = allReviews.length > displayedReviewsCount;
-  
-  // Reset displayed count when reviews change
-  useEffect(() => {
-    setDisplayedReviewsCount(REVIEWS_PER_PAGE);
-  }, [productId]);
-  
-  const handleLoadMoreReviews = () => {
-    setDisplayedReviewsCount(prev => prev + REVIEWS_PER_PAGE);
-  };
-  
-  // Get current user info for review ownership
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  useEffect(() => {
-    const getUserInfo = async () => {
-      try {
-        const user = await authService.getStoredUser();
-        setCurrentUserId(user?.id || null);
-      } catch (error) {
-        console.log('Error getting user info:', error);
-      }
-    };
-    getUserInfo();
-  }, []);
-
   // Cart and wishlist mutations
   const addToCartMutation = useAddToCart();
   const addToWishlistMutation = useAddToWishlist();
@@ -126,22 +78,6 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
   
   // Get wishlist data for refreshing
   const { refetch: refetchWishlistData } = useWishlist();
-
-  // Debug: Log reviews data to verify what's being fetched
-  useEffect(() => {
-    if (productId) {
-      console.log('📝 ProductDetailScreen - Reviews Debug:', {
-        productId,
-        reviewsCount: allReviews.length,
-        displayedReviewsCount: reviews.length,
-        productReviewCount: product?.reviewCount,
-        reviewsDataRaw: reviewsData,
-        reviewsArray: allReviews,
-        reviewsLoading,
-        reviewsError: reviewsError ? JSON.stringify(reviewsError) : null,
-      });
-    }
-  }, [productId, reviews.length, product?.reviewCount, reviewsData, reviewsLoading, reviewsError]);
 
   // Check wishlist for saved color/size and auto-select - MUST be before conditional returns
   useEffect(() => {
@@ -173,12 +109,10 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
       // Invalidate and refetch all queries related to this product
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['product', productId] }),
-        queryClient.invalidateQueries({ queryKey: ['reviews', 'product', productId] }),
         queryClient.invalidateQueries({ queryKey: ['brand'] }),
         queryClient.invalidateQueries({ queryKey: ['wishlist'] }),
         // Refetch all data
         refetchProduct(),
-        refetchReviews(),
         refetchRecommended(),
         refetchWishlist(),
         refetchWishlistData(),
@@ -191,7 +125,7 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
     } finally {
       setRefreshing(false);
     }
-  }, [productId, queryClient, refetchProduct, refetchReviews, refetchRecommended, refetchWishlist, refetchWishlistData, refetchBrandByName, refetchBrand, productBrandName, brandId]);
+  }, [productId, queryClient, refetchProduct, refetchRecommended, refetchWishlist, refetchWishlistData, refetchBrandByName, refetchBrand, productBrandName, brandId]);
 
   // Show loading screen while fetching product
   if (isLoading) {
@@ -320,36 +254,6 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
   if (!selectedSize && sizes.length > 0) {
     setSelectedSize(sizes[0]);
   }
-
-  // Handle review submission
-  const handleReviewSubmit = async (reviewData: {
-    rating: number;
-    comment: string;
-    name: string;
-  }) => {
-    if (!productId) return;
-
-    try {
-      // Get user info if authenticated
-      const user = await authService.getStoredUser();
-      const userName = user?.name || reviewData.name;
-
-      await addReviewMutation.mutateAsync({
-        productId: productId!,
-        rating: reviewData.rating,
-        comment: reviewData.comment,
-        name: userName, // Use authenticated user's name if available
-      });
-      // Refetch reviews and product after adding review
-      queryClient.invalidateQueries({ queryKey: ['reviews', 'product', productId] });
-      queryClient.invalidateQueries({ queryKey: ['product', productId] });
-      // Refresh user info to update currentUserId
-      const updatedUser = await authService.getStoredUser();
-      setCurrentUserId(updatedUser?.id || null);
-    } catch (error) {
-      console.log('Review submission error:', error);
-    }
-  };
 
   // Handle add to cart - just adds product without navigation
   const handleAddToCart = async () => {
@@ -894,8 +798,8 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
                       <View style={styles.recommendedBrandRow}>
                         <View style={styles.recommendedBrand}>
                           <View style={styles.brandLogoPlaceholder} />
-                          <Text style={styles.brandName}>{item.brand}</Text>
-                          <Image source={icons.verify} style={styles.verifyIcon} />
+                          <Text style={styles.recommendedBrandName}>{item.brand}</Text>
+                          <Image source={icons.verify} style={styles.recommendedVerifyIcon} />
                         </View>
                       </View>
                     ) : null}

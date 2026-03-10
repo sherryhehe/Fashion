@@ -8,6 +8,7 @@ const router = express.Router();
 router.get('/', productController.getAllProducts);
 router.get('/search', productController.searchProducts);
 router.get('/featured', productController.getFeaturedProducts);
+router.get('/random', productController.getRandomProducts);
 // Personalized (auth required) - must be before /:id
 router.get('/personalized', authenticate, productController.getPersonalizedProducts);
 router.get('/:id', productController.getProductById);

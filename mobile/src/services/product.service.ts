@@ -110,11 +110,17 @@ const productService = {
   },
 
   /**
-   * Get recommended products (using featured products for now)
-   * TODO: Implement actual recommendation algorithm
+   * Get recommended products (using featured for backward compatibility)
    */
   getRecommended: async (limit: number = 10): Promise<ProductResponse> => {
     return apiClient.get(`/products/featured?limit=${limit}`);
+  },
+
+  /**
+   * Get random products (new set each request - for homepage variety)
+   */
+  getRandom: async (limit: number = 10): Promise<ProductResponse> => {
+    return apiClient.get(`/products/random?limit=${limit}`);
   },
 
   /**
