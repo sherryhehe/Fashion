@@ -62,6 +62,18 @@ export const useRecommendedProducts = (limit: number = 10) => {
 };
 
 /**
+ * Hook to get random products (new set when refetched - for homepage "Recommended for You" variety).
+ * Use refetchOnMount or refetch when screen is focused so each open gets a fresh random order/set.
+ */
+export const useRandomProducts = (limit: number = 10, refetchKey?: number) => {
+  return useQuery({
+    queryKey: ['products', 'random', limit, refetchKey ?? 0],
+    queryFn: () => productService.getRandom(limit),
+    staleTime: 0, // Always consider stale so focus refetch gets new random set
+  });
+};
+
+/**
  * Hook to get personalized products (cart + wishlist first, then featured).
  * Only runs when enabled (e.g. when user is logged in).
  */

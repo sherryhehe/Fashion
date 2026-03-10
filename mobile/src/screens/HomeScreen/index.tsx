@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -21,7 +21,7 @@ import useStyles from './styles';
 
 // API Hooks
 import { useCategories } from '../../hooks/useCategories';
-import { useFeaturedProducts, useRecommendedProducts, useRecentlyAddedProducts, usePersonalizedProducts, useInfiniteProducts } from '../../hooks/useProducts';
+import { useFeaturedProducts, useRecommendedProducts, useRandomProducts, useRecentlyAddedProducts, usePersonalizedProducts, useInfiniteProducts } from '../../hooks/useProducts';
 import { useTopBrands, useFeaturedBrands, useBrands } from '../../hooks/useBrands';
 import { useAddToWishlist, useRemoveFromWishlist, useIsInWishlist, useWishlist } from '../../hooks/useWishlist';
 import { requireAuthOrPromptLogin } from '../../utils/guestHelper';
@@ -30,7 +30,7 @@ import { useBanners } from '../../hooks/useBanners';
 import { useHomeCategoriesForApp } from '../../hooks/useHomeCategories';
 import { getFirstImageSource, getImageSource, preloadImages, getImageUrl } from '../../utils/imageHelper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { CommonActions } from '@react-navigation/native';
+import { CommonActions, useFocusEffect } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -56,7 +56,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const queryClient = useQueryClient();
   const [currentSlide, setCurrentSlide] = useState(0);
   const flatListRef = useRef<FlatList>(null);
-  const autoScrollTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const autoScrollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
   const [hasToken, setHasToken] = useState(false);
   const [isAutoScrolling, setIsAutoScrolling] = useState(true);
@@ -92,10 +92,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   // API Hooks - MUST be called before using the data
   const { data: categoriesData, isLoading: categoriesLoading, error: categoriesError, refetch: refetchCategories } = useCategories();
-  const { data: featuredProductsData, isLoading: featuredLoading, refetch: refetchFeatured } = useFeaturedProducts(4);
-  const { data: recommendedProductsData, isLoading: recommendedLoading, refetch: refetchRecommended } = useRecommendedProducts(2);
-  const { data: personalizedProductsData, isLoading: personalizedLoading } = usePersonalizedProducts(2, hasToken);
-  const { data: recentlyAddedData, isLoading: recentlyAddedLoading, refetch: refetchRecentlyAdded } = useRecentlyAddedProducts(2);
+  const { data: featuredProductsData, isLoading: featuredLoading, refetch: refetchFeatured } = useFeaturedProducts(8);
+  const { data: recommendedProductsData, isLoading: recommendedLoading, refetch: refetchRecommended } = useRecommendedProducts(10);
+  const [focusShuffleKey, setFocusShuffleKey] = useState(0);
+  useFocusEffect(
+    useCallback(() => {
+      setFocusShuffleKey((k) => k + 1);
+    }, [])
+  );
+  const { data: randomProductsData, isLoading: randomLoading } = useRandomProducts(10, focusShuffleKey);
+  const { data: personalizedProductsData, isLoading: personalizedLoading } = usePersonalizedProducts(10, hasToken);
+  const { data: recentlyAddedData, isLoading: recentlyAddedLoading, refetch: refetchRecentlyAdded } = useRecentlyAddedProducts(8);
   const { data: topBrandsData, isLoading: topBrandsLoading, refetch: refetchTopBrands } = useTopBrands();
   const { data: featuredStylesData, isLoading: featuredStylesLoading, refetch: refetchStyles } = useFeaturedStyles();
   const {
@@ -123,10 +130,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const stylesArray = featuredStylesData?.data || [];
   const recommendedArray = recommendedProductsData?.data || [];
   const personalizedArray = personalizedProductsData?.data || [];
-  // For "Recommended for You": when logged in use personalized (cart + wishlist first), else recommended
+  // For "Recommended for You": when logged in use personalized; else use random products (new set each time user opens home)
+  const randomArray = randomProductsData?.data || [];
   const recommendedSourceArray = (hasToken && Array.isArray(personalizedArray) && personalizedArray.length > 0)
     ? personalizedArray
-    : recommendedArray;
+    : (Array.isArray(randomArray) && randomArray.length > 0 ? randomArray : recommendedArray);
   const topBrandsArray = topBrandsData?.data || [];
   const allProductsArray = infiniteProductsData?.pages?.flatMap((p: any) => p?.data ?? []) ?? [];
   const allBrandsArray = allBrandsData?.data || [];
@@ -144,19 +152,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     return map;
   }, [allBrandsArray]);
 
-  // Debug: Log banners array to verify all banners are fetched
+  // Debug logs only in development to avoid home screen lag
   useEffect(() => {
-    if (bannersArray.length > 0) {
+    if (__DEV__ && bannersArray.length > 0) {
       console.log('🏠 HomeScreen - Banners fetched:', bannersArray.length);
-      console.log('📋 Banners data:', bannersArray.map(b => ({ 
-        id: b.id || b._id, 
-        title: b.title, 
-        position: b.position,
-        status: b.status,
-        imageUrl: b.imageUrl || b.image 
-      })));
     }
-  }, [bannersArray]);
+  }, [bannersArray.length]);
 
   // Preload images with priority: above-the-fold first, then below-the-fold
   useEffect(() => {
@@ -203,58 +204,46 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         }
       });
 
-      // Preload priority images immediately
       if (priorityUrls.length > 0) {
-        console.log(`🚀 Preloading ${priorityUrls.length} priority images...`);
+        if (__DEV__) console.log(`🚀 Preloading ${priorityUrls.length} priority images...`);
         preloadImages(priorityUrls).then(() => {
-          console.log('✅ Priority image preloading completed');
-        }).catch(error => {
-          console.log('⚠️ Priority image preloading error:', error);
-        });
+          if (__DEV__) console.log('✅ Priority image preloading completed');
+        }).catch(() => {});
       }
     };
 
-    // Preload below-the-fold images after a delay
     const preloadBelowFoldImages = async () => {
-      // Wait 1 second before preloading below-the-fold images
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
       const belowFoldUrls: string[] = [];
-
-      // Preload bottom grid product images (limit to first 10 for initial load)
       allProductsArray.slice(0, 10).forEach(product => {
         if (product.images && product.images.length > 0) {
           const url = getImageUrl(product.images[0]);
           if (url) belowFoldUrls.push(url);
         }
       });
-
       if (belowFoldUrls.length > 0) {
-        console.log(`🚀 Preloading ${belowFoldUrls.length} below-the-fold images...`);
-        preloadImages(belowFoldUrls).then(() => {
-          console.log('✅ Below-the-fold image preloading completed');
-        }).catch(error => {
-          console.log('⚠️ Below-the-fold image preloading error:', error);
-        });
+        preloadImages(belowFoldUrls).catch(() => {});
       }
     };
 
-    // Preload priority images when data is available
-    if (
-      !categoriesLoading &&
-      !featuredStylesLoading &&
-      !recommendedLoading &&
-      !topBrandsLoading &&
-      !bannersLoading &&
-      (bannersArray.length > 0 || categoriesArray.length > 0)
-    ) {
-      preloadPriorityImages();
-    }
+    // Defer preload to next tick so first paint isn't blocked (reduces home lag)
+    const t = setTimeout(() => {
+      if (
+        !categoriesLoading &&
+        !featuredStylesLoading &&
+        !recommendedLoading &&
+        !topBrandsLoading &&
+        !bannersLoading &&
+        (bannersArray.length > 0 || categoriesArray.length > 0)
+      ) {
+        preloadPriorityImages();
+      }
+      if (!allProductsLoading && allProductsArray.length > 0) {
+        preloadBelowFoldImages();
+      }
+    }, 50);
 
-    // Preload below-the-fold images after initial render
-    if (!allProductsLoading && allProductsArray.length > 0) {
-      preloadBelowFoldImages();
-    }
+    return () => clearTimeout(t);
   }, [
     bannersArray,
     categoriesArray,
@@ -301,11 +290,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         }))
     : [];
 
-  // Debug: Log carousel data to verify all banners are included
   useEffect(() => {
-    if (carouselData.length > 0) {
+    if (__DEV__ && carouselData.length > 0) {
       console.log('🎠 Carousel data prepared:', carouselData.length, 'items');
-      console.log('📊 Carousel items:', carouselData.map(c => ({ id: c.id, title: c.title })));
     }
   }, [carouselData.length]);
 
@@ -454,7 +441,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const formatPrice = (price: number) => `PKR ${price.toLocaleString()}`;
   const formatRating = (rating: number, reviewCount: number) => `${rating.toFixed(1)} (${reviewCount})`;
 
-  // Recommended products: shuffle so order varies each time user opens app (uses personalized when logged in)
+  // Recommended products: shuffle so order varies each time user opens/focuses home
   const displayRecommendedProducts = useMemo(() => {
     if (!Array.isArray(recommendedSourceArray) || recommendedSourceArray.length === 0) return [];
     return shuffleArray(recommendedSourceArray).map(product => ({
@@ -462,10 +449,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       name: product.name,
       brand: product.brand || '',
       price: formatPrice(product.price),
-      rating: formatRating(product.rating, product.reviewCount),
+      rating: formatRating(product.rating ?? 0, product.reviewCount ?? 0),
       image: getFirstImageSource(product.images, images.velvetShawl),
     }));
-  }, [recommendedSourceArray]);
+  }, [recommendedSourceArray, focusShuffleKey]);
 
   // Check if top brands data exists and is an array
   // Show ALL brands (no limit)
@@ -489,7 +476,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       })
     : [];
 
-  // Featured products: shuffle so order varies each time
+  // Featured products: shuffle so order varies each time user opens/focuses home
   const featuredArray = featuredProductsData?.data || [];
   const displayFeaturedProducts = useMemo(() => {
     if (!Array.isArray(featuredArray) || featuredArray.length === 0) return [];
@@ -498,15 +485,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       name: product.name,
       brand: product.brand || '',
       price: formatPrice(product.price),
-      rating: formatRating(product.rating, product.reviewCount),
+      rating: formatRating(product.rating ?? 0, product.reviewCount ?? 0),
       image: getFirstImageSource(product.images, images.silkDupatta),
     }));
-  }, [featuredArray]);
+  }, [featuredArray, focusShuffleKey]);
 
   // Custom home categories (from admin) - each has name + products
   const homeCategoriesArray = homeCategoriesData?.data || [];
 
-  // Recently added products: shuffle so order varies each time
+  // Recently added products: shuffle so order varies each time user opens/focuses home
   const recentlyAddedArray = recentlyAddedData?.data || [];
   const displayRecentlyAddedProducts = useMemo(() => {
     if (!Array.isArray(recentlyAddedArray) || recentlyAddedArray.length === 0) return [];
@@ -515,10 +502,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       name: product.name,
       brand: product.brand || '',
       price: formatPrice(product.price),
-      rating: formatRating(product.rating, product.reviewCount),
+      rating: formatRating(product.rating ?? 0, product.reviewCount ?? 0),
       image: getFirstImageSource(product.images, images.minicrossbody),
     }));
-  }, [recentlyAddedArray]);
+  }, [recentlyAddedArray, focusShuffleKey]);
 
   // Bottom grid products: sorted by recently added (infinite scroll); no shuffle so load-more is consistent
   const displayBottomGridProducts = useMemo(() => {
@@ -1116,8 +1103,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Recommended for You</Text>
           </View>
-          {(hasToken ? personalizedLoading : recommendedLoading) ? (
-            <ShimmerHorizontalList count={2} cardWidth={screenWidth * 0.75} />
+          {(hasToken ? personalizedLoading : (randomLoading || recommendedLoading)) ? (
+            <ShimmerHorizontalList count={4} cardWidth={screenWidth * 0.75} />
           ) : displayRecommendedProducts.length > 0 ? (
             <FlatList
               data={displayRecommendedProducts}

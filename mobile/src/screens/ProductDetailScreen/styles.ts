@@ -562,12 +562,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#E5E5E7',
     marginRight: 6,
   },
-  brandName: {
+  recommendedBrandName: {
     fontSize: 12,
     color: '#8E8E93',
     marginRight: 4,
   },
-  verifyIcon: {
+  recommendedVerifyIcon: {
     width: 12,
     height: 12,
     tintColor: '#007AFF',
