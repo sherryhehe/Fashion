@@ -10,11 +10,13 @@ import React, { useState, useEffect } from 'react';
 import { StatusBar, useColorScheme, View, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClientProvider } from '@tanstack/react-query';
+import { StripeProvider } from '@stripe/stripe-react-native';
 import MainNavigator from './src/navigation/MainNavigator';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { queryClient } from './src/lib/queryClient';
 import Toast from 'react-native-toast-message';
 import authService from './src/services/auth.service';
+import { STRIPE_PUBLISHABLE_KEY } from './src/config/stripe';
 
 // Global function to handle logout and show auth screen
 // This will be set by App component
@@ -102,20 +104,22 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <SafeAreaProvider>
-          <StatusBar 
-            barStyle={isDarkMode ? 'light-content' : 'dark-content'} 
-            backgroundColor="#FFFFFF"
-          />
-          <MainNavigator 
-            isAuthenticated={isAuthenticated}
-            setIsAuthenticated={handleSetAuthenticated}
-            onLogout={handleLogout}
-          />
-          <Toast />
-        </SafeAreaProvider>
-      </GestureHandlerRootView>
+      <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <SafeAreaProvider>
+            <StatusBar 
+              barStyle={isDarkMode ? 'light-content' : 'dark-content'} 
+              backgroundColor="#FFFFFF"
+            />
+            <MainNavigator 
+              isAuthenticated={isAuthenticated}
+              setIsAuthenticated={handleSetAuthenticated}
+              onLogout={handleLogout}
+            />
+            <Toast />
+          </SafeAreaProvider>
+        </GestureHandlerRootView>
+      </StripeProvider>
     </QueryClientProvider>
   );
 }

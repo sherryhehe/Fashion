@@ -12,6 +12,7 @@ export interface User {
 
 export interface Product {
   id: string;
+  _id?: string;
   name: string;
   description: string;
   price: number;
@@ -22,17 +23,22 @@ export interface Product {
   brand?: string;
   sku: string;
   inventory: number;
-  minStock: number;
+  /** Backend uses "stock"; optional for API response */
+  stock?: number;
+  minStock?: number;
   weight?: number;
   dimensions?: string;
   images: string[];
   features: string[];
   specifications: Record<string, string>;
   status: 'active' | 'inactive' | 'draft';
-  visibility: 'visible' | 'hidden';
+  visibility?: 'visible' | 'hidden';
   featured: boolean;
   rating: number;
-  reviews: number;
+  reviewCount?: number;
+  reviews: number | Array<{ id?: number; name: string; rating: number; comment: string; date?: string }>;
+  salesCount?: number;
+  views?: number;
   createdAt: string;
   updatedAt: string;
 }

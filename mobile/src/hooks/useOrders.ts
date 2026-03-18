@@ -50,6 +50,21 @@ export const useCreateOrder = () => {
 };
 
 /**
+ * Hook to confirm order payment (after Stripe Payment Sheet succeeds).
+ */
+export const useConfirmOrderPayment = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (orderId: string) => orderService.confirmPayment(orderId),
+    onSuccess: (_response, orderId) => {
+      queryClient.invalidateQueries({ queryKey: ['order', orderId] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+    },
+  });
+};
+
+/**
  * Hook to cancel an order
  */
 export const useCancelOrder = () => {

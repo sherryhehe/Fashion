@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -9,9 +9,12 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { usePaymentSheet } from '@stripe/stripe-react-native';
 import { CartStackParamList } from '../../navigation/HomeNavigator';
 import { SafeView } from '../../components';
-import { useOrder } from '../../hooks/useOrders';
+import { useOrder, useConfirmOrderPayment } from '../../hooks/useOrders';
+import { MERCHANT_DISPLAY_NAME } from '../../config/stripe';
+import { showToast } from '../../utils/toast';
 
 export type OrderSuccessScreenParams = { orderId: string; clientSecret?: string };
 
@@ -26,13 +29,43 @@ const OrderSuccessScreen: React.FC<OrderSuccessScreenProps> = ({ navigation, rou
   const insets = useSafeAreaInsets();
   const orderId = route.params?.orderId || '';
   const clientSecret = route.params?.clientSecret;
-  const { data: orderResponse, isLoading } = useOrder(orderId);
+  const [paymentComplete, setPaymentComplete] = useState(false);
+  const { data: orderResponse, isLoading, refetch } = useOrder(orderId);
   const order = orderResponse?.data;
+  const confirmPaymentMutation = useConfirmOrderPayment();
+  const { initPaymentSheet, presentPaymentSheet } = usePaymentSheet();
+
+  const needsPayment = !!clientSecret && !paymentComplete && order?.paymentStatus !== 'paid';
+
+  const handlePayNow = async () => {
+    if (!clientSecret || !orderId) return;
+    try {
+      const { error: initError } = await initPaymentSheet({
+        paymentIntentClientSecret: clientSecret,
+        merchantDisplayName: MERCHANT_DISPLAY_NAME,
+      });
+      if (initError) {
+        showToast.error(initError.message || 'Could not load payment form');
+        return;
+      }
+      const { error: presentError } = await presentPaymentSheet();
+      if (presentError) {
+        showToast.error(presentError.message || 'Payment was cancelled');
+        return;
+      }
+      await confirmPaymentMutation.mutateAsync(orderId);
+      setPaymentComplete(true);
+      refetch();
+      showToast.success('Payment successful!', 'Order confirmed');
+    } catch (err: any) {
+      showToast.error(err?.message || 'Payment failed');
+    }
+  };
 
   const formatPrice = (n: number) => `PKR ${(n || 0).toLocaleString()}`;
-  const title = clientSecret ? 'Order Created' : 'Order Successful!';
-  const subtitle = clientSecret
-    ? 'Complete payment with your card to confirm this order. You can also do this later from your order details.'
+  const title = needsPayment ? 'Order created — pay to confirm' : 'Order successful!';
+  const subtitle = needsPayment
+    ? 'Pay with your card below to confirm this order.'
     : "Thank you for shopping with us. You'll receive updates about your delivery shortly.";
 
   return (
@@ -86,6 +119,20 @@ const OrderSuccessScreen: React.FC<OrderSuccessScreenProps> = ({ navigation, rou
         )}
 
         <Text style={styles.emailNote}>A confirmation email has been sent to your inbox.</Text>
+
+        {needsPayment && (
+          <TouchableOpacity
+            style={styles.payNowButton}
+            onPress={handlePayNow}
+            disabled={confirmPaymentMutation.isPending}
+          >
+            {confirmPaymentMutation.isPending ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={styles.primaryButtonText}>Pay now</Text>
+            )}
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity
           style={styles.primaryButton}
@@ -206,6 +253,13 @@ const styles = StyleSheet.create({
     color: '#8E8E93',
     textAlign: 'center',
     marginBottom: 24,
+  },
+  payNowButton: {
+    backgroundColor: '#34C759',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginBottom: 12,
   },
   primaryButton: {
     backgroundColor: '#2C2C2E',

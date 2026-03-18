@@ -7,16 +7,19 @@ import {
   TextInput,
   StyleSheet,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { usePaymentSheet } from '@stripe/stripe-react-native';
 import { CartStackParamList } from '../../navigation/HomeNavigator';
 import { SafeView, ShimmerLoader } from '../../components';
 import { getFirstImageSource } from '../../utils/imageHelper';
 import images from '../../assets/images';
+import { MERCHANT_DISPLAY_NAME } from '../../config/stripe';
 
 // API Hooks
 import { useCart, useRemoveFromCart } from '../../hooks/useCart';
-import { useCreateOrder } from '../../hooks/useOrders';
+import { useCreateOrder, useConfirmOrderPayment } from '../../hooks/useOrders';
 import authService from '../../services/auth.service';
 import brandService from '../../services/brand.service';
 import { showToast } from '../../utils/toast';
@@ -51,7 +54,10 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
   // Fetch cart and user profile
   const { data: cartData, isLoading: cartLoading } = useCart();
   const createOrderMutation = useCreateOrder();
+  const confirmPaymentMutation = useConfirmOrderPayment();
   const removeFromCartMutation = useRemoveFromCart();
+  const { initPaymentSheet, presentPaymentSheet } = usePaymentSheet();
+  const [isPaymentSheetOpen, setIsPaymentSheetOpen] = useState(false);
 
   const cartItems = cartData?.data || [];
 
@@ -208,18 +214,52 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
         notes: saveInfoChecked ? 'Save information for next time' : undefined,
       });
 
-      const data = response?.data as any;
-      const order = data?.order ?? data;
-      const orderId = order?._id || order?.orderNumber || data?._id || data?.orderNumber;
-      const clientSecret = data?.clientSecret;
+      const body = response?.data as any;
+      const payload = body?.data ?? body;
+      const order = payload?.order ?? payload;
+      const orderId = order?._id || order?.orderNumber || payload?._id || payload?.orderNumber;
+      const clientSecret = payload?.clientSecret ?? body?.clientSecret;
+
+      if (!orderId) {
+        navigation.getParent()?.navigate('Orders');
+        return;
+      }
+
+      // Card payment: show Stripe Payment Sheet
+      if (clientSecret && paymentMethod === 'card') {
+        setIsPaymentSheetOpen(true);
+        try {
+          const { error: initError } = await initPaymentSheet({
+            paymentIntentClientSecret: clientSecret,
+            merchantDisplayName: MERCHANT_DISPLAY_NAME,
+          });
+          if (initError) {
+            showToast.error(initError.message || 'Could not load payment form');
+            navigation.replace('OrderSuccess', { orderId, clientSecret });
+            return;
+          }
+          const { error: presentError } = await presentPaymentSheet();
+          if (presentError) {
+            showToast.error(presentError.message || 'Payment was cancelled');
+            navigation.replace('OrderSuccess', { orderId, clientSecret });
+            return;
+          }
+          await confirmPaymentMutation.mutateAsync(orderId as string);
+          showToast.success('Payment successful!', 'Order confirmed');
+          navigation.replace('OrderSuccess', { orderId });
+        } catch (err: any) {
+          showToast.error(err?.message || 'Payment failed');
+          navigation.replace('OrderSuccess', { orderId, clientSecret });
+        } finally {
+          setIsPaymentSheetOpen(false);
+        }
+        return;
+      }
+
       if (clientSecret) {
         showToast.success('Order created. Complete payment in the next step.');
       }
-      if (orderId) {
-        navigation.replace('OrderSuccess', { orderId, clientSecret: clientSecret || undefined });
-      } else {
-        navigation.getParent()?.navigate('Orders');
-      }
+      navigation.replace('OrderSuccess', { orderId, clientSecret: clientSecret || undefined });
     } catch (error: any) {
       console.log('Error creating order:', error);
       // Error is already handled by the mutation hook
@@ -476,13 +516,17 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
 
         {/* Submit Order Button */}
         <TouchableOpacity 
-          style={[styles.submitButton, createOrderMutation.isPending && styles.submitButtonDisabled]} 
+          style={[styles.submitButton, (createOrderMutation.isPending || isPaymentSheetOpen) && styles.submitButtonDisabled]} 
           onPress={handleSubmitOrder}
-          disabled={createOrderMutation.isPending || cartItems.length === 0}
+          disabled={createOrderMutation.isPending || isPaymentSheetOpen || cartItems.length === 0}
         >
-          <Text style={styles.submitButtonText}>
-            {createOrderMutation.isPending ? 'Placing order...' : 'Submit Order'}
-          </Text>
+          {(createOrderMutation.isPending || isPaymentSheetOpen) ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <Text style={styles.submitButtonText}>
+              {paymentMethod === 'card' ? 'Place order & pay' : 'Submit order'}
+            </Text>
+          )}
         </TouchableOpacity>
       </ScrollView>
     </SafeView>
@@ -528,6 +572,10 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#2C2C2E',
+  },
+  headerRight: {
+    width: 40,
+    height: 40,
   },
   editButton: {
     fontSize: 16,
