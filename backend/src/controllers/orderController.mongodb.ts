@@ -395,3 +395,57 @@ export const cancelOrder = async (req: AuthRequest, res: Response): Promise<void
   }
 };
 
+/**
+ * Stripe webhook handler. Must be mounted with express.raw({ type: 'application/json' }) so req.body is the raw Buffer.
+ * In Stripe Dashboard: add endpoint with URL https://your-api-domain.com/api/orders/stripe-webhook
+ * Select event: payment_intent.succeeded. Copy the "Signing secret" (whsec_...) to STRIPE_WEBHOOK_SECRET in .env.
+ */
+export const stripeWebhook = async (req: Request, res: Response): Promise<void> => {
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!webhookSecret) {
+    console.error('Stripe webhook: STRIPE_WEBHOOK_SECRET is not set');
+    res.status(500).json({ error: 'Webhook not configured' });
+    return;
+  }
+  if (!stripe) {
+    console.error('Stripe webhook: Stripe is not initialized');
+    res.status(500).json({ error: 'Stripe not configured' });
+    return;
+  }
+  const signature = req.headers['stripe-signature'];
+  if (!signature || typeof signature !== 'string') {
+    res.status(400).json({ error: 'Missing stripe-signature header' });
+    return;
+  }
+  // req.body is the raw Buffer when using express.raw()
+  const rawBody: Buffer = req.body;
+  if (!rawBody || !Buffer.isBuffer(rawBody)) {
+    res.status(400).json({ error: 'Invalid body' });
+    return;
+  }
+  let event: Stripe.Event;
+  try {
+    event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
+  } catch (err: any) {
+    console.error('Stripe webhook signature verification failed:', err?.message);
+    res.status(400).json({ error: `Webhook signature verification failed: ${err?.message}` });
+    return;
+  }
+  if (event.type === 'payment_intent.succeeded') {
+    const paymentIntent = event.data.object as Stripe.PaymentIntent;
+    const paymentIntentId = paymentIntent.id;
+    try {
+      const order = await Order.findOne({ paymentIntentId });
+      if (order && order.paymentStatus !== 'paid') {
+        await markOrderPaidAndDecrementStock(order);
+        console.log(`Stripe webhook: order ${order.orderNumber} marked as paid (PaymentIntent ${paymentIntentId})`);
+      }
+    } catch (err) {
+      console.error('Stripe webhook: error marking order paid', err);
+      res.status(500).json({ error: 'Failed to process payment_intent.succeeded' });
+      return;
+    }
+  }
+  res.status(200).json({ received: true });
+};
+

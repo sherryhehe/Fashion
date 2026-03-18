@@ -84,6 +84,13 @@ const orderService = {
   cancelOrder: async (orderId: string): Promise<OrderResponse> => {
     return apiClient.put(`/orders/${orderId}/cancel`);
   },
+
+  /**
+   * Confirm card payment after Stripe PaymentIntent succeeds (syncs order to paid + decrements stock).
+   */
+  confirmPayment: async (orderId: string): Promise<OrderResponse> => {
+    return apiClient.patch(`/orders/${orderId}/confirm-payment`);
+  },
 };
 
 export default orderService;

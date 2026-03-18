@@ -327,7 +327,7 @@ export default function ProductEdit() {
         category: formData.category,
         brand: formData.brand || undefined,
         stock: parseInt(formData.inventory),
-        status: formData.status,
+        status: formData.status as 'active' | 'inactive' | 'draft',
         style: formData.style,
         features: featuresArray,
         images: finalImages,
@@ -881,58 +881,61 @@ export default function ProductEdit() {
               </div>
               <div className="card-body">
                 {/* Bulk add reviews */}
-                <div className="mb-4 p-3 bg-light rounded">
-                  <h6 className="mb-2">Bulk add reviews</h6>
-                  <p className="small text-muted mb-2">Add many reviews at once (e.g. 700). Same name/rating/comment will be used for all.</p>
-                  <div className="row g-2 align-items-end">
-                    <div className="col-md-2">
-                      <label className="form-label small mb-0">Count</label>
+                <div className="mb-4 p-4 border rounded-3 bg-white shadow-sm" style={{ borderLeft: '4px solid var(--bs-success)' }}>
+                  <div className="d-flex align-items-center gap-2 mb-2">
+                    <span className="badge bg-success opacity-75">Bulk</span>
+                    <h6 className="mb-0 fw-semibold">Add multiple reviews at once</h6>
+                  </div>
+                  <p className="small text-muted mb-3">Add hundreds of reviews in one go. The same name, rating, and comment will be applied to all.</p>
+                  <div className="row g-3 align-items-end">
+                    <div className="col-6 col-md-2">
+                      <label className="form-label small fw-medium text-secondary">Number of reviews</label>
                       <input
                         type="number"
-                        className="form-control form-control-sm"
+                        className="form-control"
                         min={1}
                         max={5000}
                         value={bulkReviewCount}
                         onChange={(e) => setBulkReviewCount(e.target.value)}
-                        placeholder="700"
+                        placeholder="e.g. 700"
                       />
                     </div>
-                    <div className="col-md-2">
-                      <label className="form-label small mb-0">Name</label>
+                    <div className="col-6 col-md-2">
+                      <label className="form-label small fw-medium text-secondary">Reviewer name</label>
                       <input
                         type="text"
-                        className="form-control form-control-sm"
+                        className="form-control"
                         value={bulkReviewName}
                         onChange={(e) => setBulkReviewName(e.target.value)}
                         placeholder="Customer"
                       />
                     </div>
-                    <div className="col-md-2">
-                      <label className="form-label small mb-0">Rating</label>
+                    <div className="col-6 col-md-2">
+                      <label className="form-label small fw-medium text-secondary">Rating</label>
                       <select
-                        className="form-select form-select-sm"
+                        className="form-select"
                         value={bulkReviewRating}
                         onChange={(e) => setBulkReviewRating(Number(e.target.value))}
                       >
                         {[1, 2, 3, 4, 5].map((n) => (
-                          <option key={n} value={n}>{n} Star{n > 1 ? 's' : ''}</option>
+                          <option key={n} value={n}>{n} star{n > 1 ? 's' : ''}</option>
                         ))}
                       </select>
                     </div>
-                    <div className="col-md-3">
-                      <label className="form-label small mb-0">Comment</label>
+                    <div className="col-12 col-md-3">
+                      <label className="form-label small fw-medium text-secondary">Comment</label>
                       <input
                         type="text"
-                        className="form-control form-control-sm"
+                        className="form-control"
                         value={bulkReviewComment}
                         onChange={(e) => setBulkReviewComment(e.target.value)}
                         placeholder="Great product!"
                       />
                     </div>
-                    <div className="col-md-2">
+                    <div className="col-6 col-md-2">
                       <button
                         type="button"
-                        className="btn btn-sm btn-success w-100"
+                        className="btn btn-success w-100 py-2 fw-medium"
                         disabled={bulkAdding || !productId}
                         onClick={async () => {
                           const count = Math.min(5000, Math.max(1, parseInt(bulkReviewCount, 10) || 0));
@@ -953,7 +956,14 @@ export default function ProductEdit() {
                           }
                         }}
                       >
-                        {bulkAdding ? 'Adding...' : `Add ${bulkReviewCount || 0} reviews`}
+                        {bulkAdding ? (
+                          <>
+                            <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" />
+                            Adding…
+                          </>
+                        ) : (
+                          <>Add {bulkReviewCount || 0} reviews</>
+                        )}
                       </button>
                     </div>
                   </div>

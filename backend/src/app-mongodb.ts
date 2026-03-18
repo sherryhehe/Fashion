@@ -16,6 +16,7 @@ import brandRoutes from './routes/brandRoutes.mongodb';
 import notificationRoutes from './routes/notificationRoutes.mongodb';
 import cartRoutes from './routes/cartRoutes.mongodb';
 import orderRoutes from './routes/orderRoutes.mongodb';
+import * as orderController from './controllers/orderController.mongodb';
 import dashboardRoutes from './routes/dashboardRoutes.mongodb';
 import userRoutes from './routes/userRoutes.mongodb';
 import uploadRoutes from './routes/uploadRoutes';
@@ -25,12 +26,23 @@ import wishlistRoutes from './routes/wishlistRoutes.mongodb';
 import homeCategoryRoutes from './routes/homeCategoryRoutes.mongodb';
 import settingsRoutes from './routes/settingsRoutes.mongodb';
 
-// Load environment variables (prefer local.env if present)
+// Load environment: .env → .env.production fills any missing keys → local.env / .env.local wins
+dotenv.config(); // .env
+const prodEnvPath = path.join(__dirname, '..', '.env.production');
+if (fs.existsSync(prodEnvPath)) {
+  const parsed = dotenv.parse(fs.readFileSync(prodEnvPath, 'utf8'));
+  for (const [key, value] of Object.entries(parsed)) {
+    if (value !== undefined && value !== '' && (process.env[key] === undefined || process.env[key] === '')) {
+      process.env[key] = value;
+    }
+  }
+}
 const localEnvPath = path.join(__dirname, '..', 'local.env');
+const envLocalPath = path.join(__dirname, '..', '.env.local');
 if (fs.existsSync(localEnvPath)) {
-  dotenv.config({ path: localEnvPath });
-} else {
-  dotenv.config();
+  dotenv.config({ path: localEnvPath, override: true });
+} else if (fs.existsSync(envLocalPath)) {
+  dotenv.config({ path: envLocalPath, override: true });
 }
 
 // Create Express app
@@ -74,6 +86,13 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 }));
+
+// Stripe webhook must receive raw body for signature verification (register before express.json)
+app.post(
+  '/api/orders/stripe-webhook',
+  express.raw({ type: 'application/json' }),
+  orderController.stripeWebhook
+);
 
 // Body parsing middleware with increased limits for file uploads
 // Note: For multipart/form-data (file uploads), these limits don't apply
