@@ -3,14 +3,18 @@
 import Layout from '@/components/layout/Layout';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { usePaymentSettings, useUpdatePaymentSettings } from '@/hooks/useApi';
+import { useChangePassword, usePaymentSettings, useUpdatePaymentSettings } from '@/hooks/useApi';
 import { useNotificationContext } from '@/contexts/NotificationContext';
 
 export default function Settings() {
   const { data: paymentData, isLoading: paymentLoading } = usePaymentSettings();
   const updatePayment = useUpdatePaymentSettings();
+  const changePassword = useChangePassword();
   const { addNotification } = useNotificationContext();
   const [paymentCurrency, setPaymentCurrency] = useState<string>('pkr');
+  const [currentPassword, setCurrentPassword] = useState<string>('');
+  const [newPassword, setNewPassword] = useState<string>('');
+  const [confirmPassword, setConfirmPassword] = useState<string>('');
 
   useEffect(() => {
     if (paymentData?.currency) setPaymentCurrency(paymentData.currency);
@@ -23,6 +27,35 @@ export default function Settings() {
       addNotification('success', 'Payment settings saved');
     } catch (err: any) {
       addNotification('error', err?.message || 'Failed to save');
+    }
+  };
+
+  const handlePasswordSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      addNotification('error', 'Please fill in all password fields');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      addNotification('error', 'New password must be at least 6 characters');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      addNotification('error', 'New password and confirm password do not match');
+      return;
+    }
+
+    try {
+      await changePassword.mutateAsync({ currentPassword, newPassword });
+      addNotification('success', 'Admin password changed successfully');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err: any) {
+      addNotification('error', err?.message || 'Failed to change password');
     }
   };
   return (
@@ -84,49 +117,41 @@ export default function Settings() {
             <div className="card">
               <div className="card-body">
                 <h4 className="card-title">Security Settings</h4>
-                <form>
+                <form onSubmit={handlePasswordSave}>
                   <div className="mb-3">
-                    <label className="form-label">Password Policy</label>
-                    <select className="form-select">
-                      <option>Strong (8+ chars, numbers, symbols)</option>
-                      <option>Medium (6+ chars, numbers)</option>
-                      <option>Basic (4+ chars)</option>
-                    </select>
+                    <label className="form-label">Current Password</label>
+                    <input
+                      type="password"
+                      className="form-control"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      autoComplete="current-password"
+                    />
                   </div>
                   <div className="mb-3">
-                    <label className="form-label">Session Timeout</label>
-                    <select className="form-select">
-                      <option>15 minutes</option>
-                      <option>30 minutes</option>
-                      <option>1 hour</option>
-                      <option>2 hours</option>
-                    </select>
+                    <label className="form-label">New Password</label>
+                    <input
+                      type="password"
+                      className="form-control"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      autoComplete="new-password"
+                    />
+                    <small className="text-muted">Minimum 6 characters.</small>
                   </div>
                   <div className="mb-3">
-                    <div className="form-check">
-                      <input className="form-check-input" type="checkbox" id="twofa" defaultChecked />
-                      <label className="form-check-label" htmlFor="twofa">
-                        Two-Factor Authentication
-                      </label>
-                    </div>
+                    <label className="form-label">Confirm New Password</label>
+                    <input
+                      type="password"
+                      className="form-control"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      autoComplete="new-password"
+                    />
                   </div>
-                  <div className="mb-3">
-                    <div className="form-check">
-                      <input className="form-check-input" type="checkbox" id="loginattempts" defaultChecked />
-                      <label className="form-check-label" htmlFor="loginattempts">
-                        Limit Login Attempts
-                      </label>
-                    </div>
-                  </div>
-                  <div className="mb-3">
-                    <div className="form-check">
-                      <input className="form-check-input" type="checkbox" id="ipwhitelist" />
-                      <label className="form-check-label" htmlFor="ipwhitelist">
-                        IP Whitelist
-                      </label>
-                    </div>
-                  </div>
-                  <button type="submit" className="btn btn-primary">Save Changes</button>
+                  <button type="submit" className="btn btn-primary" disabled={changePassword.isPending}>
+                    {changePassword.isPending ? 'Updating...' : 'Change password'}
+                  </button>
                 </form>
               </div>
             </div>

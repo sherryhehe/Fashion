@@ -11,11 +11,12 @@ if (fs.existsSync(localEnvPath)) {
   dotenv.config();
 }
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/larkon_fashion';
+const MONGODB_URI = 'mongodb+srv://shopo_admin:G4LSU5NPc12XvLPy@cluster0.zikm9az.mongodb.net/larkon_fashion?retryWrites=true&w=majority&appName=Cluster0';
 
 export const connectMongoDB = async (): Promise<void> => {
   try {
     console.log('🔄 Connecting to MongoDB...');
+    console.log(MONGODB_URI);
     
     await mongoose.connect(MONGODB_URI);
     
