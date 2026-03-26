@@ -295,6 +295,13 @@ export const useUpdatePaymentSettings = () => {
   });
 };
 
+export const useChangePassword = () => {
+  return useMutation({
+    mutationFn: (data: { currentPassword: string; newPassword: string }) =>
+      apiRequest('/auth/change-password', { method: 'PUT', body: JSON.stringify(data) }),
+  });
+};
+
 // =====================================================
 // DASHBOARD
 // =====================================================
