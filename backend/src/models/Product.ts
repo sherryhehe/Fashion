@@ -194,7 +194,6 @@ ProductSchema.index({ category: 1 });
 ProductSchema.index({ status: 1 });
 ProductSchema.index({ featured: 1 });
 ProductSchema.index({ promoted: 1 });
-ProductSchema.index({ sku: 1 });
 
 export default mongoose.model<IProduct>('Product', ProductSchema);
 

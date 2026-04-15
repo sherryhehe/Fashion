@@ -63,7 +63,6 @@ const CategorySchema = new Schema<ICategory>(
 );
 
 // Index for faster queries
-CategorySchema.index({ name: 1 });
 CategorySchema.index({ status: 1 });
 
 export default mongoose.model<ICategory>('Category', CategorySchema);

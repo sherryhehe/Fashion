@@ -61,7 +61,6 @@ const StyleSchema = new Schema<IStyle>(
 );
 
 // Create indexes
-StyleSchema.index({ slug: 1 });
 StyleSchema.index({ status: 1 });
 StyleSchema.index({ featured: 1 });
 

@@ -173,8 +173,6 @@ const BrandSchema = new Schema<IBrand>(
 );
 
 // Create indexes
-BrandSchema.index({ slug: 1 });
-BrandSchema.index({ email: 1 });
 BrandSchema.index({ status: 1 });
 BrandSchema.index({ featured: 1 });
 BrandSchema.index({ verified: 1 });
