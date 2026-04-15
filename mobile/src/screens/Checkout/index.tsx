@@ -20,12 +20,11 @@ import { MERCHANT_DISPLAY_NAME } from '../../config/stripe';
 // API Hooks
 import { useCart, useRemoveFromCart } from '../../hooks/useCart';
 import { useCreateOrder, useConfirmOrderPayment } from '../../hooks/useOrders';
+import { useShippingSettings } from '../../hooks/useShippingSettings';
 import authService from '../../services/auth.service';
 import brandService from '../../services/brand.service';
 import { showToast } from '../../utils/toast';
 
-// Platform fee: 100 PKR on every order (matches backend)
-const PLATFORM_FEE_PKR = 100;
 // Card transaction fee: 5% when payment method is card
 const CARD_FEE_PERCENT = 0.05;
 import { requireAuthOrPromptLogin } from '../../utils/guestHelper';
@@ -48,11 +47,13 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
   const [address, setAddress] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [saveInfoChecked, setSaveInfoChecked] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'cod'>('card');
-  const [allowedPaymentMethods, setAllowedPaymentMethods] = useState<string[]>(['card', 'cash']);
+  const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'cod'>('stripe');
+  const [allowedPaymentMethods, setAllowedPaymentMethods] = useState<string[]>(['stripe', 'cash']);
 
   // Fetch cart and user profile
   const { data: cartData, isLoading: cartLoading } = useCart();
+  const { data: shippingSettings } = useShippingSettings();
+  const shippingFeePkr = shippingSettings?.shippingCost ?? 0;
   const createOrderMutation = useCreateOrder();
   const confirmPaymentMutation = useConfirmOrderPayment();
   const removeFromCartMutation = useRemoveFromCart();
@@ -61,31 +62,51 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
 
   const cartItems = cartData?.data || [];
 
-  // Fetch allowed payment methods based on brands in cart (card/cash; COD = cash)
+  // Fetch allowed payment methods based on brands in cart (stripe/card/cash; COD = cash)
   const cartBrandNames = [...new Set(
     cartItems.map((item: any) => item?.product?.brand || item?.brand).filter(Boolean)
   )].sort().join(',');
+
+  const normalizeAllowedMethods = (methods: string[] | undefined): string[] => {
+    if (!Array.isArray(methods) || methods.length === 0) {
+      return ['stripe', 'cash'];
+    }
+
+    const normalized = methods
+      .map((method) => {
+        const normalizedMethod = String(method).toLowerCase();
+        if (normalizedMethod === 'card' || normalizedMethod === 'stripe') return 'stripe';
+        if (normalizedMethod === 'cash') return 'cash';
+        return null;
+      })
+      .filter((method): method is string => Boolean(method));
+
+    const deduped = normalized.length > 0 ? Array.from(new Set(normalized)) : ['stripe', 'cash'];
+    // Keep Stripe available for checkout testing even if a brand is cash-only.
+    return Array.from(new Set(['stripe', ...deduped]));
+  };
+
   useEffect(() => {
     const brandNames = cartBrandNames ? cartBrandNames.split(',') : [];
     if (brandNames.length === 0) {
-      setAllowedPaymentMethods(['card', 'cash']);
+      setAllowedPaymentMethods(['stripe', 'cash']);
       return;
     }
     let cancelled = false;
     brandService.getAllowedPaymentMethods(brandNames).then(({ allowedPaymentMethods: allowed }) => {
-      if (!cancelled) setAllowedPaymentMethods(allowed);
+      if (!cancelled) setAllowedPaymentMethods(normalizeAllowedMethods(allowed));
     }).catch(() => {
-      if (!cancelled) setAllowedPaymentMethods(['card', 'cash']);
+      if (!cancelled) setAllowedPaymentMethods(['stripe', 'cash']);
     });
     return () => { cancelled = true; };
   }, [cartBrandNames]);
 
   // Default payment to first allowed if current is not allowed
   useEffect(() => {
-    const allowCard = allowedPaymentMethods.includes('card');
+    const allowStripe = allowedPaymentMethods.includes('stripe');
     const allowCash = allowedPaymentMethods.includes('cash');
-    if (paymentMethod === 'card' && !allowCard && allowCash) setPaymentMethod('cod');
-    if (paymentMethod === 'cod' && !allowCash && allowCard) setPaymentMethod('card');
+    if (paymentMethod === 'stripe' && !allowStripe && allowCash) setPaymentMethod('cod');
+    if (paymentMethod === 'cod' && !allowCash && allowStripe) setPaymentMethod('stripe');
   }, [allowedPaymentMethods]);
 
   // Load user profile data
@@ -189,11 +210,11 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
         };
       });
 
-    // Calculate totals - match backend: subtotal + 100 PKR + 5% if card
+    // Calculate totals - match backend: subtotal + shipping + 5% if card
     const subtotal = orderItems.reduce((sum: number, item: any) => sum + item.total, 0);
-    const isCard = (paymentMethod || '').toLowerCase() === 'card';
+    const isCard = (paymentMethod || '').toLowerCase() === 'stripe';
     const cardFee = isCard ? Math.round(subtotal * CARD_FEE_PERCENT) : 0;
-    const total = subtotal + PLATFORM_FEE_PKR + cardFee;
+    const total = subtotal + shippingFeePkr + cardFee;
 
     // Prepare shipping address
     const shippingAddress = {
@@ -210,7 +231,7 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
       const response = await createOrderMutation.mutateAsync({
         items: orderItems,
         shippingAddress,
-        paymentMethod: paymentMethod === 'cod' ? 'cash' : paymentMethod,
+        paymentMethod: paymentMethod === 'cod' ? 'cash' : 'stripe',
         notes: saveInfoChecked ? 'Save information for next time' : undefined,
       });
 
@@ -226,7 +247,7 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
       }
 
       // Card payment: show Stripe Payment Sheet
-      if (clientSecret && paymentMethod === 'card') {
+      if (clientSecret && paymentMethod === 'stripe') {
         setIsPaymentSheetOpen(true);
         try {
           const { error: initError } = await initPaymentSheet({
@@ -450,21 +471,21 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Payment Method</Text>
           <View style={[styles.formWrapper,styles.paymentMethodWrapper]} >
-          {allowedPaymentMethods.includes('card') && (
+          {allowedPaymentMethods.includes('stripe') && (
             <TouchableOpacity 
               style={styles.paymentOption}
-              onPress={() => setPaymentMethod('card')}
+              onPress={() => setPaymentMethod('stripe')}
             >
               <View style={styles.paymentOptionLeft}>
-                {renderRadioButton(paymentMethod === 'card')}
-                <Text style={styles.paymentOptionText}>Debit- Credit Card</Text>
+                {renderRadioButton(paymentMethod === 'stripe')}
+                <Text style={styles.paymentOptionText}>Stripe (Card)</Text>
               </View>
               <View style={styles.mastercardLogo}>
-                <Text style={styles.mastercardText}>MC</Text>
+                <Text style={styles.mastercardText}>STRIPE</Text>
               </View>
             </TouchableOpacity>
           )}
-          {allowedPaymentMethods.includes('card') && allowedPaymentMethods.includes('cash') && <View style={styles.lineSeparator} />}
+          {allowedPaymentMethods.includes('stripe') && allowedPaymentMethods.includes('cash') && <View style={styles.lineSeparator} />}
           {allowedPaymentMethods.includes('cash') && (
             <TouchableOpacity 
               style={styles.paymentOption}
@@ -486,9 +507,9 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
             const price = item.productPrice ?? (p?.price ?? 0);
             return sum + price * (item.quantity || 0);
           }, 0));
-          const isCard = (paymentMethod || '').toLowerCase() === 'card';
+          const isCard = (paymentMethod || '').toLowerCase() === 'stripe';
           const cardFeeSum = isCard ? Math.round(subtotalSum * CARD_FEE_PERCENT) : 0;
-          const totalSum = subtotalSum + PLATFORM_FEE_PKR + cardFeeSum;
+          const totalSum = subtotalSum + shippingFeePkr + cardFeeSum;
           return (
             <View style={styles.orderSummarySection}>
               <Text style={styles.sectionTitle}>Order Summary</Text>
@@ -497,9 +518,16 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
                 <Text style={styles.summaryValue}>PKR {subtotalSum.toLocaleString()}</Text>
               </View>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Platform fee</Text>
-                <Text style={styles.summaryValue}>PKR {PLATFORM_FEE_PKR.toLocaleString()}</Text>
+                <Text style={styles.summaryLabel}>Shipping</Text>
+                <Text style={styles.summaryValue}>
+                  {shippingFeePkr > 0 ? `PKR ${shippingFeePkr.toLocaleString()}` : 'Free'}
+                </Text>
               </View>
+              {shippingSettings?.estimatedDelivery ? (
+                <Text style={styles.shippingEta}>
+                  Est. delivery: {shippingSettings.estimatedDelivery}
+                </Text>
+              ) : null}
               {isCard && cardFeeSum > 0 && (
                 <View style={styles.summaryRow}>
                   <Text style={styles.summaryLabel}>Card fee (5%)</Text>
@@ -524,7 +552,7 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
             <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
             <Text style={styles.submitButtonText}>
-              {paymentMethod === 'card' ? 'Place order & pay' : 'Submit order'}
+              {paymentMethod === 'stripe' ? 'Place order & pay' : 'Submit order'}
             </Text>
           )}
         </TouchableOpacity>
@@ -746,7 +774,7 @@ borderColor: '#E8ECF4',
   },
   mastercardText: {
     color: '#FFFFFF',
-    fontSize: 10,
+    fontSize: 8,
     fontWeight: 'bold',
   },
   lineSeparator:{
@@ -808,6 +836,7 @@ borderColor: '#E8ECF4',
   },
   summaryLabel: { fontSize: 15, color: '#2C2C2E' },
   summaryValue: { fontSize: 15, color: '#2C2C2E' },
+  shippingEta: { fontSize: 12, color: '#8E8E93', marginBottom: 8 },
   summaryTotalRow: { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#E5E5E7' },
   summaryTotalLabel: { fontSize: 17, fontWeight: 'bold', color: '#2C2C2E' },
   summaryTotalValue: { fontSize: 17, fontWeight: 'bold', color: '#2C2C2E' },

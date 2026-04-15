@@ -33,6 +33,9 @@ export default function ProductAdd() {
     originalPrice: '',
     discount: '',
     stock: '',
+    shippingFees: '0',
+    shippingTime: '',
+    notes: '',
     description: '',
     notes: '',
     features: '',
@@ -248,6 +251,20 @@ export default function ProductAdd() {
       // Clean up variations
       const variationsArray = variations.map(({ id, ...rest }) => rest);
 
+      const shippingFees = parseFloat(formData.shippingFees || '0');
+      if (Number.isNaN(shippingFees) || shippingFees < 0) {
+        alert('Shipping fees must be a non-negative number');
+        return;
+      }
+      if (formData.shippingTime.length > 120) {
+        alert('Shipping time must be at most 120 characters');
+        return;
+      }
+      if (formData.notes.length > 1000) {
+        alert('Notes must be at most 1000 characters');
+        return;
+      }
+
       const featuresArray = formData.features.split('\n').filter(f => f.trim());
       const tagsArray = formData.tags.split(',').map(t => t.trim()).filter(t => t);
 
@@ -263,6 +280,9 @@ export default function ProductAdd() {
         category: formData.category,
         brand: formData.brand || undefined,
         stock: parseInt(formData.stock),
+        shippingFees,
+        shippingTime: formData.shippingTime.trim(),
+        notes: formData.notes.trim(),
         status: formData.status,
         featured: false,
         images: imageUrls,
@@ -552,6 +572,35 @@ export default function ProductAdd() {
                       />
                     </div>
                     <div className="col-md-6 mb-3">
+                      <label htmlFor="shippingFees" className="form-label">Shipping Fees</label>
+                      <input
+                        type="number"
+                        className="form-control"
+                        id="shippingFees"
+                        name="shippingFees"
+                        placeholder="0.00"
+                        step="0.01"
+                        min="0"
+                        value={formData.shippingFees}
+                        onChange={handleChange}
+                      />
+                      <small className="text-muted">Defaults to 0 if left empty</small>
+                    </div>
+                    <div className="col-12 mb-3">
+                      <label htmlFor="shippingTime" className="form-label">Shipping Time</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        id="shippingTime"
+                        name="shippingTime"
+                        placeholder="e.g. 3-5 business days"
+                        maxLength={120}
+                        value={formData.shippingTime}
+                        onChange={handleChange}
+                      />
+                      <small className="text-muted">{formData.shippingTime.length}/120 characters</small>
+                    </div>
+                    <div className="col-md-6 mb-3">
                       <label htmlFor="status" className="form-label">Status</label>
                       <select 
                         className="form-select" 
@@ -602,6 +651,20 @@ export default function ProductAdd() {
                         onChange={handleChange}
                       ></textarea>
                       <small className="text-muted">One feature per line</small>
+                    </div>
+                    <div className="col-12 mb-3">
+                      <label htmlFor="notes" className="form-label">Notes</label>
+                      <textarea
+                        className="form-control"
+                        id="notes"
+                        name="notes"
+                        rows={4}
+                        placeholder="Internal or customer-visible notes"
+                        maxLength={1000}
+                        value={formData.notes}
+                        onChange={handleChange}
+                      ></textarea>
+                      <small className="text-muted">{formData.notes.length}/1000 characters</small>
                     </div>
 
                     <div className="col-md-6 mb-3">
@@ -796,11 +859,19 @@ export default function ProductAdd() {
                         productName: '',
                         productSku: '',
                         category: '',
+                        brand: '',
                         style: '',
                         price: '',
+                        originalPrice: '',
+                        discount: '',
                         stock: '',
+                        shippingFees: '0',
+                        shippingTime: '',
+                        notes: '',
                         description: '',
-                        isActive: true,
+                        features: '',
+                        tags: '',
+                        status: 'active',
                       });
                     }}>
                       <i className="bx bx-reset me-1"></i>Reset Form

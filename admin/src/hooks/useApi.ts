@@ -295,6 +295,21 @@ export const useUpdatePaymentSettings = () => {
   });
 };
 
+export const useShippingSettings = () => {
+  return useQuery({
+    queryKey: ['settings', 'shipping'],
+    queryFn: () => apiRequest('/settings/shipping'),
+  });
+};
+
+export const useUpdateShippingSettings = () => {
+  return useMutation({
+    mutationFn: (data: { shippingCost?: number; estimatedDelivery?: string }) =>
+      apiRequest('/settings/shipping', { method: 'PATCH', body: JSON.stringify(data) }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['settings', 'shipping'] }),
+  });
+};
+
 export const useChangePassword = () => {
   return useMutation({
     mutationFn: (data: { currentPassword: string; newPassword: string }) =>

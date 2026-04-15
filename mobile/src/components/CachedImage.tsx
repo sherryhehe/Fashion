@@ -1,29 +1,36 @@
 /**
  * CachedImage Component
- * Wraps react-native-fast-image with fallback to React Native Image
- * Provides automatic caching for faster image loading with placeholder support
+ *
+ * Thin wrapper around React Native's built-in <Image> that adds:
+ *   - a placeholder / loading indicator while the image is resolving
+ *   - graceful fallback on error
+ *
+ * Previously this wrapped `react-native-fast-image`, which is incompatible
+ * with the New Architecture (Fabric) on RN 0.81 — its view manager props
+ * don't wire up, so images render as blank boxes. React Native's built-in
+ * Image component uses Fresco on Android and NSURLCache on iOS, so disk
+ * caching still works out of the box.
  */
 
 import React, { useState } from 'react';
-import { Image, ImageProps, StyleProp, ImageStyle, View, ActivityIndicator } from 'react-native';
-
-// Try to import FastImage, fallback gracefully if not available
-let FastImage: any = null;
-let FastImageAvailable = false;
-
-try {
-  FastImage = require('react-native-fast-image').default;
-  FastImageAvailable = true;
-} catch (error) {
-  // FastImage not available - will use regular Image component with cache props
-}
+import {
+  ActivityIndicator,
+  Image,
+  ImageProps,
+  ImageStyle,
+  StyleProp,
+  View,
+} from 'react-native';
 
 interface CachedImageProps extends Omit<ImageProps, 'source'> {
   source: ImageProps['source'] | { uri: string };
   style?: StyleProp<ImageStyle>;
   resizeMode?: 'contain' | 'cover' | 'stretch' | 'center';
+  /** Kept for API compatibility with previous FastImage-based version. */
   priority?: 'low' | 'normal' | 'high';
+  /** Kept for API compatibility with previous FastImage-based version. */
   cache?: 'immutable' | 'web' | 'cacheOnly';
+  /** Kept for API compatibility; always falls back gracefully on error now. */
   fallback?: boolean;
   placeholder?: ImageProps['source'];
   showLoadingIndicator?: boolean;
@@ -34,18 +41,21 @@ const CachedImage: React.FC<CachedImageProps> = ({
   source,
   style,
   resizeMode = 'cover',
-  priority = 'normal',
-  cache = 'immutable',
-  fallback = true,
   placeholder,
   showLoadingIndicator = true,
   loadingIndicatorColor = '#E0E0E0',
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  priority: _priority,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  cache: _cache,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  fallback: _fallback,
   ...props
 }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
 
-  // Handle local images (require statements) - use regular Image
+  // Local images (require(...)) — render directly, no loading state needed.
   if (typeof source === 'number') {
     return (
       <Image
@@ -57,10 +67,9 @@ const CachedImage: React.FC<CachedImageProps> = ({
     );
   }
 
-  // Handle URI sources - use FastImage for caching if available
   const imageSource = source as { uri?: string };
-  
-  // Check if it's a local image object without URI
+
+  // Local image object without a URI — pass through.
   if (!imageSource?.uri) {
     return (
       <Image
@@ -72,106 +81,25 @@ const CachedImage: React.FC<CachedImageProps> = ({
     );
   }
 
-  // Use FastImage for remote images with caching if available
-  if (FastImageAvailable && FastImage) {
-    try {
-      // Map priority string to FastImage priority enum
-      const fastImagePriority = 
-        priority === 'high' ? FastImage.priority.high :
-        priority === 'low' ? FastImage.priority.low :
-        FastImage.priority.normal;
-
-      // Map cache string to FastImage cache control enum
-      const fastImageCache = 
-        cache === 'web' ? FastImage.cacheControl.web :
-        cache === 'cacheOnly' ? FastImage.cacheControl.cacheOnly :
-        FastImage.cacheControl.immutable;
-
-      const fastImageSource = {
-        uri: imageSource.uri,
-        priority: fastImagePriority,
-        cache: fastImageCache,
-      };
-
-      return (
-        <View style={[{ position: 'relative' }, style]}>
-          {isLoading && (placeholder || showLoadingIndicator) && (
-            <View style={[
-              { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: loadingIndicatorColor },
-              style
-            ]}>
-              {placeholder ? (
-                <Image
-                  source={placeholder}
-                  style={style}
-                  resizeMode={resizeMode as ImageProps['resizeMode']}
-                />
-              ) : showLoadingIndicator ? (
-                <ActivityIndicator size="small" color="#999999" />
-              ) : null}
-            </View>
-          )}
-          <FastImage
-            source={fastImageSource}
-            style={style}
-            resizeMode={resizeMode}
-            onLoadStart={() => setIsLoading(true)}
-            onLoadEnd={() => setIsLoading(false)}
-            onError={(error) => {
-              setIsLoading(false);
-              setHasError(true);
-            }}
-            {...props}
-          />
-        </View>
-      );
-    } catch (error) {
-      // Fallback to regular Image if FastImage fails
-      if (fallback) {
-        return (
-          <View style={[{ position: 'relative' }, style]}>
-            {isLoading && (placeholder || showLoadingIndicator) && (
-              <View style={[
-                { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: loadingIndicatorColor },
-                style
-              ]}>
-                {placeholder ? (
-                  <Image
-                    source={placeholder}
-                    style={style}
-                    resizeMode={resizeMode as ImageProps['resizeMode']}
-                  />
-                ) : showLoadingIndicator ? (
-                  <ActivityIndicator size="small" color="#999999" />
-                ) : null}
-              </View>
-            )}
-            <Image
-              source={source as ImageProps['source']}
-              style={style}
-              resizeMode={resizeMode as ImageProps['resizeMode']}
-              onLoadStart={() => setIsLoading(true)}
-              onLoadEnd={() => setIsLoading(false)}
-              onError={(error) => {
-                setIsLoading(false);
-                setHasError(true);
-              }}
-              {...props}
-            />
-          </View>
-        );
-      }
-    }
-  }
-
-  // Fallback to regular Image component with cache props (iOS only)
+  // Remote image — show placeholder/spinner over it until it loads.
   return (
     <View style={[{ position: 'relative' }, style]}>
-      {isLoading && (placeholder || showLoadingIndicator) && (
-        <View style={[
-          { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: loadingIndicatorColor },
-          style
-        ]}>
+      {isLoading && !hasError && (placeholder || showLoadingIndicator) && (
+        <View
+          style={[
+            {
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              justifyContent: 'center',
+              alignItems: 'center',
+              backgroundColor: loadingIndicatorColor,
+            },
+            style,
+          ]}
+        >
           {placeholder ? (
             <Image
               source={placeholder}
@@ -184,7 +112,7 @@ const CachedImage: React.FC<CachedImageProps> = ({
         </View>
       )}
       <Image
-        source={source as ImageProps['source']}
+        source={{ uri: imageSource.uri }}
         style={style}
         resizeMode={resizeMode as ImageProps['resizeMode']}
         onLoadStart={() => setIsLoading(true)}
@@ -193,8 +121,6 @@ const CachedImage: React.FC<CachedImageProps> = ({
           setIsLoading(false);
           setHasError(true);
         }}
-        // iOS cache props
-        {...(typeof source === 'object' && source?.uri && { cache: 'force-cache' } as any)}
         {...props}
       />
     </View>

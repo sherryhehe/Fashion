@@ -1,7 +1,12 @@
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import Setting from '../models/Setting';
 import { successResponse, errorResponse } from '../utils/responseHelper';
 import { AuthRequest } from '../middleware/auth';
+import {
+  getShippingSettingsResolved,
+  SHIPPING_COST_KEY,
+  SHIPPING_TIME_KEY,
+} from '../utils/shippingSettings';
 
 const PAYMENT_CURRENCY_KEY = 'payment_currency';
 
@@ -48,5 +53,56 @@ export const updatePaymentSettings = async (req: AuthRequest, res: Response): Pr
   } catch (error) {
     console.error('Update payment settings error:', error);
     errorResponse(res, 'Failed to update payment settings', 500);
+  }
+};
+
+/**
+ * GET /api/settings/shipping — Public (mobile + admin) read for delivery fee and ETA copy.
+ */
+export const getShippingSettings = async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const settings = await getShippingSettingsResolved();
+    successResponse(res, settings);
+  } catch (error) {
+    console.error('Get shipping settings error:', error);
+    errorResponse(res, 'Failed to get shipping settings', 500);
+  }
+};
+
+/**
+ * PATCH /api/settings/shipping — Admin only
+ * Body: { shippingCost?: number, estimatedDelivery?: string }
+ */
+export const updateShippingSettings = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { shippingCost, estimatedDelivery } = req.body || {};
+
+    if (shippingCost !== undefined) {
+      const n = typeof shippingCost === 'number' ? shippingCost : Number(shippingCost);
+      if (!Number.isFinite(n) || n < 0 || n > 1_000_000_000) {
+        errorResponse(res, 'shippingCost must be a number between 0 and 1e9', 400);
+        return;
+      }
+      await Setting.findOneAndUpdate(
+        { key: SHIPPING_COST_KEY },
+        { $set: { value: Math.round(n) } },
+        { upsert: true, new: true }
+      );
+    }
+
+    if (estimatedDelivery !== undefined) {
+      const text = String(estimatedDelivery).trim().slice(0, 200);
+      await Setting.findOneAndUpdate(
+        { key: SHIPPING_TIME_KEY },
+        { $set: { value: text } },
+        { upsert: true, new: true }
+      );
+    }
+
+    const settings = await getShippingSettingsResolved();
+    successResponse(res, settings, 'Shipping settings updated');
+  } catch (error) {
+    console.error('Update shipping settings error:', error);
+    errorResponse(res, 'Failed to update shipping settings', 500);
   }
 };

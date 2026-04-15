@@ -39,6 +39,9 @@ export default function ProductEdit() {
     originalPrice: '',
     discount: '',
     inventory: '',
+    shippingFees: '0',
+    shippingTime: '',
+    notes: '',
     productImages: '',
     description: '',
     notes: '',
@@ -119,6 +122,9 @@ export default function ProductEdit() {
         originalPrice: product.originalPrice?.toString() || '',
         discount: product.discount?.toString() || '',
         inventory: product.stock?.toString() || '',
+        shippingFees: (product.shippingFees ?? 0).toString(),
+        shippingTime: product.shippingTime || '',
+        notes: product.notes || '',
         productImages: product.images?.join(', ') || '',
         description: product.description || '',
         notes: product.notes || '',
@@ -319,6 +325,19 @@ export default function ProductEdit() {
       }
 
       const featuresArray = formData.features.split('\n').filter(f => f.trim());
+      const shippingFees = parseFloat(formData.shippingFees || '0');
+      if (Number.isNaN(shippingFees) || shippingFees < 0) {
+        alert('Shipping fees must be a non-negative number');
+        return;
+      }
+      if (formData.shippingTime.length > 120) {
+        alert('Shipping time must be at most 120 characters');
+        return;
+      }
+      if (formData.notes.length > 1000) {
+        alert('Notes must be at most 1000 characters');
+        return;
+      }
       const avgRating = reviews.length > 0 
         ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length 
         : 0;
@@ -335,6 +354,9 @@ export default function ProductEdit() {
         category: formData.category,
         brand: formData.brand || undefined,
         stock: parseInt(formData.inventory),
+        shippingFees,
+        shippingTime: formData.shippingTime.trim(),
+        notes: formData.notes.trim(),
         status: formData.status as 'active' | 'inactive' | 'draft',
         style: formData.style,
         features: featuresArray,
@@ -699,6 +721,33 @@ export default function ProductEdit() {
                       </div>
                       <small className="text-muted">Set to 0 to show as out of stock to customers.</small>
                     </div>
+                    <div className="col-md-6 mb-3">
+                      <label htmlFor="shippingFees" className="form-label">Shipping Fees</label>
+                      <input
+                        type="number"
+                        className="form-control"
+                        id="shippingFees"
+                        name="shippingFees"
+                        value={formData.shippingFees}
+                        onChange={handleChange}
+                        step="0.01"
+                        min="0"
+                      />
+                    </div>
+                    <div className="col-12 mb-3">
+                      <label htmlFor="shippingTime" className="form-label">Shipping Time</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        id="shippingTime"
+                        name="shippingTime"
+                        value={formData.shippingTime}
+                        onChange={handleChange}
+                        maxLength={120}
+                        placeholder="e.g. 3-5 business days"
+                      />
+                      <small className="text-muted">{formData.shippingTime.length}/120 characters</small>
+                    </div>
                     <div className="col-12 mb-3">
                       <label htmlFor="description" className="form-label">Description</label>
                       <textarea 
@@ -733,6 +782,20 @@ export default function ProductEdit() {
                         onChange={handleChange}
                         placeholder="Feature 1&#10;Feature 2&#10;Feature 3"
                       ></textarea>
+                    </div>
+                    <div className="col-12 mb-3">
+                      <label htmlFor="notes" className="form-label">Notes</label>
+                      <textarea
+                        className="form-control"
+                        id="notes"
+                        name="notes"
+                        rows={4}
+                        value={formData.notes}
+                        onChange={handleChange}
+                        maxLength={1000}
+                        placeholder="Internal or customer-visible notes"
+                      ></textarea>
+                      <small className="text-muted">{formData.notes.length}/1000 characters</small>
                     </div>
                   </div>
                   <div className="d-flex gap-2">

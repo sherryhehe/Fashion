@@ -212,6 +212,9 @@ export interface ProductFormData {
   weight?: number;
   dimensions?: string;
   features: string[];
+  shippingFees?: number;
+  shippingTime?: string;
+  notes?: string;
   specifications: Record<string, string>;
   status: 'active' | 'inactive' | 'draft';
   visibility: 'visible' | 'hidden';

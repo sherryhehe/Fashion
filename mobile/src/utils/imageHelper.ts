@@ -3,6 +3,8 @@
  * Converts backend image paths to full URLs with caching support
  */
 
+import { Image } from 'react-native';
+
 // Import centralized API configuration
 import { IMAGE_BASE_URL } from '../config/apiConfig';
 
@@ -72,20 +74,17 @@ export const getFirstImageSource = (images?: string[] | null, fallback?: any) =>
 };
 
 /**
- * Preloads images for faster display
+ * Preloads images for faster display.
+ * Uses React Native's built-in Image.prefetch (Fresco on Android, NSURLCache on iOS).
  * @param imageUrls - Array of image URLs to preload
  */
 export const preloadImages = async (imageUrls: string[]) => {
   try {
-    const FastImage = require('react-native-fast-image').default;
     const validUrls = imageUrls.filter(url => url && typeof url === 'string');
-    
-    if (validUrls.length > 0) {
-      const sources = validUrls.map(uri => ({ uri }));
-      await FastImage.preload(sources);
-    }
+    if (validUrls.length === 0) return;
+    await Promise.all(validUrls.map(uri => Image.prefetch(uri)));
   } catch (error) {
-    // Silently fail if FastImage is not available
+    // Silently fail — prefetching is best-effort.
   }
 };
 

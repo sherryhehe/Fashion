@@ -14,7 +14,8 @@ if (fs.existsSync(localEnvPath)) {
   dotenv.config();
 }
 
-const PORT = process.env.PORT || 5000;
+// Default 5001 avoids macOS AirPlay Receiver binding to :5000 (EADDRINUSE).
+const PORT = process.env.PORT || 5001;
 
 // Initialize database with default admin user if needed
 const initializeDatabase = async () => {

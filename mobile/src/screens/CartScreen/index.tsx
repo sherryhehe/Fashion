@@ -17,11 +17,9 @@ import { styles } from './styles';
 import { icons } from '../../assets/icons';
 import { getFirstImageSource } from '../../utils/imageHelper';
 
-// Platform fee: 100 PKR on every order (matches backend)
-const PLATFORM_FEE = 100;
-
 // API Hooks
 import { useCart, useUpdateCartItem, useRemoveFromCart } from '../../hooks/useCart';
+import { useShippingSettings } from '../../hooks/useShippingSettings';
 
 interface CartItem {
   id: string;
@@ -45,6 +43,7 @@ const CartScreen: React.FC<CartScreenProps> = ({ navigation }) => {
 
   // Fetch cart from API (only runs if authenticated)
   const { data: cartData, isLoading: cartLoading, error: cartError } = useCart();
+  const { data: shippingSettings } = useShippingSettings();
   const updateCartItemMutation = useUpdateCartItem();
   const removeFromCartMutation = useRemoveFromCart();
 
@@ -94,6 +93,8 @@ const CartScreen: React.FC<CartScreenProps> = ({ navigation }) => {
   // Calculate totals using product prices from API
   // Memoize to prevent recalculation on every render
   // Only include items with valid product data and prices
+  const shippingFee = shippingSettings?.shippingCost ?? 0;
+
   const { subtotal, deliveryFee, total } = useMemo(() => {
     // Filter items that have valid prices and quantities > 0
     const validItems = cartItems.filter((item: any) => {
@@ -112,16 +113,14 @@ const CartScreen: React.FC<CartScreenProps> = ({ navigation }) => {
       return sum;
     }, 0);
     
-    // Platform fee: 100 PKR on every order (matches backend)
-    // Calculate total
-    const calculatedTotal = calculatedSubtotal + PLATFORM_FEE;
-    
+    const calculatedTotal = calculatedSubtotal + shippingFee;
+
     return {
       subtotal: calculatedSubtotal,
-      deliveryFee: PLATFORM_FEE,
+      deliveryFee: shippingFee,
       total: calculatedTotal,
     };
-  }, [cartItems]);
+  }, [cartItems, shippingFee]);
 
   const updateQuantity = async (cartItemId: string, currentQuantity: number, change: number) => {
     const newQuantity = Math.max(0, currentQuantity + change);
@@ -295,9 +294,16 @@ const CartScreen: React.FC<CartScreenProps> = ({ navigation }) => {
                 <Text style={styles.summaryValue}>{subtotal.toLocaleString()} PKR</Text>
               </View>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Platform Fee</Text>
-                <Text style={styles.summaryValue}>{deliveryFee.toLocaleString()} PKR</Text>
+                <Text style={styles.summaryLabel}>Shipping</Text>
+                <Text style={styles.summaryValue}>
+                  {deliveryFee > 0 ? `${deliveryFee.toLocaleString()} PKR` : 'Free'}
+                </Text>
               </View>
+              {shippingSettings?.estimatedDelivery ? (
+                <Text style={styles.shippingEta}>
+                  Est. delivery: {shippingSettings.estimatedDelivery}
+                </Text>
+              ) : null}
               <View style={styles.separator} />
               <View style={styles.summaryRow}>
                 <Text style={styles.totalLabel}>Total Cost</Text>

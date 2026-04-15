@@ -3,22 +3,59 @@
 import Layout from '@/components/layout/Layout';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { useChangePassword, usePaymentSettings, useUpdatePaymentSettings } from '@/hooks/useApi';
+import {
+  useChangePassword,
+  usePaymentSettings,
+  useUpdatePaymentSettings,
+  useShippingSettings,
+  useUpdateShippingSettings,
+} from '@/hooks/useApi';
 import { useNotificationContext } from '@/contexts/NotificationContext';
 
 export default function Settings() {
   const { data: paymentData, isLoading: paymentLoading } = usePaymentSettings();
+  const { data: shippingData, isLoading: shippingLoading } = useShippingSettings();
   const updatePayment = useUpdatePaymentSettings();
+  const updateShipping = useUpdateShippingSettings();
   const changePassword = useChangePassword();
   const { addNotification } = useNotificationContext();
   const [paymentCurrency, setPaymentCurrency] = useState<string>('pkr');
   const [currentPassword, setCurrentPassword] = useState<string>('');
   const [newPassword, setNewPassword] = useState<string>('');
   const [confirmPassword, setConfirmPassword] = useState<string>('');
+  const [shippingCost, setShippingCost] = useState<string>('100');
+  const [estimatedDelivery, setEstimatedDelivery] = useState<string>('');
 
   useEffect(() => {
     if (paymentData?.currency) setPaymentCurrency(paymentData.currency);
   }, [paymentData?.currency]);
+
+  useEffect(() => {
+    if (shippingData && typeof shippingData.shippingCost === 'number') {
+      setShippingCost(String(shippingData.shippingCost));
+    }
+    if (shippingData?.estimatedDelivery) {
+      setEstimatedDelivery(shippingData.estimatedDelivery);
+    }
+  }, [shippingData]);
+
+  const handleShippingSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cost = Number(shippingCost);
+    if (!Number.isFinite(cost) || cost < 0) {
+      addNotification('error', 'Shipping cost must be a valid number ≥ 0');
+      return;
+    }
+    try {
+      await updateShipping.mutateAsync({
+        shippingCost: Math.round(cost),
+        estimatedDelivery: estimatedDelivery.trim(),
+      });
+      addNotification('success', 'Shipping settings saved — values apply to new orders and the mobile app');
+    } catch (err: any) {
+      addNotification('error', err?.message || 'Failed to save');
+    }
+  };
 
   const handlePaymentSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -153,6 +190,53 @@ export default function Settings() {
                     {changePassword.isPending ? 'Updating...' : 'Change password'}
                   </button>
                 </form>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Shipping (mobile + checkout) */}
+        <div className="row">
+          <div className="col-md-6">
+            <div className="card">
+              <div className="card-body">
+                <h4 className="card-title">Shipping &amp; delivery</h4>
+                <p className="text-muted small">
+                  Sets the flat shipping charge added to every order and the estimated delivery message shown in the mobile app (cart and checkout).
+                </p>
+                {shippingLoading ? (
+                  <p className="text-muted">Loading...</p>
+                ) : (
+                  <form onSubmit={handleShippingSave}>
+                    <div className="mb-3">
+                      <label className="form-label">Shipping cost (same currency as your store)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        step={1}
+                        className="form-control"
+                        value={shippingCost}
+                        onChange={(e) => setShippingCost(e.target.value)}
+                        required
+                      />
+                      <small className="text-muted">Previously fixed at 100 PKR; now stored in the database.</small>
+                    </div>
+                    <div className="mb-3">
+                      <label className="form-label">Estimated delivery time (shown to customers)</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="e.g. 3–5 business days"
+                        value={estimatedDelivery}
+                        onChange={(e) => setEstimatedDelivery(e.target.value)}
+                        maxLength={200}
+                      />
+                    </div>
+                    <button type="submit" className="btn btn-primary" disabled={updateShipping.isPending}>
+                      {updateShipping.isPending ? 'Saving...' : 'Save shipping settings'}
+                    </button>
+                  </form>
+                )}
               </div>
             </div>
           </div>

@@ -6,7 +6,8 @@ import Brand from '../models/Brand';
 import Setting from '../models/Setting';
 import { successResponse, errorResponse } from '../utils/responseHelper';
 import { AuthRequest } from '../middleware/auth';
-import { PLATFORM_FEE_PKR, CARD_FEE_PERCENT } from '../constants/orderFees';
+import { CARD_FEE_PERCENT } from '../constants/orderFees';
+import { getShippingCostAmount } from '../utils/shippingSettings';
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const stripe = stripeSecretKey ? new Stripe(stripeSecretKey, { apiVersion: '2026-01-28.clover' }) : null;
@@ -157,7 +158,9 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
     }
 
     // Resolve payment method (normalize to lowercase for validation)
-    const selectedMethod = (paymentMethod || 'cash').toLowerCase();
+    // Accept both "card" and "stripe" as Stripe card payments.
+    const selectedMethodRaw = (paymentMethod || 'cash').toLowerCase();
+    const selectedMethod = selectedMethodRaw === 'stripe' ? 'card' : selectedMethodRaw;
     const isCardPayment = selectedMethod === 'card';
 
     // Calculate totals, validate payment method and stock
@@ -207,7 +210,7 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
 
     const tax = 0;
     const subtotalRounded = Math.round(subtotal);
-    const shippingCost = PLATFORM_FEE_PKR;
+    const shippingCost = await getShippingCostAmount();
     const transactionFee = isCardPayment ? Math.round(subtotalRounded * CARD_FEE_PERCENT) : 0;
     const total = subtotalRounded + shippingCost + transactionFee;
 
@@ -226,7 +229,7 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
       shippingCost,
       total,
       status: 'pending',
-      paymentMethod: paymentMethod || 'cash',
+      paymentMethod: selectedMethod,
       paymentStatus,
       shippingAddress,
       notes,

@@ -76,14 +76,23 @@ const brandService = {
   getAllowedPaymentMethods: async (brandNames: string[]): Promise<{ allowedPaymentMethods: string[] }> => {
     const names = [...new Set(brandNames.map((n) => (n || '').trim()).filter(Boolean))];
     if (names.length === 0) {
-      return { allowedPaymentMethods: ['card', 'cash'] };
+      return { allowedPaymentMethods: ['stripe', 'cash'] };
     }
     const res = await apiClient.get(
       `/brands/allowed-payment-methods?names=${names.map((n) => encodeURIComponent(n)).join(',')}`
     );
     const raw = res?.data?.allowedPaymentMethods ?? res?.allowedPaymentMethods;
+    const normalized: string[] = Array.isArray(raw)
+      ? raw.reduce<string[]>((acc, method) => {
+          const normalizedMethod = String(method).toLowerCase();
+          if (normalizedMethod === 'card' || normalizedMethod === 'stripe') acc.push('stripe');
+          if (normalizedMethod === 'cash') acc.push('cash');
+          return acc;
+        }, [])
+      : ['stripe', 'cash'];
+
     return {
-      allowedPaymentMethods: Array.isArray(raw) ? raw : ['card', 'cash'],
+      allowedPaymentMethods: normalized.length > 0 ? Array.from(new Set(normalized)) : ['stripe', 'cash'],
     };
   },
 };

@@ -11,7 +11,7 @@ const LOCAL_IP = '192.168.1.17';
 
 // FORCE PRODUCTION API - Set to true to always use production API
 // Set to false to use local/devtunnels backend for testing
-const FORCE_PRODUCTION_API = false; // Use devtunnels backend
+const FORCE_PRODUCTION_API = true; // Dev tunnel dead — use production API
 
 // Base URL configuration
 const getBaseURL = (): string => {

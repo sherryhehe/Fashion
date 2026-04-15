@@ -204,6 +204,12 @@ export const styles = StyleSheet.create({
     color: '#1A1A1A',
     fontWeight: '500',
   },
+  shippingEta: {
+    fontSize: 12,
+    color: '#8E8E93',
+    marginTop: -6,
+    marginBottom: 8,
+  },
   separator: {
     height: 1,
     backgroundColor: '#E0E0E0',

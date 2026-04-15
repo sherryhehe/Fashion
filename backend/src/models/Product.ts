@@ -19,6 +19,9 @@ export interface IProduct extends Document {
   specifications: Record<string, any>;
   variations: any[];
   features?: string[];
+  shippingFees?: number;
+  shippingTime?: string;
+  notes?: string;
   tags?: string[];
   shippingFees?: number;
   shippingTime?: string;
@@ -119,6 +122,23 @@ const ProductSchema = new Schema<IProduct>(
     features: {
       type: [String],
       default: [],
+    },
+    shippingFees: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    shippingTime: {
+      type: String,
+      maxlength: 120,
+      default: '',
+      trim: true,
+    },
+    notes: {
+      type: String,
+      maxlength: 1000,
+      default: '',
+      trim: true,
     },
     tags: {
       type: [String],

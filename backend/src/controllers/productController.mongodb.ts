@@ -10,6 +10,54 @@ import Wishlist from '../models/Wishlist';
 import { successResponse, errorResponse } from '../utils/responseHelper';
 import { AuthRequest } from '../middleware/auth';
 
+const MAX_SHIPPING_TIME_LENGTH = 120;
+const MAX_NOTES_LENGTH = 1000;
+
+const normalizeProductShippingFields = (product: any) => {
+  const rawProduct = typeof product?.toObject === 'function' ? product.toObject() : product;
+  if (!rawProduct) return rawProduct;
+
+  return {
+    ...rawProduct,
+    shippingFees:
+      typeof rawProduct.shippingFees === 'number' && rawProduct.shippingFees >= 0
+        ? rawProduct.shippingFees
+        : 0,
+    shippingTime: typeof rawProduct.shippingTime === 'string' ? rawProduct.shippingTime : '',
+    notes: typeof rawProduct.notes === 'string' ? rawProduct.notes : '',
+  };
+};
+
+const validateAndNormalizeShippingFields = (payload: any): string | null => {
+  if (payload.shippingFees !== undefined) {
+    const shippingFees = Number(payload.shippingFees);
+    if (Number.isNaN(shippingFees) || shippingFees < 0) {
+      return 'shippingFees must be a number greater than or equal to 0';
+    }
+    payload.shippingFees = shippingFees;
+  }
+
+  if (payload.shippingTime !== undefined) {
+    if (typeof payload.shippingTime !== 'string') {
+      return 'shippingTime must be a string';
+    }
+    if (payload.shippingTime.length > MAX_SHIPPING_TIME_LENGTH) {
+      return `shippingTime cannot exceed ${MAX_SHIPPING_TIME_LENGTH} characters`;
+    }
+  }
+
+  if (payload.notes !== undefined) {
+    if (typeof payload.notes !== 'string') {
+      return 'notes must be a string';
+    }
+    if (payload.notes.length > MAX_NOTES_LENGTH) {
+      return `notes cannot exceed ${MAX_NOTES_LENGTH} characters`;
+    }
+  }
+
+  return null;
+};
+
 /**
  * Get all products with pagination and filters
  */
@@ -75,7 +123,9 @@ export const getAllProducts = async (req: Request, res: Response): Promise<void>
 
     const total = await Product.countDocuments(query);
 
-    successResponse(res, products, undefined, 200, {
+    const normalizedProducts = products.map((product) => normalizeProductShippingFields(product));
+
+    successResponse(res, normalizedProducts, undefined, 200, {
       page: pageNum,
       limit: limitNum,
       total,
@@ -125,7 +175,7 @@ export const getProductById = async (req: Request, res: Response): Promise<void>
 
     // Convert product to plain object and merge reviews
     const productWithReviews = {
-      ...product.toObject(),
+      ...normalizeProductShippingFields(product),
       reviews: allReviews
     };
 
@@ -144,8 +194,14 @@ export const createProduct = async (req: AuthRequest, res: Response): Promise<vo
     const productData = req.body;
 
     // Validation
-    if (!productData.name || !productData.price || !productData.category || !productData.sku) {
+    if (!productData.name || productData.price === undefined || productData.price === null || !productData.category || !productData.sku) {
       errorResponse(res, 'Name, price, category, and SKU are required', 400);
+      return;
+    }
+
+    const shippingValidationError = validateAndNormalizeShippingFields(productData);
+    if (shippingValidationError) {
+      errorResponse(res, shippingValidationError, 400);
       return;
     }
 
@@ -183,7 +239,7 @@ export const createProduct = async (req: AuthRequest, res: Response): Promise<vo
       await Style.updateOne({ name: product.style }, { productCount: count });
     }
 
-    successResponse(res, product, 'Product created successfully', 201);
+    successResponse(res, normalizeProductShippingFields(product), 'Product created successfully', 201);
   } catch (error: any) {
     console.error('Create product error:', error);
     if (error.code === 11000) {
@@ -206,6 +262,12 @@ export const updateProduct = async (req: AuthRequest, res: Response): Promise<vo
     if (updates.reviews) {
       console.log('📝 Updating product with reviews:', updates.reviews.length);
       console.log('Reviews data:', JSON.stringify(updates.reviews, null, 2));
+    }
+
+    const shippingValidationError = validateAndNormalizeShippingFields(updates);
+    if (shippingValidationError) {
+      errorResponse(res, shippingValidationError, 400);
+      return;
     }
 
     const existing = await Product.findById(id);
@@ -262,7 +324,7 @@ export const updateProduct = async (req: AuthRequest, res: Response): Promise<vo
       }
     }
 
-    successResponse(res, product, 'Product updated successfully');
+    successResponse(res, normalizeProductShippingFields(product), 'Product updated successfully');
   } catch (error: any) {
     console.error('Update product error:', error);
     if (error.code === 11000) {
@@ -330,9 +392,9 @@ export const searchProducts = async (req: Request, res: Response): Promise<void>
     })
       .limit(parseInt(limit as string))
       .sort({ promoted: -1, createdAt: -1 })
-      .select('name price images category sku');
+      .select('name price images category sku shippingFees shippingTime notes');
 
-    successResponse(res, products);
+    successResponse(res, products.map((product) => normalizeProductShippingFields(product)));
   } catch (error) {
     console.error('Search products error:', error);
     errorResponse(res, 'Failed to search products', 500);
@@ -353,7 +415,7 @@ export const getFeaturedProducts = async (req: Request, res: Response): Promise<
       .limit(parseInt(limit as string))
       .sort({ promoted: -1, createdAt: -1 });
 
-    successResponse(res, products);
+    successResponse(res, products.map((product) => normalizeProductShippingFields(product)));
   } catch (error) {
     console.error('Get featured products error:', error);
     errorResponse(res, 'Failed to get featured products', 500);
@@ -373,7 +435,7 @@ export const getRandomProducts = async (req: Request, res: Response): Promise<vo
       { $sample: { size: limitNum } },
     ]);
 
-    successResponse(res, products);
+    successResponse(res, products.map((product) => normalizeProductShippingFields(product)));
   } catch (error) {
     console.error('Get random products error:', error);
     errorResponse(res, 'Failed to get random products', 500);
@@ -423,7 +485,7 @@ export const getPersonalizedProducts = async (req: AuthRequest, res: Response): 
       products = [...products, ...featured];
     }
 
-    successResponse(res, products);
+    successResponse(res, products.map((product) => normalizeProductShippingFields(product)));
   } catch (error) {
     console.error('Get personalized products error:', error);
     errorResponse(res, 'Failed to get personalized products', 500);

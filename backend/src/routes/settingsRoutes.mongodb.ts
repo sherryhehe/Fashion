@@ -7,4 +7,7 @@ const router = express.Router();
 router.get('/payment', authenticate, settingsController.getPaymentSettings);
 router.patch('/payment', authenticate, requireAdmin, settingsController.updatePaymentSettings);
 
+router.get('/shipping', settingsController.getShippingSettings);
+router.patch('/shipping', authenticate, requireAdmin, settingsController.updateShippingSettings);
+
 export default router;

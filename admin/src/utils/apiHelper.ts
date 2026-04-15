@@ -13,7 +13,7 @@ export const getApiUrl = (): string => {
     process.env.NEXT_PUBLIC_USE_REMOTE_API === 'true';
 
   const localApi =
-    (process.env.NEXT_PUBLIC_API_URL_LOCAL || 'http://localhost:5000/api').replace(
+    (process.env.NEXT_PUBLIC_API_URL_LOCAL || 'http://localhost:5001/api').replace(
       /\/$/,
       ''
     );
