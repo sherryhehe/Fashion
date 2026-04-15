@@ -23,9 +23,6 @@ export interface IProduct extends Document {
   shippingTime?: string;
   notes?: string;
   tags?: string[];
-  shippingFees?: number;
-  shippingTime?: string;
-  notes?: string;
   rating: number;
   reviewCount: number;
   reviews?: Array<{
@@ -143,21 +140,6 @@ const ProductSchema = new Schema<IProduct>(
     tags: {
       type: [String],
       default: [],
-    },
-    shippingFees: {
-      type: Number,
-      min: 0,
-      default: 0,
-    },
-    shippingTime: {
-      type: String,
-      default: '',
-      trim: true,
-    },
-    notes: {
-      type: String,
-      default: '',
-      trim: true,
     },
     rating: {
       type: Number,
