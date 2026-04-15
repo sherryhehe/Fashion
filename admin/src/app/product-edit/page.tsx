@@ -34,11 +34,14 @@ export default function ProductEdit() {
     brand: '',
     style: '',
     price: '',
+    shippingFees: '',
+    shippingTime: '',
     originalPrice: '',
     discount: '',
     inventory: '',
     productImages: '',
     description: '',
+    notes: '',
     features: '',
     status: 'active',
   });
@@ -111,11 +114,14 @@ export default function ProductEdit() {
         brand: product.brand || '',
         style: product.style || '',
         price: product.price?.toString() || '',
+        shippingFees: product.shippingFees?.toString() || '',
+        shippingTime: product.shippingTime || '',
         originalPrice: product.originalPrice?.toString() || '',
         discount: product.discount?.toString() || '',
         inventory: product.stock?.toString() || '',
         productImages: product.images?.join(', ') || '',
         description: product.description || '',
+        notes: product.notes || '',
         features: product.features?.join('\n') || '',
         status: product.status || 'active',
       });
@@ -322,6 +328,8 @@ export default function ProductEdit() {
         sku: formData.productSku,
         description: formData.description,
         price: parseFloat(formData.price),
+        shippingFees: formData.shippingFees ? parseFloat(formData.shippingFees) : 0,
+        shippingTime: formData.shippingTime || '',
         originalPrice: formData.originalPrice ? parseFloat(formData.originalPrice) : undefined,
         discount: formData.discount ? parseFloat(formData.discount) : 0,
         category: formData.category,
@@ -330,6 +338,7 @@ export default function ProductEdit() {
         status: formData.status as 'active' | 'inactive' | 'draft',
         style: formData.style,
         features: featuresArray,
+        notes: formData.notes || '',
         images: finalImages,
         rating: avgRating,
         reviewCount: reviews.length,
@@ -604,6 +613,19 @@ export default function ProductEdit() {
                       />
                     </div>
                     <div className="col-md-4 mb-3">
+                      <label htmlFor="shippingFees" className="form-label">Shipping Fees</label>
+                      <input 
+                        type="number" 
+                        className="form-control" 
+                        id="shippingFees" 
+                        name="shippingFees"
+                        value={formData.shippingFees}
+                        onChange={handleChange}
+                        step="0.01"
+                        min="0"
+                      />
+                    </div>
+                    <div className="col-md-4 mb-3">
                       <label htmlFor="discount" className="form-label">Discount (%)</label>
                       <input 
                         type="number" 
@@ -614,6 +636,18 @@ export default function ProductEdit() {
                         onChange={handleChange}
                         min="0" 
                         max="100" 
+                      />
+                    </div>
+                    <div className="col-md-6 mb-3">
+                      <label htmlFor="shippingTime" className="form-label">Shipping Time</label>
+                      <input 
+                        type="text" 
+                        className="form-control" 
+                        id="shippingTime" 
+                        name="shippingTime"
+                        value={formData.shippingTime}
+                        onChange={handleChange}
+                        placeholder="e.g., 3-5 business days"
                       />
                     </div>
                     <div className="col-md-6 mb-3">
@@ -674,6 +708,18 @@ export default function ProductEdit() {
                         rows={4} 
                         value={formData.description}
                         onChange={handleChange}
+                      ></textarea>
+                    </div>
+                    <div className="col-12 mb-3">
+                      <label htmlFor="notes" className="form-label">Notes</label>
+                      <textarea 
+                        className="form-control" 
+                        id="notes" 
+                        name="notes"
+                        rows={3} 
+                        value={formData.notes}
+                        onChange={handleChange}
+                        placeholder="Add internal notes for this product"
                       ></textarea>
                     </div>
                     <div className="col-12 mb-3">

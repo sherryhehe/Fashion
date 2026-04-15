@@ -28,10 +28,13 @@ export default function ProductAdd() {
     brand: '',
     style: '',
     price: '',
+    shippingFees: '',
+    shippingTime: '',
     originalPrice: '',
     discount: '',
     stock: '',
     description: '',
+    notes: '',
     features: '',
     tags: '',
     status: 'active',
@@ -253,6 +256,8 @@ export default function ProductAdd() {
         sku: formData.productSku,
         description: formData.description,
         price: parseFloat(formData.price),
+        shippingFees: formData.shippingFees ? parseFloat(formData.shippingFees) : 0,
+        shippingTime: formData.shippingTime || '',
         originalPrice: formData.originalPrice ? parseFloat(formData.originalPrice) : undefined,
         discount: formData.discount ? parseFloat(formData.discount) : 0,
         category: formData.category,
@@ -265,6 +270,7 @@ export default function ProductAdd() {
         variations: variationsArray,
         features: featuresArray,
         tags: tagsArray,
+        notes: formData.notes || '',
         rating: reviews.length > 0 ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length : 0,
         reviewCount: reviews.length,
         salesCount: salesCount,
@@ -492,6 +498,20 @@ export default function ProductAdd() {
                       <small className="text-muted">For showing discounts</small>
                     </div>
                     <div className="col-md-4 mb-3">
+                      <label htmlFor="shippingFees" className="form-label">Shipping Fees</label>
+                      <input 
+                        type="number" 
+                        className="form-control" 
+                        id="shippingFees" 
+                        name="shippingFees"
+                        placeholder="0.00" 
+                        step="0.01"
+                        min="0"
+                        value={formData.shippingFees}
+                        onChange={handleChange}
+                      />
+                    </div>
+                    <div className="col-md-4 mb-3">
                       <label htmlFor="discount" className="form-label">Discount %</label>
                       <input 
                         type="number" 
@@ -502,6 +522,18 @@ export default function ProductAdd() {
                         min="0"
                         max="100"
                         value={formData.discount}
+                        onChange={handleChange}
+                      />
+                    </div>
+                    <div className="col-md-6 mb-3">
+                      <label htmlFor="shippingTime" className="form-label">Shipping Time</label>
+                      <input 
+                        type="text" 
+                        className="form-control" 
+                        id="shippingTime" 
+                        name="shippingTime"
+                        placeholder="e.g., 3-5 business days"
+                        value={formData.shippingTime}
                         onChange={handleChange}
                       />
                     </div>
@@ -542,6 +574,18 @@ export default function ProductAdd() {
                         rows={4} 
                         placeholder="Enter product description"
                         value={formData.description}
+                        onChange={handleChange}
+                      ></textarea>
+                    </div>
+                    <div className="col-12 mb-3">
+                      <label htmlFor="notes" className="form-label">Notes</label>
+                      <textarea 
+                        className="form-control" 
+                        id="notes" 
+                        name="notes"
+                        rows={3} 
+                        placeholder="Add internal notes for this product"
+                        value={formData.notes}
                         onChange={handleChange}
                       ></textarea>
                     </div>
