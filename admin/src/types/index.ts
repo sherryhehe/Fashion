@@ -16,6 +16,8 @@ export interface Product {
   name: string;
   description: string;
   price: number;
+  shippingFees?: number;
+  shippingTime?: string;
   originalPrice?: number;
   discount?: number;
   category: string;
@@ -30,6 +32,7 @@ export interface Product {
   dimensions?: string;
   images: string[];
   features: string[];
+  notes?: string;
   specifications: Record<string, string>;
   status: 'active' | 'inactive' | 'draft';
   visibility?: 'visible' | 'hidden';
