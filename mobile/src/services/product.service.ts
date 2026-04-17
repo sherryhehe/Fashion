@@ -14,6 +14,7 @@ export interface Product {
   discount?: number;
   category: string;
   brand?: string;
+  style?: string;
   sku: string;
   stock: number;
   images: string[];
@@ -21,6 +22,11 @@ export interface Product {
   status: string;
   specifications?: any;
   variations?: any[];
+  features?: string[];
+  shippingFees?: number;
+  shippingTime?: string;
+  notes?: string;
+  tags?: string[];
   rating: number;
   reviewCount: number;
   reviews?: any[];

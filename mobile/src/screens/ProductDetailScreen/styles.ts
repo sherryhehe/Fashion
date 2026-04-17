@@ -381,6 +381,21 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
+  // Shipping Section Styles
+  shippingSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#F2F2F7',
+  },
+  shippingText: {
+    fontSize: 14,
+    color: '#2C2C2E',
+    lineHeight: 22,
+    marginBottom: 4,
+  },
+
   // Description Section Styles
   descriptionSection: {
     paddingHorizontal: 20,

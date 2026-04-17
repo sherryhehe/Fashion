@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Image,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { usePaymentSheet } from '@stripe/stripe-react-native';
@@ -235,11 +236,18 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
         notes: saveInfoChecked ? 'Save information for next time' : undefined,
       });
 
-      const body = response?.data as any;
-      const payload = body?.data ?? body;
-      const order = payload?.order ?? payload;
-      const orderId = order?._id || order?.orderNumber || payload?._id || payload?.orderNumber;
-      const clientSecret = payload?.clientSecret ?? body?.clientSecret;
+      // axios interceptor already strips the Axios envelope → response = { success, data: {...}, message }
+      // For Stripe orders: data = { order, clientSecret }
+      // For COD orders:    data = order object directly
+      const raw = response as any;
+      const data = raw?.data ?? raw;
+      // Stripe path: data = { order: {...}, clientSecret: "pi_..." }
+      // COD path:    data = { _id, orderNumber, ... }
+      const isStripeShape = !!(data?.order && data?.clientSecret);
+      const order = isStripeShape ? data.order : data;
+      const clientSecret: string | undefined = isStripeShape ? data.clientSecret : undefined;
+      const orderId = order?._id || order?.orderNumber;
+
 
       if (!orderId) {
         navigation.getParent()?.navigate('Orders');

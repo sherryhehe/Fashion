@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { Cart, Product } from '../models';
 import { successResponse, errorResponse } from '../utils/responseHelper';
 import { AuthRequest } from '../middleware/auth';
+import { getAvailableStockForSelection, getSelectionLabel } from '../utils/productStock';
 
 export const getCart = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -40,9 +41,9 @@ export const addToCart = async (req: AuthRequest, res: Response): Promise<void> 
       errorResponse(res, 'Product not found', 404);
       return;
     }
-    const availableStock = product.stock ?? 0;
+    const availableStock = getAvailableStockForSelection(product, size, color);
     if (availableStock <= 0) {
-      errorResponse(res, 'This product is out of stock', 400);
+      errorResponse(res, `This ${getSelectionLabel(size, color)} is out of stock`, 400);
       return;
     }
 
@@ -57,7 +58,11 @@ export const addToCart = async (req: AuthRequest, res: Response): Promise<void> 
     if (existingItem) {
       const newQty = existingItem.quantity + quantity;
       if (newQty > availableStock) {
-        errorResponse(res, `Only ${availableStock} unit(s) available`, 400);
+        errorResponse(
+          res,
+          `Only ${availableStock} unit(s) available for ${getSelectionLabel(size, color)}`,
+          400
+        );
         return;
       }
       existingItem.quantity = newQty;
@@ -65,7 +70,11 @@ export const addToCart = async (req: AuthRequest, res: Response): Promise<void> 
       successResponse(res, existingItem, 'Cart updated successfully');
     } else {
       if (quantity > availableStock) {
-        errorResponse(res, `Only ${availableStock} unit(s) available`, 400);
+        errorResponse(
+          res,
+          `Only ${availableStock} unit(s) available for ${getSelectionLabel(size, color)}`,
+          400
+        );
         return;
       }
       const cartItem = await Cart.create({
@@ -93,16 +102,31 @@ export const updateCartItem = async (req: AuthRequest, res: Response): Promise<v
       return;
     }
 
-    const cartItem = await Cart.findOneAndUpdate(
-      { _id: id, userId: req.user!.id },
-      { quantity },
-      { new: true }
-    );
+    const cartItem = await Cart.findOne({ _id: id, userId: req.user!.id });
 
     if (!cartItem) {
       errorResponse(res, 'Cart item not found', 404);
       return;
     }
+
+    const product = await Product.findById(cartItem.productId);
+    if (!product) {
+      errorResponse(res, 'Product not found', 404);
+      return;
+    }
+
+    const availableStock = getAvailableStockForSelection(product, cartItem.size, cartItem.color);
+    if (quantity > availableStock) {
+      errorResponse(
+        res,
+        `Only ${availableStock} unit(s) available for ${getSelectionLabel(cartItem.size, cartItem.color)}`,
+        400
+      );
+      return;
+    }
+
+    cartItem.quantity = quantity;
+    await cartItem.save();
 
     successResponse(res, cartItem, 'Cart item updated successfully');
   } catch (error) {

@@ -6,6 +6,10 @@ backend/node_modules/
 .pnp
 .pnp.*
 
+.DS_Store
+mobile/.DS_Store
+backend/.DS_Store
+admin/.DS_Store
 # Build outputs
 .next/
 out/
@@ -40,3 +44,7 @@ admin/.DS_Store
 admin/.DS_Store
 admin/.DS_Store
 .DS_Store
+backend/.DS_Store
+.DS_Store
+.DS_Store
+admin/.DS_Store

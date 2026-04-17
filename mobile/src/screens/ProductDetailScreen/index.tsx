@@ -24,6 +24,7 @@ import { useProduct, useRecommendedProducts } from '../../hooks/useProducts';
 import { useBrandByName, useBrand } from '../../hooks/useBrands';
 import { useAddToCart } from '../../hooks/useCart';
 import { useAddToWishlist, useRemoveFromWishlist, useIsInWishlist, useWishlist } from '../../hooks/useWishlist';
+import type { Product as ApiProduct } from '../../services/product.service';
 import { getFirstImageSource, getImageSource } from '../../utils/imageHelper';
 import { useQueryClient } from '@tanstack/react-query';
 import authService from '../../services/auth.service';
@@ -58,7 +59,14 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
   const { data: recommendedData, refetch: refetchRecommended } = useRecommendedProducts(4);
   
   // Get product early for brand lookup (but hooks still called unconditionally)
-  const product = productData?.data;
+  const product = productData?.data as ApiProduct | undefined;
+
+  // Debug: inspect full API response for shipping fields
+  useEffect(() => {
+    if (productData) {
+      console.log('Product API response:', productData);
+    }
+  }, [productData]);
   const productBrandName = product?.brand || '';
   
   // Fetch brand data - hooks called unconditionally with empty string if no brand
@@ -511,6 +519,10 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
     </TouchableOpacity>
   );
 
+  const shippingFees = product?.shippingFees;
+  const shippingTime = product?.shippingTime;
+  const shippingNotes = product?.notes;
+
   return (
     <SafeView>
       {/* Header Section */}
@@ -662,7 +674,7 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
                   ]}
                 />
               )}
-            </TouchableOpacity>
+          </TouchableOpacity>
           </View>
 
           {/* Brand/Shop Section - use brand from exact name lookup only; navigate only when name matches product's brand */}
@@ -763,6 +775,33 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
             {product.description || 'No description available for this product.'}
           </Text>
         </View>
+
+        {/* Shipping info from product (fees, time, notes) */}
+        {(shippingFees !== undefined && shippingFees !== null) ||
+        (shippingTime && shippingTime.trim().length > 0) ||
+        (shippingNotes && shippingNotes.trim().length > 0) ? (
+          <View style={styles.shippingSection}>
+            <Text style={styles.sectionTitle}>Shipping</Text>
+            {typeof shippingFees === 'number' && shippingFees >= 0 && (
+              <Text style={styles.shippingText}>
+                Shipping fee:{' '}
+                {shippingFees === 0
+                  ? 'Free'
+                  : `PKR ${shippingFees.toLocaleString()}`}
+              </Text>
+            )}
+            {shippingTime && shippingTime.trim().length > 0 && (
+              <Text style={styles.shippingText}>
+                Estimated delivery: {shippingTime}
+              </Text>
+            )}
+            {shippingNotes && shippingNotes.trim().length > 0 && (
+              <Text style={styles.shippingText}>
+                {`Note: ${shippingNotes}`}
+              </Text>
+            )}
+          </View>
+        ) : null}
 
         {/* Recommended Products Section */}
         {recommendedData?.data && recommendedData.data.length > 0 && (

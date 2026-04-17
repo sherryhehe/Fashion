@@ -8,6 +8,11 @@ import { successResponse, errorResponse } from '../utils/responseHelper';
 import { AuthRequest } from '../middleware/auth';
 import { CARD_FEE_PERCENT } from '../constants/orderFees';
 import { getShippingCostAmount } from '../utils/shippingSettings';
+import {
+  decrementStockForSelection,
+  getAvailableStockForSelection,
+  getSelectionLabel,
+} from '../utils/productStock';
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const stripe = stripeSecretKey ? new Stripe(stripeSecretKey, { apiVersion: '2026-01-28.clover' }) : null;
@@ -165,6 +170,10 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
 
     // Calculate totals, validate payment method and stock
     let subtotal = 0;
+    const requestedQuantityBySelection = new Map<string, number>();
+    const selectionKey = (productId: string, size?: string, color?: string) =>
+      `${productId}|${String(size || '').trim().toLowerCase()}|${String(color || '').trim().toLowerCase()}`;
+
     const orderItems = await Promise.all(
       items.map(async (item: any) => {
         const product = await Product.findById(item.productId);
@@ -172,12 +181,16 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
           throw new Error(`Product ${item.productId} not found`);
         }
         const qty = Math.max(1, Number(item.quantity) || 1);
-        const availableStock = product.stock ?? 0;
-        if (availableStock < qty) {
+        const availableStock = getAvailableStockForSelection(product, item.size, item.color);
+        const key = selectionKey(String(product._id), item.size, item.color);
+        const previouslyRequested = requestedQuantityBySelection.get(key) ?? 0;
+        const totalRequested = previouslyRequested + qty;
+        if (availableStock < totalRequested) {
           throw new Error(
-            `Insufficient stock for "${product.name}". Available: ${availableStock}, requested: ${qty}.`
+            `Insufficient stock for "${product.name}" (${getSelectionLabel(item.size, item.color)}). Available: ${availableStock}, requested: ${totalRequested}.`
           );
         }
+        requestedQuantityBySelection.set(key, totalRequested);
         // Validate payment method for this product's brand
         if (product.brand) {
           const brand = await Brand.findOne({ name: new RegExp(`^${String(product.brand).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }).lean();
@@ -257,9 +270,9 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
 
     if (!useStripe) {
       for (const item of orderItems) {
-        await Product.findByIdAndUpdate(item.productId, {
-          $inc: { stock: -item.quantity },
-        });
+        const product = await Product.findById(item.productId);
+        if (!product) continue;
+        await decrementStockForSelection(product, item.quantity, item.size, item.color);
       }
     }
 
@@ -325,7 +338,9 @@ async function markOrderPaidAndDecrementStock(order: any): Promise<void> {
   await order.save();
   const items = order.items || [];
   for (const item of items) {
-    await Product.findByIdAndUpdate(item.productId, { $inc: { stock: -item.quantity } });
+    const product = await Product.findById(item.productId);
+    if (!product) continue;
+    await decrementStockForSelection(product, item.quantity, item.size, item.color);
   }
 }
 

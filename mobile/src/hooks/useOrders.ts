@@ -35,9 +35,14 @@ export const useCreateOrder = () => {
     mutationFn: (data: CreateOrderData) => orderService.createOrder(data),
     onSuccess: (response) => {
       if (response.success) {
-        showToast.success('Order placed successfully!', 'Order Confirmed');
+        // Only toast for COD orders here; Stripe card orders show their own toast after payment sheet
+        const raw = response as any;
+        const hasClientSecret = !!(raw?.data?.clientSecret ?? raw?.clientSecret);
+        if (!hasClientSecret) {
+          showToast.success('Order placed successfully!', 'Order Confirmed');
+        }
         queryClient.invalidateQueries({ queryKey: ['orders'] });
-        queryClient.invalidateQueries({ queryKey: ['cart'] }); // Clear cart after order
+        queryClient.invalidateQueries({ queryKey: ['cart'] });
       } else {
         showToast.error(response.message || 'Failed to place order');
       }

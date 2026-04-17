@@ -4,10 +4,10 @@
   "description": "Backend API for Larkon Fashion App",
   "main": "dist/index-mongodb.js",
   "scripts": {
-    "dev": "nodemon --exec ts-node src/index-mongodb.ts",
-    "dev:mongodb": "nodemon --exec ts-node src/index-mongodb.ts",
+    "dev": "nodemon --exec \"ts-node -r dotenv/config src/index-mongodb.ts\"",
+    "dev:mongodb": "nodemon --exec \"ts-node -r dotenv/config src/index-mongodb.ts\"",
     "build": "tsc",
-    "start": "node dist/index-mongodb.js",
+    "start": "node -r dotenv/config dist/index-mongodb.js",
     "watch": "tsc --watch",
     "backfill:product-shipping-fields": "ts-node src/scripts/backfillProductShippingFields.ts"
   },
