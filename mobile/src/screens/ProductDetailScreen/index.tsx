@@ -255,21 +255,64 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
   // Available sizes from product variations
   const sizes = getSizesFromVariations();
 
+  const normalizedSelectedColor = (selectedColor || '').trim().toLowerCase();
+  const hasVariantStockData = Array.isArray(product.variations)
+    && product.variations.some((variation) => typeof variation?.stock === 'number');
+
+  const getVariationStockForSize = (size: string) => {
+    if (!hasVariantStockData) {
+      return Math.max(0, product?.stock ?? 0);
+    }
+
+    const normalizedSize = (size || '').trim().toLowerCase();
+    const matchingBySize = (product.variations || []).filter((variation: any) => (
+      typeof variation?.stock === 'number'
+      && (variation?.size || '').trim().toLowerCase() === normalizedSize
+    ));
+
+    if (matchingBySize.length === 0) return 0;
+
+    const matchingByColor = normalizedSelectedColor
+      ? matchingBySize.filter((variation: any) => (
+          (variation?.color || '').trim().toLowerCase() === normalizedSelectedColor
+        ))
+      : [];
+
+    const stockSource = matchingByColor.length > 0 ? matchingByColor : matchingBySize;
+    return stockSource.reduce(
+      (sum: number, variation: any) => sum + Math.max(0, Number(variation?.stock) || 0),
+      0
+    );
+  };
+
+  const selectedStock = hasVariantStockData && selectedSize
+    ? getVariationStockForSize(selectedSize)
+    : Math.max(0, product?.stock ?? 0);
+  const effectiveAvailableStock = Math.max(0, selectedStock);
+  const isSelectionOutOfStock = effectiveAvailableStock <= 0;
+
   // Set initial selected color and size if not set
   if (!selectedColor && colors.length > 0) {
     setSelectedColor(colors[0].name);
   }
   if (!selectedSize && sizes.length > 0) {
-    setSelectedSize(sizes[0]);
+    const firstInStockSize = sizes.find((size) => getVariationStockForSize(size) > 0);
+    setSelectedSize(firstInStockSize || sizes[0]);
   }
 
   // Handle add to cart - just adds product without navigation
   const handleAddToCart = async () => {
     if (!productId || !product) return;
 
-    const stock = product?.stock ?? 0;
-    if (stock <= 0) {
-      Alert.alert('Out of stock', 'This product is currently out of stock.');
+    if (isSelectionOutOfStock) {
+      Alert.alert('Out of stock', selectedSize
+        ? `Size ${selectedSize} is currently out of stock.`
+        : 'This product is currently out of stock.');
+      return;
+    }
+
+    if (quantity > effectiveAvailableStock) {
+      Alert.alert('Stock limit reached', `Only ${effectiveAvailableStock} unit(s) available for this selection.`);
       return;
     }
 
@@ -323,9 +366,15 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
   const handleBuyNow = async () => {
     if (!productId || !product) return;
 
-    const stock = product?.stock ?? 0;
-    if (stock <= 0) {
-      Alert.alert('Out of stock', 'This product is currently out of stock.');
+    if (isSelectionOutOfStock) {
+      Alert.alert('Out of stock', selectedSize
+        ? `Size ${selectedSize} is currently out of stock.`
+        : 'This product is currently out of stock.');
+      return;
+    }
+
+    if (quantity > effectiveAvailableStock) {
+      Alert.alert('Stock limit reached', `Only ${effectiveAvailableStock} unit(s) available for this selection.`);
       return;
     }
 
@@ -501,23 +550,31 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
     </TouchableOpacity>
   );
 
-  const renderSizeItem = (size: string) => (
+  const renderSizeItem = (size: string) => {
+    const sizeStock = getVariationStockForSize(size);
+    const isOutOfStock = sizeStock <= 0;
+
+    return (
     <TouchableOpacity
       key={size}
       style={[
         styles.sizeButton,
+        isOutOfStock && styles.sizeButtonDisabled,
         selectedSize === size && styles.selectedSizeButton
       ]}
       onPress={() => setSelectedSize(size)}
+      disabled={isOutOfStock}
     >
       <Text style={[
         styles.sizeText,
+        isOutOfStock && styles.sizeTextDisabled,
         selectedSize === size && styles.selectedSizeText
       ]}>
-        {size}
+        {isOutOfStock ? `${size} (Out)` : size}
       </Text>
     </TouchableOpacity>
-  );
+    );
+  };
 
   const shippingFees = product?.shippingFees;
   const shippingTime = product?.shippingTime;
@@ -761,11 +818,16 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
             <Text style={styles.quantityText}>{quantity}</Text>
             <TouchableOpacity
               style={styles.quantityButton}
-              onPress={() => setQuantity(quantity + 1)}
+              onPress={() => setQuantity(Math.min(Math.max(1, effectiveAvailableStock), quantity + 1))}
             >
                 <Image source={icons.plus} tintColor='#FFFFFF' style={styles.quantityButtonImage} />    
             </TouchableOpacity>
           </View>
+          <Text style={styles.quantityHintText}>
+            {isSelectionOutOfStock
+              ? 'This selection is out of stock'
+              : `${effectiveAvailableStock} unit(s) available`}
+          </Text>
         </View>
 
         {/* Description Section */}
@@ -876,18 +938,20 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
 
         {/* Bottom Action Bar */}
         <View style={styles.bottomActionBar}>
-          {(product?.stock ?? 0) <= 0 && (
+          {isSelectionOutOfStock && (
             <View style={styles.outOfStockBanner}>
-              <Text style={styles.outOfStockBannerText}>Out of stock</Text>
+              <Text style={styles.outOfStockBannerText}>
+                {selectedSize ? `Size ${selectedSize} out of stock` : 'Out of stock'}
+              </Text>
             </View>
           )}
           <TouchableOpacity 
             style={[
               styles.cartButton,
-              (addToCartMutation.isPending || (product?.stock ?? 0) <= 0) && styles.cartButtonDisabled,
+              (addToCartMutation.isPending || isSelectionOutOfStock) && styles.cartButtonDisabled,
             ]}
             onPress={handleAddToCart}
-            disabled={addToCartMutation.isPending || (product?.stock ?? 0) <= 0}
+            disabled={addToCartMutation.isPending || isSelectionOutOfStock}
           >
             {addToCartMutation.isPending ? (
               <ActivityIndicator size="small" color="#2C2C2E" />
@@ -898,14 +962,14 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
           <TouchableOpacity 
             style={[
               styles.checkoutButton,
-              (product?.stock ?? 0) <= 0 && styles.checkoutButtonDisabled,
+              isSelectionOutOfStock && styles.checkoutButtonDisabled,
             ]}
             onPress={handleBuyNow}
-            disabled={addToCartMutation.isPending || (product?.stock ?? 0) <= 0}
+            disabled={addToCartMutation.isPending || isSelectionOutOfStock}
           >
             <Text style={styles.checkoutButtonText}>
-              {(product?.stock ?? 0) <= 0
-                ? 'Out of stock'
+              {isSelectionOutOfStock
+                ? selectedSize ? `${selectedSize} out of stock` : 'Out of stock'
                 : addToCartMutation.isPending
                   ? 'Processing...'
                   : 'Buy Now'}

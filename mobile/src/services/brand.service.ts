@@ -78,7 +78,7 @@ const brandService = {
     if (names.length === 0) {
       return { allowedPaymentMethods: ['stripe', 'cash'] };
     }
-    const res = await apiClient.get(
+    const res: any = await apiClient.get(
       `/brands/allowed-payment-methods?names=${names.map((n) => encodeURIComponent(n)).join(',')}`
     );
     const raw = res?.data?.allowedPaymentMethods ?? res?.allowedPaymentMethods;
@@ -92,7 +92,7 @@ const brandService = {
       : ['stripe', 'cash'];
 
     return {
-      allowedPaymentMethods: normalized.length > 0 ? Array.from(new Set(normalized)) : ['stripe', 'cash'],
+      allowedPaymentMethods: normalized.length > 0 ? Array.from(new Set(normalized)) : ['cash'],
     };
   },
 };

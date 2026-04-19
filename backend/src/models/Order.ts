@@ -10,6 +10,11 @@ export interface IOrderItem {
   color?: string;
   /** Product image URL/path for order history (per-item so each line shows correct image) */
   productImage?: string;
+  /** Shipping portion for this line (product shippingFees × qty). */
+  shippingFee?: number;
+  /** Snapshot of merchant product notes / delivery note for this line */
+  notes?: string;
+  shippingTime?: string;
 }
 
 export interface IOrder extends Document {
@@ -18,7 +23,12 @@ export interface IOrder extends Document {
   items: IOrderItem[];
   subtotal: number;
   tax: number;
+  /** Sum of per-line shipping fees (from products). */
   shippingCost: number;
+  /** Platform / service fee for the whole order (from settings). */
+  platformFee: number;
+  /** Card processing fee (percentage of item subtotal) when paying by card. */
+  transactionFee: number;
   total: number;
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   paymentMethod: string;
@@ -57,6 +67,9 @@ const OrderSchema = new Schema<IOrder>(
         size: String,
         color: String,
         productImage: { type: String },
+        shippingFee: { type: Number, min: 0 },
+        notes: { type: String },
+        shippingTime: { type: String },
       },
     ],
     subtotal: {
@@ -70,6 +83,16 @@ const OrderSchema = new Schema<IOrder>(
       min: 0,
     },
     shippingCost: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    platformFee: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    transactionFee: {
       type: Number,
       default: 0,
       min: 0,

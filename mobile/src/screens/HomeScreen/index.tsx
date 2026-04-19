@@ -913,7 +913,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         {/* Hero Banner Section - Full Width Carousel */}
         {bannersLoading ? (
           <View style={styles.heroSection}>
-            <View style={{ width: screenWidth, height: 200, backgroundColor: '#F2F2F7', borderRadius: 12 }} />
+            <View style={{ width: screenWidth, height: 200, backgroundColor: '#F2F2F7', borderRadius: 16 }} />
           </View>
         ) : carouselData.length > 0 ? (
           <View style={styles.heroSection}>
@@ -983,15 +983,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </View>
         ) : (
           <View style={styles.heroSection}>
-            <View style={{ width: screenWidth, height: 200, backgroundColor: '#F2F2F7', borderRadius: 12, justifyContent: 'center', alignItems: 'center' }}>
+            <View style={{ width: screenWidth, height: 200, backgroundColor: '#F2F2F7', borderRadius: 16, justifyContent: 'center', alignItems: 'center' }}>
               <Text style={{ color: '#8E8E93', fontSize: 14 }}>No banners available</Text>
             </View>
           </View>
         )}
 
-        {/* Brand Banners (swipable, Shop Now → brand page) */}
+        {/* Brand promo banners — full-bleed image only (tap opens store when linked) */}
         {brandCarouselData.length > 0 && (
-          <View style={[styles.heroSection, { marginTop: 16 }]}>
+          <View style={[styles.heroSection, { marginTop: 12 }]}>
             <FlatList
               data={brandCarouselData}
               horizontal
@@ -1007,24 +1007,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 return (
                   <TouchableOpacity
                     style={[styles.heroImageContainer, { width: screenWidth }]}
-                    activeOpacity={1}
+                    activeOpacity={storeId ? 0.92 : 1}
                     onPress={() => {
                       if (storeId) navigation.getParent()?.navigate('StoreDetail', { storeId });
                     }}
                   >
-                    <CachedImage source={imageSource} style={styles.heroImage} resizeMode="cover" />
-                    <View style={styles.brandBannerOverlay}>
-                      {item.title ? <Text style={styles.brandBannerTitle}>{item.title}</Text> : null}
-                      {item.subtitle ? <Text style={styles.brandBannerSubtitle}>{item.subtitle}</Text> : null}
-                      {storeId ? (
-                        <TouchableOpacity
-                          style={styles.brandBannerCta}
-                          onPress={() => navigation.getParent()?.navigate('StoreDetail', { storeId })}
-                        >
-                          <Text style={styles.brandBannerCtaText}>Shop Now</Text>
-                        </TouchableOpacity>
-                      ) : null}
-                    </View>
+                    <CachedImage source={imageSource} style={styles.heroImage} resizeMode="cover" priority="high" cache="immutable" />
                   </TouchableOpacity>
                 );
               }}

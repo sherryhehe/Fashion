@@ -84,12 +84,12 @@ const useStyles = ()=>{
     position: 'relative',
   },
   carousel: {
-    height: 280,
+    height: 200,
   },
   heroImageContainer: {
     position: 'relative',
     overflow: 'hidden',
-    height: 280,
+    height: 200,
   },
   heroImage: {
     width: '100%',

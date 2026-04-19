@@ -20,6 +20,7 @@ import { getFirstImageSource } from '../../utils/imageHelper';
 // API Hooks
 import { useCart, useUpdateCartItem, useRemoveFromCart } from '../../hooks/useCart';
 import { useShippingSettings } from '../../hooks/useShippingSettings';
+import { computeOrderAmounts } from '../../utils/orderPricing';
 
 interface CartItem {
   id: string;
@@ -93,34 +94,22 @@ const CartScreen: React.FC<CartScreenProps> = ({ navigation }) => {
   // Calculate totals using product prices from API
   // Memoize to prevent recalculation on every render
   // Only include items with valid product data and prices
-  const shippingFee = shippingSettings?.shippingCost ?? 0;
+  const platformFee = shippingSettings?.platformFee ?? 0;
 
-  const { subtotal, deliveryFee, total } = useMemo(() => {
-    // Filter items that have valid prices and quantities > 0
-    const validItems = cartItems.filter((item: any) => {
-      return item.hasValidProduct && 
-             item.quantity > 0 && 
-             item.productPrice > 0;
-    });
-    
-    // Calculate subtotal from valid items only
-    const calculatedSubtotal = validItems.reduce((sum: number, item: any) => {
-      const price = item.productPrice || 0;
-      const quantity = item.quantity || 0;
-      if (price > 0 && quantity > 0) {
-        return sum + (price * quantity);
-      }
-      return sum;
-    }, 0);
-    
-    const calculatedTotal = calculatedSubtotal + shippingFee;
+  const validCartItems = useMemo(
+    () =>
+      cartItems.filter(
+        (item: any) =>
+          item.hasValidProduct && item.quantity > 0 && item.productPrice > 0
+      ),
+    [cartItems]
+  );
 
-    return {
-      subtotal: calculatedSubtotal,
-      deliveryFee: shippingFee,
-      total: calculatedTotal,
-    };
-  }, [cartItems, shippingFee]);
+  const { itemsSubtotal, shippingSum, platformFee: pfRounded, total, perLineByKey } = useMemo(() => {
+    const amounts = computeOrderAmounts(validCartItems, platformFee, 'cod');
+    const perLineByKey = new Map(amounts.perLine.map((p) => [p.key, p]));
+    return { ...amounts, perLineByKey };
+  }, [validCartItems, platformFee]);
 
   const updateQuantity = async (cartItemId: string, currentQuantity: number, change: number) => {
     const newQuantity = Math.max(0, currentQuantity + change);
@@ -172,6 +161,11 @@ const CartScreen: React.FC<CartScreenProps> = ({ navigation }) => {
     // Use product details from API (backend returns product data in item.product)
     const productName = item.productName || item.name || 'Unknown Product';
     const productPrice = item.productPrice || item.price || 0;
+    const lineKey = String(item._id || item.id || productName);
+    const lineMeta = perLineByKey.get(lineKey);
+    const lineShip = lineMeta?.shipping ?? 0;
+    const lineNotes = (item.product || {})?.notes;
+    const lineShipTime = (item.product || {})?.shippingTime;
     // Handle image from API - could be a full URL or just a path
     const productImage = item.productImage || (item.images && item.images[0]);
     const imageSource = productImage 
@@ -204,6 +198,15 @@ const CartScreen: React.FC<CartScreenProps> = ({ navigation }) => {
               </>
             )}
           </View>
+          {lineShip > 0 ? (
+            <Text style={styles.itemShippingLine}>Shipping: {lineShip.toLocaleString()} PKR</Text>
+          ) : null}
+          {lineShipTime ? (
+            <Text style={styles.itemNoteLine}>Est. delivery: {lineShipTime}</Text>
+          ) : null}
+          {lineNotes ? (
+            <Text style={styles.itemNoteLine} numberOfLines={3}>Note: {lineNotes}</Text>
+          ) : null}
           <View style={styles.priceAndQuantityRow}>
             <Text style={styles.itemPrice}>Rs.{productPrice.toLocaleString()}</Text>
             <View style={styles.quantityControls}>
@@ -290,13 +293,19 @@ const CartScreen: React.FC<CartScreenProps> = ({ navigation }) => {
             {/* Order Summary */}
             <View style={styles.orderSummary}>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Sub-total</Text>
-                <Text style={styles.summaryValue}>{subtotal.toLocaleString()} PKR</Text>
+                <Text style={styles.summaryLabel}>Item</Text>
+                <Text style={styles.summaryValue}>{itemsSubtotal.toLocaleString()} PKR</Text>
               </View>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Shipping</Text>
                 <Text style={styles.summaryValue}>
-                  {deliveryFee > 0 ? `${deliveryFee.toLocaleString()} PKR` : 'Free'}
+                  {shippingSum > 0 ? `${shippingSum.toLocaleString()} PKR` : 'Free'}
+                </Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Platform fees</Text>
+                <Text style={styles.summaryValue}>
+                  {pfRounded > 0 ? `${pfRounded.toLocaleString()} PKR` : 'Free'}
                 </Text>
               </View>
               {shippingSettings?.estimatedDelivery ? (

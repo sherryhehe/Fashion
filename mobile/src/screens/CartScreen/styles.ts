@@ -80,6 +80,17 @@ export const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666666',
   },
+  itemShippingLine: {
+    fontSize: 12,
+    color: '#2C2C2E',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  itemNoteLine: {
+    fontSize: 11,
+    color: '#8E8E93',
+    marginBottom: 4,
+  },
   priceAndQuantityRow: {
     flexDirection: 'row',
     alignItems: 'center',

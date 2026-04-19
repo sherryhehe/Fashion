@@ -6,6 +6,7 @@ import {
   getShippingSettingsResolved,
   SHIPPING_COST_KEY,
   SHIPPING_TIME_KEY,
+  PLATFORM_FEE_KEY,
 } from '../utils/shippingSettings';
 
 const PAYMENT_CURRENCY_KEY = 'payment_currency';
@@ -71,13 +72,26 @@ export const getShippingSettings = async (_req: Request, res: Response): Promise
 
 /**
  * PATCH /api/settings/shipping — Admin only
- * Body: { shippingCost?: number, estimatedDelivery?: string }
+ * Body: { platformFee?: number, shippingCost?: number (legacy), estimatedDelivery?: string }
  */
 export const updateShippingSettings = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { shippingCost, estimatedDelivery } = req.body || {};
+    const { platformFee, shippingCost, estimatedDelivery } = req.body || {};
 
-    if (shippingCost !== undefined) {
+    if (platformFee !== undefined) {
+      const n = typeof platformFee === 'number' ? platformFee : Number(platformFee);
+      if (!Number.isFinite(n) || n < 0 || n > 1_000_000_000) {
+        errorResponse(res, 'platformFee must be a number between 0 and 1e9', 400);
+        return;
+      }
+      await Setting.findOneAndUpdate(
+        { key: PLATFORM_FEE_KEY },
+        { $set: { value: Math.round(n) } },
+        { upsert: true, new: true }
+      );
+    }
+
+    if (shippingCost !== undefined && platformFee === undefined) {
       const n = typeof shippingCost === 'number' ? shippingCost : Number(shippingCost);
       if (!Number.isFinite(n) || n < 0 || n > 1_000_000_000) {
         errorResponse(res, 'shippingCost must be a number between 0 and 1e9', 400);

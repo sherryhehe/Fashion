@@ -263,13 +263,25 @@ const OrderDetailScreen: React.FC<OrderDetailScreenProps> = ({ navigation }) => 
         <View style={styles.orderCard}>
           <Text style={styles.sectionTitle}>Order Summary</Text>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Subtotal</Text>
+            <Text style={styles.summaryLabel}>Item</Text>
             <Text style={styles.summaryValue}>{formatCurrency(order.subtotal || 0)}</Text>
           </View>
           {order.shippingCost !== undefined && (
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Shipping</Text>
               <Text style={styles.summaryValue}>{formatCurrency(order.shippingCost)}</Text>
+            </View>
+          )}
+          {order.platformFee !== undefined && (order.platformFee ?? 0) > 0 && (
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Platform fees</Text>
+              <Text style={styles.summaryValue}>{formatCurrency(order.platformFee)}</Text>
+            </View>
+          )}
+          {order.transactionFee !== undefined && (order.transactionFee ?? 0) > 0 && (
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Card fee</Text>
+              <Text style={styles.summaryValue}>{formatCurrency(order.transactionFee)}</Text>
             </View>
           )}
           {order.tax !== undefined && order.tax > 0 && (

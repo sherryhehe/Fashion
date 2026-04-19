@@ -8,6 +8,7 @@ import SettingsScreen from '../screens/SettingsScreen';
 import CategoriesScreen from '../screens/Categories';
 import CheckoutScreen from '../screens/Checkout';
 import OrderSuccessScreen from '../screens/OrderSuccessScreen';
+import PaymentFailedScreen from '../screens/PaymentFailedScreen';
 import FloatingBottomTab from '../components/FloatingBottomTab';
 
 // Define parameter lists for type safety
@@ -21,6 +22,7 @@ export type CartStackParamList = {
   Cart: undefined;
   Checkout: undefined;
   OrderSuccess: { orderId: string; clientSecret?: string };
+  PaymentFailed: { orderId?: string; message?: string };
 };
 
 export type SettingsStackParamList = {
@@ -94,6 +96,7 @@ const CartStackNavigator = () => {
       <CartStack.Screen name="Cart" component={CartScreen} />
       <CartStack.Screen name="Checkout" component={CheckoutScreen} />
       <CartStack.Screen name="OrderSuccess" component={OrderSuccessScreen} />
+      <CartStack.Screen name="PaymentFailed" component={PaymentFailedScreen} />
     </CartStack.Navigator>
   );
 };

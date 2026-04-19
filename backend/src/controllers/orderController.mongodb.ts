@@ -7,7 +7,7 @@ import Setting from '../models/Setting';
 import { successResponse, errorResponse } from '../utils/responseHelper';
 import { AuthRequest } from '../middleware/auth';
 import { CARD_FEE_PERCENT } from '../constants/orderFees';
-import { getShippingCostAmount } from '../utils/shippingSettings';
+import { getPlatformFeeAmount } from '../utils/shippingSettings';
 import {
   decrementStockForSelection,
   getAvailableStockForSelection,
@@ -170,6 +170,7 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
 
     // Calculate totals, validate payment method and stock
     let subtotal = 0;
+    let lineShippingTotal = 0;
     const requestedQuantityBySelection = new Map<string, number>();
     const selectionKey = (productId: string, size?: string, color?: string) =>
       `${productId}|${String(size || '').trim().toLowerCase()}|${String(color || '').trim().toLowerCase()}`;
@@ -205,6 +206,17 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
         const unitPrice = typeof item.price === 'number' && item.price >= 0 ? item.price : product.price;
         const itemTotal = unitPrice * qty;
         subtotal += itemTotal;
+        const unitShip = Math.max(0, Number((product as any).shippingFees) || 0);
+        const lineShip = Math.round(unitShip * qty);
+        lineShippingTotal += lineShip;
+        const notesSnap =
+          typeof (product as any).notes === 'string'
+            ? String((product as any).notes).trim().slice(0, 1000)
+            : '';
+        const shipTimeSnap =
+          typeof (product as any).shippingTime === 'string'
+            ? String((product as any).shippingTime).trim().slice(0, 120)
+            : '';
         const productImage = Array.isArray((product as any).images) && (product as any).images.length > 0
           ? String((product as any).images[0])
           : undefined;
@@ -217,15 +229,19 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
           size: item.size,
           color: item.color,
           productImage,
+          shippingFee: lineShip,
+          notes: notesSnap || undefined,
+          shippingTime: shipTimeSnap || undefined,
         };
       })
     );
 
     const tax = 0;
     const subtotalRounded = Math.round(subtotal);
-    const shippingCost = await getShippingCostAmount();
+    const shippingCost = lineShippingTotal;
+    const platformFee = await getPlatformFeeAmount();
     const transactionFee = isCardPayment ? Math.round(subtotalRounded * CARD_FEE_PERCENT) : 0;
-    const total = subtotalRounded + shippingCost + transactionFee;
+    const total = subtotalRounded + shippingCost + platformFee + transactionFee;
 
     const orderCount = await Order.countDocuments();
     const orderNumber = `ORD-${Date.now()}-${orderCount + 1}`;
@@ -240,6 +256,8 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
       subtotal: subtotalRounded,
       tax,
       shippingCost,
+      platformFee,
+      transactionFee,
       total,
       status: 'pending',
       paymentMethod: selectedMethod,
