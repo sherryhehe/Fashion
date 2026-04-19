@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -13,8 +14,11 @@ import { usePaymentSheet } from '@stripe/stripe-react-native';
 import { CartStackParamList } from '../../navigation/HomeNavigator';
 import { SafeView } from '../../components';
 import { useOrder, useConfirmOrderPayment } from '../../hooks/useOrders';
+import type { Order } from '../../services/order.service';
 import { MERCHANT_DISPLAY_NAME } from '../../config/stripe';
 import { showToast } from '../../utils/toast';
+import { getFirstImageSource } from '../../utils/imageHelper';
+import images from '../../assets/images';
 
 export type OrderSuccessScreenParams = { orderId: string; clientSecret?: string };
 
@@ -31,7 +35,11 @@ const OrderSuccessScreen: React.FC<OrderSuccessScreenProps> = ({ navigation, rou
   const clientSecret = route.params?.clientSecret;
   const [paymentComplete, setPaymentComplete] = useState(false);
   const { data: orderResponse, isLoading, refetch } = useOrder(orderId);
-  const order = orderResponse?.data;
+  const order: Order | undefined = (() => {
+    const d = orderResponse?.data;
+    if (d == null) return undefined;
+    return Array.isArray(d) ? d[0] : d;
+  })();
   const confirmPaymentMutation = useConfirmOrderPayment();
   const { initPaymentSheet, presentPaymentSheet } = usePaymentSheet();
 
@@ -46,11 +54,19 @@ const OrderSuccessScreen: React.FC<OrderSuccessScreenProps> = ({ navigation, rou
       });
       if (initError) {
         showToast.error(initError.message || 'Could not load payment form');
+        navigation.replace('PaymentFailed', {
+          orderId,
+          message: initError.message || 'Could not load payment form',
+        });
         return;
       }
       const { error: presentError } = await presentPaymentSheet();
       if (presentError) {
         showToast.error(presentError.message || 'Payment was cancelled');
+        navigation.replace('PaymentFailed', {
+          orderId,
+          message: presentError.message || 'Payment did not complete',
+        });
         return;
       }
       await confirmPaymentMutation.mutateAsync(orderId);
@@ -59,6 +75,10 @@ const OrderSuccessScreen: React.FC<OrderSuccessScreenProps> = ({ navigation, rou
       showToast.success('Payment successful!', 'Order confirmed');
     } catch (err: any) {
       showToast.error(err?.message || 'Payment failed');
+      navigation.replace('PaymentFailed', {
+        orderId,
+        message: err?.message || 'Payment failed',
+      });
     }
   };
 
@@ -98,21 +118,64 @@ const OrderSuccessScreen: React.FC<OrderSuccessScreenProps> = ({ navigation, rou
             </View>
             {order.items?.length > 0 && (
               <View style={styles.itemsList}>
-                {order.items.slice(0, 5).map((item: any, idx: number) => (
-                  <View key={`${item.productId}-${idx}`} style={styles.itemRow}>
-                    <View style={styles.itemImagePlaceholder} />
-                    <View style={styles.itemDetails}>
-                      <Text style={styles.itemName} numberOfLines={1}>{item.productName}</Text>
-                      <Text style={styles.itemMeta}>
-                        Qty: {item.quantity} · {formatPrice(item.total)}
-                      </Text>
+                {order.items.slice(0, 20).map((item: any, idx: number) => {
+                  const imgSrc = item.productImage
+                    ? getFirstImageSource([item.productImage], images.image1)
+                    : images.image1;
+                  return (
+                    <View key={`${item.productId}-${idx}`} style={styles.itemRow}>
+                      <Image source={imgSrc} style={styles.itemThumb} resizeMode="cover" />
+                      <View style={styles.itemDetails}>
+                        <Text style={styles.itemName} numberOfLines={2}>{item.productName}</Text>
+                        <Text style={styles.itemMeta}>
+                          Qty: {item.quantity} · {formatPrice(item.total)}
+                        </Text>
+                        {(item.size || item.color) ? (
+                          <Text style={styles.itemMeta}>
+                            {[item.color, item.size ? `Size ${item.size}` : ''].filter(Boolean).join(' · ')}
+                          </Text>
+                        ) : null}
+                        {item.shippingFee > 0 ? (
+                          <Text style={styles.itemShipping}>Shipping: {formatPrice(item.shippingFee)}</Text>
+                        ) : null}
+                        {item.shippingTime ? (
+                          <Text style={styles.itemNote}>Est. delivery: {item.shippingTime}</Text>
+                        ) : null}
+                        {item.notes ? (
+                          <Text style={styles.itemNote} numberOfLines={4}>Note: {item.notes}</Text>
+                        ) : null}
+                      </View>
                     </View>
-                  </View>
-                ))}
+                  );
+                })}
               </View>
             )}
+            <View style={styles.feeBox}>
+              <View style={styles.feeRow}>
+                <Text style={styles.feeLabel}>Item</Text>
+                <Text style={styles.feeVal}>{formatPrice(order.subtotal)}</Text>
+              </View>
+              <View style={styles.feeRow}>
+                <Text style={styles.feeLabel}>Shipping</Text>
+                <Text style={styles.feeVal}>{formatPrice(order.shippingCost ?? 0)}</Text>
+              </View>
+              <View style={styles.feeRow}>
+                <Text style={styles.feeLabel}>Platform fees</Text>
+                <Text style={styles.feeVal}>{formatPrice(order.platformFee ?? 0)}</Text>
+              </View>
+              {(order.transactionFee ?? 0) > 0 ? (
+                <View style={styles.feeRow}>
+                  <Text style={styles.feeLabel}>Card fee (5%)</Text>
+                  <Text style={styles.feeVal}>{formatPrice(order.transactionFee ?? 0)}</Text>
+                </View>
+              ) : null}
+              <View style={[styles.feeRow, styles.feeTotalRow]}>
+                <Text style={styles.feeTotalLabel}>Total</Text>
+                <Text style={styles.feeTotalVal}>{formatPrice(order.total)}</Text>
+              </View>
+            </View>
             <View style={styles.deliveryBar}>
-              <Text style={styles.deliveryLabel}>Note</Text>
+              <Text style={styles.deliveryLabel}>Updates</Text>
               <Text style={styles.deliveryValue}>We'll send you a confirmation message.</Text>
             </View>
           </View>
@@ -228,10 +291,10 @@ const styles = StyleSheet.create({
   },
   itemRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
+    alignItems: 'flex-start',
+    marginBottom: 12,
   },
-  itemImagePlaceholder: {
+  itemThumb: {
     width: 48,
     height: 48,
     borderRadius: 8,
@@ -241,6 +304,29 @@ const styles = StyleSheet.create({
   itemDetails: { flex: 1 },
   itemName: { fontSize: 15, color: '#2C2C2E', fontWeight: '500' },
   itemMeta: { fontSize: 13, color: '#8E8E93', marginTop: 2 },
+  itemShipping: { fontSize: 12, color: '#2C2C2E', fontWeight: '600', marginTop: 4 },
+  itemNote: { fontSize: 11, color: '#8E8E93', marginTop: 2 },
+  feeBox: {
+    marginBottom: 12,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5E7',
+  },
+  feeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  feeLabel: { fontSize: 14, color: '#8E8E93' },
+  feeVal: { fontSize: 14, color: '#2C2C2E', fontWeight: '500' },
+  feeTotalRow: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5E7',
+  },
+  feeTotalLabel: { fontSize: 16, fontWeight: 'bold', color: '#2C2C2E' },
+  feeTotalVal: { fontSize: 16, fontWeight: 'bold', color: '#34C759' },
   deliveryBar: {
     backgroundColor: 'rgba(52, 199, 89, 0.15)',
     borderRadius: 8,

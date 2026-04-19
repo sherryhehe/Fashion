@@ -10,6 +10,7 @@ import { getProductImageUrl } from '@/utils/imageHelper';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import ConfirmDialog from '@/components/organisms/ConfirmDialog';
 import { getApiUrl } from '@/utils/apiHelper';
+import { formatCurrency } from '@/utils/currencyHelper';
 
 export default function ProductEdit() {
   const router = useRouter();
@@ -34,20 +35,44 @@ export default function ProductEdit() {
     brand: '',
     style: '',
     price: '',
-    shippingFees: '',
+    shippingFees: '0',
     shippingTime: '',
     originalPrice: '',
     discount: '',
     inventory: '',
-    shippingFees: '0',
-    shippingTime: '',
-    notes: '',
     productImages: '',
     description: '',
     notes: '',
     features: '',
     status: 'active',
   });
+
+  const [variations, setVariations] = useState<
+    Array<{ id: string | number; size?: string; color?: string; price?: number; stock?: number }>
+  >([]);
+  const [newVariation, setNewVariation] = useState({
+    size: '',
+    color: '',
+    price: '',
+    stock: '',
+  });
+
+  const handleAddVariation = () => {
+    if (!newVariation.size && !newVariation.color) return;
+    const variation = {
+      id: Date.now(),
+      size: newVariation.size || undefined,
+      color: newVariation.color || undefined,
+      price: newVariation.price ? parseFloat(newVariation.price) : undefined,
+      stock: newVariation.stock !== '' ? parseInt(newVariation.stock, 10) : undefined,
+    };
+    setVariations([...variations, variation]);
+    setNewVariation({ size: '', color: '', price: '', stock: '' });
+  };
+
+  const handleRemoveVariation = (id: string | number) => {
+    setVariations(variations.filter((v) => v.id !== id));
+  };
 
   // SEO data
   const [seoData, setSeoData] = useState({
@@ -117,20 +142,28 @@ export default function ProductEdit() {
         brand: product.brand || '',
         style: product.style || '',
         price: product.price?.toString() || '',
-        shippingFees: product.shippingFees?.toString() || '',
+        shippingFees: (product.shippingFees ?? 0).toString(),
         shippingTime: product.shippingTime || '',
         originalPrice: product.originalPrice?.toString() || '',
         discount: product.discount?.toString() || '',
         inventory: product.stock?.toString() || '',
-        shippingFees: (product.shippingFees ?? 0).toString(),
-        shippingTime: product.shippingTime || '',
-        notes: product.notes || '',
         productImages: product.images?.join(', ') || '',
         description: product.description || '',
         notes: product.notes || '',
         features: product.features?.join('\n') || '',
         status: product.status || 'active',
       });
+
+      const rawVars = Array.isArray(product.variations) ? product.variations : [];
+      setVariations(
+        rawVars.map((v: any, i: number) => ({
+          id: v.id ?? `var-${i}-${Date.now()}`,
+          size: v.size,
+          color: v.color,
+          price: typeof v.price === 'number' ? v.price : undefined,
+          stock: typeof v.stock === 'number' ? v.stock : undefined,
+        }))
+      );
 
       setSalesCount(product.salesCount || 0);
       setStats({
@@ -342,26 +375,26 @@ export default function ProductEdit() {
         ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length 
         : 0;
 
+      const variationsArray = variations.map(({ id: _id, ...rest }) => rest);
+
       const productData = {
         name: formData.productName,
         sku: formData.productSku,
         description: formData.description,
         price: parseFloat(formData.price),
-        shippingFees: formData.shippingFees ? parseFloat(formData.shippingFees) : 0,
-        shippingTime: formData.shippingTime || '',
+        shippingFees,
+        shippingTime: formData.shippingTime.trim(),
         originalPrice: formData.originalPrice ? parseFloat(formData.originalPrice) : undefined,
         discount: formData.discount ? parseFloat(formData.discount) : 0,
         category: formData.category,
         brand: formData.brand || undefined,
-        stock: parseInt(formData.inventory),
-        shippingFees,
-        shippingTime: formData.shippingTime.trim(),
+        stock: parseInt(formData.inventory, 10),
         notes: formData.notes.trim(),
         status: formData.status as 'active' | 'inactive' | 'draft',
         style: formData.style,
         features: featuresArray,
-        notes: formData.notes || '',
         images: finalImages,
+        variations: variationsArray,
         rating: avgRating,
         reviewCount: reviews.length,
         reviews: reviews,
@@ -721,32 +754,91 @@ export default function ProductEdit() {
                       </div>
                       <small className="text-muted">Set to 0 to show as out of stock to customers.</small>
                     </div>
-                    <div className="col-md-6 mb-3">
-                      <label htmlFor="shippingFees" className="form-label">Shipping Fees</label>
-                      <input
-                        type="number"
-                        className="form-control"
-                        id="shippingFees"
-                        name="shippingFees"
-                        value={formData.shippingFees}
-                        onChange={handleChange}
-                        step="0.01"
-                        min="0"
-                      />
-                    </div>
                     <div className="col-12 mb-3">
-                      <label htmlFor="shippingTime" className="form-label">Shipping Time</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        id="shippingTime"
-                        name="shippingTime"
-                        value={formData.shippingTime}
-                        onChange={handleChange}
-                        maxLength={120}
-                        placeholder="e.g. 3-5 business days"
-                      />
-                      <small className="text-muted">{formData.shippingTime.length}/120 characters</small>
+                      <label className="form-label">Size / color variants & stock</label>
+                      <div className="border rounded p-3 bg-light">
+                        <div className="row g-2 mb-3">
+                          <div className="col-md-3">
+                            <input
+                              type="text"
+                              className="form-control form-control-sm"
+                              placeholder="Size (e.g. M)"
+                              value={newVariation.size}
+                              onChange={(e) => setNewVariation({ ...newVariation, size: e.target.value })}
+                            />
+                          </div>
+                          <div className="col-md-3">
+                            <input
+                              type="text"
+                              className="form-control form-control-sm"
+                              placeholder="Color"
+                              value={newVariation.color}
+                              onChange={(e) => setNewVariation({ ...newVariation, color: e.target.value })}
+                            />
+                          </div>
+                          <div className="col-md-2">
+                            <input
+                              type="number"
+                              className="form-control form-control-sm"
+                              placeholder="Price"
+                              step="0.01"
+                              value={newVariation.price}
+                              onChange={(e) => setNewVariation({ ...newVariation, price: e.target.value })}
+                            />
+                          </div>
+                          <div className="col-md-2">
+                            <input
+                              type="number"
+                              className="form-control form-control-sm"
+                              placeholder="Stock"
+                              value={newVariation.stock}
+                              onChange={(e) => setNewVariation({ ...newVariation, stock: e.target.value })}
+                            />
+                          </div>
+                          <div className="col-md-2">
+                            <button type="button" className="btn btn-sm btn-primary w-100" onClick={handleAddVariation}>
+                              Add
+                            </button>
+                          </div>
+                        </div>
+                        {variations.length > 0 ? (
+                          <div className="table-responsive">
+                            <table className="table table-sm table-bordered mb-0">
+                              <thead className="table-light">
+                                <tr>
+                                  <th>Size</th>
+                                  <th>Color</th>
+                                  <th>Price</th>
+                                  <th>Stock</th>
+                                  <th style={{ width: 48 }} />
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {variations.map((v) => (
+                                  <tr key={String(v.id)}>
+                                    <td>{v.size || '—'}</td>
+                                    <td>{v.color || '—'}</td>
+                                    <td>{v.price != null ? formatCurrency(v.price) : '—'}</td>
+                                    <td>{v.stock ?? '—'}</td>
+                                    <td>
+                                      <button
+                                        type="button"
+                                        className="btn btn-sm btn-outline-danger"
+                                        onClick={() => handleRemoveVariation(v.id)}
+                                      >
+                                        ×
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : (
+                          <p className="text-muted small mb-0 text-center">No variants yet — optional override for base inventory.</p>
+                        )}
+                      </div>
+                      <small className="text-muted">Each variant can have its own stock; mobile checkout uses these levels.</small>
                     </div>
                     <div className="col-12 mb-3">
                       <label htmlFor="description" className="form-label">Description</label>
@@ -757,18 +849,6 @@ export default function ProductEdit() {
                         rows={4} 
                         value={formData.description}
                         onChange={handleChange}
-                      ></textarea>
-                    </div>
-                    <div className="col-12 mb-3">
-                      <label htmlFor="notes" className="form-label">Notes</label>
-                      <textarea 
-                        className="form-control" 
-                        id="notes" 
-                        name="notes"
-                        rows={3} 
-                        value={formData.notes}
-                        onChange={handleChange}
-                        placeholder="Add internal notes for this product"
                       ></textarea>
                     </div>
                     <div className="col-12 mb-3">

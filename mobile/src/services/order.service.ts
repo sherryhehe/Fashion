@@ -8,6 +8,10 @@ export interface OrderItem {
   total: number;
   size?: string;
   color?: string;
+  productImage?: string;
+  shippingFee?: number;
+  notes?: string;
+  shippingTime?: string;
 }
 
 export interface ShippingAddress {
@@ -35,10 +39,12 @@ export interface Order {
   subtotal: number;
   tax: number;
   shippingCost: number;
+  platformFee?: number;
+  transactionFee?: number;
   total: number;
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   paymentMethod: string;
-  paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded';
+  paymentStatus?: 'pending' | 'paid' | 'failed' | 'refunded';
   shippingAddress: ShippingAddress;
   notes?: string;
   timeline: Array<{

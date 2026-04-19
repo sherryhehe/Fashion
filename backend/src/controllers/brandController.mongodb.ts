@@ -46,6 +46,7 @@ export const getAllowedPaymentMethods = async (req: Request, res: Response): Pro
       successResponse(res, { allowedPaymentMethods: ['card', 'cash'] });
       return;
     }
+    // Start from full set; intersect with each brand that defines methods.
     const brands = await Brand.find({
       $or: brandNames.map((n: string) => ({ name: new RegExp(`^${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') })),
     })
@@ -60,7 +61,7 @@ export const getAllowedPaymentMethods = async (req: Request, res: Response): Pro
       }
     }
     if (allowed.length === 0) {
-      allowed = ['card', 'cash'];
+      allowed = ['cash'];
     }
     successResponse(res, { allowedPaymentMethods: allowed });
   } catch (error) {

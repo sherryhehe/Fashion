@@ -336,10 +336,16 @@ const styles = StyleSheet.create({
   selectedSizeButton: {
     backgroundColor: '#2C2C2E',
   },
+  sizeButtonDisabled: {
+    opacity: 0.45,
+  },
   sizeText: {
     fontSize: 16,
     fontWeight: '500',
     color: '#8E8E93',
+  },
+  sizeTextDisabled: {
+    color: '#B0B0B5',
   },
   selectedSizeText: {
     color: '#FFFFFF',
@@ -379,6 +385,11 @@ const styles = StyleSheet.create({
     marginHorizontal: 10,
     minWidth: 30,
     textAlign: 'center',
+  },
+  quantityHintText: {
+    marginTop: 10,
+    fontSize: 12,
+    color: '#8E8E93',
   },
 
   // Shipping Section Styles

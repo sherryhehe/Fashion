@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -25,9 +25,7 @@ import { useShippingSettings } from '../../hooks/useShippingSettings';
 import authService from '../../services/auth.service';
 import brandService from '../../services/brand.service';
 import { showToast } from '../../utils/toast';
-
-// Card transaction fee: 5% when payment method is card
-const CARD_FEE_PERCENT = 0.05;
+import { computeOrderAmounts } from '../../utils/orderPricing';
 import { requireAuthOrPromptLogin } from '../../utils/guestHelper';
 
 type CheckoutScreenNavigationProp = StackNavigationProp<CartStackParamList, 'Checkout'>;
@@ -54,7 +52,7 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
   // Fetch cart and user profile
   const { data: cartData, isLoading: cartLoading } = useCart();
   const { data: shippingSettings } = useShippingSettings();
-  const shippingFeePkr = shippingSettings?.shippingCost ?? 0;
+  const platformFeePkr = shippingSettings?.platformFee ?? 0;
   const createOrderMutation = useCreateOrder();
   const confirmPaymentMutation = useConfirmOrderPayment();
   const removeFromCartMutation = useRemoveFromCart();
@@ -63,6 +61,36 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
 
   const cartItems = cartData?.data || [];
 
+  const pricedCartItems = useMemo(() => {
+    return cartItems.filter((item: any) => {
+      const product = item.product || null;
+      const productPrice =
+        typeof item.productPrice === 'number' && item.productPrice > 0
+          ? item.productPrice
+          : product &&
+              typeof product.price === 'number' &&
+              product.price > 0
+            ? product.price
+            : 0;
+      return productPrice > 0 && item.quantity > 0;
+    });
+  }, [cartItems]);
+
+  const checkoutPricing = useMemo(
+    () =>
+      computeOrderAmounts(
+        pricedCartItems,
+        platformFeePkr,
+        paymentMethod === 'stripe' ? 'stripe' : 'cod'
+      ),
+    [pricedCartItems, platformFeePkr, paymentMethod]
+  );
+
+  const lineMetaByKey = useMemo(
+    () => new Map(checkoutPricing.perLine.map((p) => [p.key, p])),
+    [checkoutPricing.perLine]
+  );
+
   // Fetch allowed payment methods based on brands in cart (stripe/card/cash; COD = cash)
   const cartBrandNames = [...new Set(
     cartItems.map((item: any) => item?.product?.brand || item?.brand).filter(Boolean)
@@ -70,21 +98,17 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
 
   const normalizeAllowedMethods = (methods: string[] | undefined): string[] => {
     if (!Array.isArray(methods) || methods.length === 0) {
-      return ['stripe', 'cash'];
+      return ['cash'];
     }
 
-    const normalized = methods
-      .map((method) => {
-        const normalizedMethod = String(method).toLowerCase();
-        if (normalizedMethod === 'card' || normalizedMethod === 'stripe') return 'stripe';
-        if (normalizedMethod === 'cash') return 'cash';
-        return null;
-      })
-      .filter((method): method is string => Boolean(method));
+    const normalized: Array<'stripe' | 'cash'> = [];
+    for (const method of methods) {
+      const m = String(method).toLowerCase();
+      if (m === 'card' || m === 'stripe') normalized.push('stripe');
+      else if (m === 'cash') normalized.push('cash');
+    }
 
-    const deduped = normalized.length > 0 ? Array.from(new Set(normalized)) : ['stripe', 'cash'];
-    // Keep Stripe available for checkout testing even if a brand is cash-only.
-    return Array.from(new Set(['stripe', ...deduped]));
+    return normalized.length > 0 ? Array.from(new Set(normalized)) : ['cash'];
   };
 
   useEffect(() => {
@@ -175,47 +199,28 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
       return;
     }
 
-    // Prepare order items from cart
-    // Use productPrice from cart items (same as cart screen uses)
-    const orderItems = cartItems
-      .filter((item: any) => {
-        // Only include items with valid product and price (same filter as cart screen)
-        const product = item.product || null;
-        const productPrice = product && 
-                            product.price && 
-                            typeof product.price === 'number' && 
-                            product.price > 0 
-          ? product.price 
-          : 0;
-        return productPrice > 0 && item.quantity > 0;
-      })
-      .map((item: any) => {
-        // Get price - prefer productPrice if set (from CartScreen mapping), otherwise use product.price
-        const product = item.product || null;
-        const productPrice = item.productPrice || // Use productPrice if available (from CartScreen)
-                            (product && 
-                             product.price && 
-                             typeof product.price === 'number' && 
-                             product.price > 0 
-                              ? product.price 
-                              : 0);
-        
-        return {
-          productId: item.productId,
-          productName: item.productName || product?.name || 'Unknown Product',
-          quantity: item.quantity,
-          price: productPrice, // Use productPrice (what user saw in cart)
-          total: productPrice * item.quantity,
-          size: item.size,
-          color: item.color,
-        };
-      });
+    // Prepare order items from cart (same rows as pricedCartItems / backend validation)
+    const orderItems = pricedCartItems.map((item: any) => {
+      const product = item.product || null;
+      const productPrice =
+        typeof item.productPrice === 'number' && item.productPrice > 0
+          ? item.productPrice
+          : product &&
+              typeof product.price === 'number' &&
+              product.price > 0
+            ? product.price
+            : 0;
 
-    // Calculate totals - match backend: subtotal + shipping + 5% if card
-    const subtotal = orderItems.reduce((sum: number, item: any) => sum + item.total, 0);
-    const isCard = (paymentMethod || '').toLowerCase() === 'stripe';
-    const cardFee = isCard ? Math.round(subtotal * CARD_FEE_PERCENT) : 0;
-    const total = subtotal + shippingFeePkr + cardFee;
+      return {
+        productId: item.productId,
+        productName: item.productName || product?.name || 'Unknown Product',
+        quantity: item.quantity,
+        price: productPrice,
+        total: productPrice * item.quantity,
+        size: item.size,
+        color: item.color,
+      };
+    });
 
     // Prepare shipping address
     const shippingAddress = {
@@ -264,13 +269,19 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
           });
           if (initError) {
             showToast.error(initError.message || 'Could not load payment form');
-            navigation.replace('OrderSuccess', { orderId, clientSecret });
+            navigation.replace('PaymentFailed', {
+              orderId,
+              message: initError.message || 'Could not load payment form',
+            });
             return;
           }
           const { error: presentError } = await presentPaymentSheet();
           if (presentError) {
             showToast.error(presentError.message || 'Payment was cancelled');
-            navigation.replace('OrderSuccess', { orderId, clientSecret });
+            navigation.replace('PaymentFailed', {
+              orderId,
+              message: presentError.message || 'Payment did not complete',
+            });
             return;
           }
           await confirmPaymentMutation.mutateAsync(orderId as string);
@@ -278,7 +289,10 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
           navigation.replace('OrderSuccess', { orderId });
         } catch (err: any) {
           showToast.error(err?.message || 'Payment failed');
-          navigation.replace('OrderSuccess', { orderId, clientSecret });
+          navigation.replace('PaymentFailed', {
+            orderId,
+            message: err?.message || 'Payment failed',
+          });
         } finally {
           setIsPaymentSheetOpen(false);
         }
@@ -348,10 +362,10 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>What you're buying</Text>
           <View style={styles.formWrapper}>
-            {cartItems.length === 0 ? (
+            {pricedCartItems.length === 0 ? (
               <Text style={styles.emptyCartText}>Your cart is empty</Text>
             ) : (
-              cartItems.map((item: any) => {
+              pricedCartItems.map((item: any) => {
                 const product = item.product || {};
                 const productPrice = item.productPrice ?? product?.price ?? 0;
                 const qty = item.quantity || 0;
@@ -362,6 +376,8 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
                   images?.image1 || images?.velvetShawl
                 );
                 const cartItemId = item._id || item.id;
+                const lineKey = String(cartItemId || product?.name || '');
+                const meta = lineMetaByKey.get(lineKey);
                 return (
                   <View key={cartItemId} style={styles.cartItemRow}>
                     <Image
@@ -376,6 +392,17 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
                       <Text style={styles.cartItemMeta}>
                         {qty} × PKR {productPrice.toLocaleString()} = PKR {lineTotal.toLocaleString()}
                       </Text>
+                      {meta && meta.shipping > 0 ? (
+                        <Text style={styles.cartItemExtra}>Shipping: PKR {meta.shipping.toLocaleString()}</Text>
+                      ) : null}
+                      {meta?.shippingTime ? (
+                        <Text style={styles.cartItemExtraMuted}>Est. delivery: {meta.shippingTime}</Text>
+                      ) : null}
+                      {meta?.notes ? (
+                        <Text style={styles.cartItemExtraMuted} numberOfLines={3}>
+                          Note: {meta.notes}
+                        </Text>
+                      ) : null}
                     </View>
                     <TouchableOpacity
                       style={[styles.removeItemButton, removeFromCartMutation.isPending && styles.removeItemButtonDisabled]}
@@ -508,47 +535,44 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
         </View>
         </View>
 
-        {/* Order Summary - show platform fee and card fee before place order (rounding matches backend) */}
-        {(() => {
-          const subtotalSum = Math.round(cartItems.reduce((sum: number, item: any) => {
-            const p = item.product;
-            const price = item.productPrice ?? (p?.price ?? 0);
-            return sum + price * (item.quantity || 0);
-          }, 0));
-          const isCard = (paymentMethod || '').toLowerCase() === 'stripe';
-          const cardFeeSum = isCard ? Math.round(subtotalSum * CARD_FEE_PERCENT) : 0;
-          const totalSum = subtotalSum + shippingFeePkr + cardFeeSum;
-          return (
-            <View style={styles.orderSummarySection}>
-              <Text style={styles.sectionTitle}>Order Summary</Text>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Subtotal</Text>
-                <Text style={styles.summaryValue}>PKR {subtotalSum.toLocaleString()}</Text>
-              </View>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Shipping</Text>
-                <Text style={styles.summaryValue}>
-                  {shippingFeePkr > 0 ? `PKR ${shippingFeePkr.toLocaleString()}` : 'Free'}
-                </Text>
-              </View>
-              {shippingSettings?.estimatedDelivery ? (
-                <Text style={styles.shippingEta}>
-                  Est. delivery: {shippingSettings.estimatedDelivery}
-                </Text>
-              ) : null}
-              {isCard && cardFeeSum > 0 && (
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Card fee (5%)</Text>
-                  <Text style={styles.summaryValue}>PKR {cardFeeSum.toLocaleString()}</Text>
-                </View>
-              )}
-              <View style={[styles.summaryRow, styles.summaryTotalRow]}>
-                <Text style={styles.summaryTotalLabel}>Total</Text>
-                <Text style={styles.summaryTotalValue}>PKR {totalSum.toLocaleString()}</Text>
-              </View>
+        <View style={styles.orderSummarySection}>
+          <Text style={styles.sectionTitle}>Order Summary</Text>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Item</Text>
+            <Text style={styles.summaryValue}>PKR {checkoutPricing.itemsSubtotal.toLocaleString()}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Shipping</Text>
+            <Text style={styles.summaryValue}>
+              {checkoutPricing.shippingSum > 0
+                ? `PKR ${checkoutPricing.shippingSum.toLocaleString()}`
+                : 'Free'}
+            </Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Platform fees</Text>
+            <Text style={styles.summaryValue}>
+              {checkoutPricing.platformFee > 0
+                ? `PKR ${checkoutPricing.platformFee.toLocaleString()}`
+                : 'Free'}
+            </Text>
+          </View>
+          {shippingSettings?.estimatedDelivery ? (
+            <Text style={styles.shippingEta}>
+              Est. delivery: {shippingSettings.estimatedDelivery}
+            </Text>
+          ) : null}
+          {checkoutPricing.cardFee > 0 && (
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Card fee (5%)</Text>
+              <Text style={styles.summaryValue}>PKR {checkoutPricing.cardFee.toLocaleString()}</Text>
             </View>
-          );
-        })()}
+          )}
+          <View style={[styles.summaryRow, styles.summaryTotalRow]}>
+            <Text style={styles.summaryTotalLabel}>Total</Text>
+            <Text style={styles.summaryTotalValue}>PKR {checkoutPricing.total.toLocaleString()}</Text>
+          </View>
+        </View>
 
         {/* Submit Order Button */}
         <TouchableOpacity 
@@ -656,6 +680,17 @@ const styles = StyleSheet.create({
   cartItemMeta: {
     fontSize: 13,
     color: '#8E8E93',
+  },
+  cartItemExtra: {
+    fontSize: 12,
+    color: '#2C2C2E',
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  cartItemExtraMuted: {
+    fontSize: 11,
+    color: '#8E8E93',
+    marginTop: 2,
   },
   removeItemButton: {
     width: 36,
