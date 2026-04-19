@@ -16,7 +16,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { queryClient } from './src/lib/queryClient';
 import Toast from 'react-native-toast-message';
 import authService from './src/services/auth.service';
-import { STRIPE_PUBLISHABLE_KEY } from './src/config/stripe';
+import { STRIPE_PUBLISHABLE_KEY, STRIPE_URL_SCHEME } from './src/config/stripe';
 
 // Global function to handle logout and show auth screen
 // This will be set by App component
@@ -104,7 +104,7 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>
+      <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY} urlScheme={STRIPE_URL_SCHEME}>
         <GestureHandlerRootView style={{ flex: 1 }}>
           <SafeAreaProvider>
             <StatusBar 

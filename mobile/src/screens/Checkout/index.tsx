@@ -16,7 +16,7 @@ import { CartStackParamList } from '../../navigation/HomeNavigator';
 import { SafeView, ShimmerLoader } from '../../components';
 import { getFirstImageSource } from '../../utils/imageHelper';
 import images from '../../assets/images';
-import { MERCHANT_DISPLAY_NAME } from '../../config/stripe';
+import { MERCHANT_DISPLAY_NAME, STRIPE_RETURN_URL } from '../../config/stripe';
 
 // API Hooks
 import { useCart, useRemoveFromCart } from '../../hooks/useCart';
@@ -259,6 +259,13 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
         return;
       }
 
+      if (paymentMethod === 'stripe' && !clientSecret) {
+        showToast.error(
+          'Card checkout could not start (no payment session from server). Use cash on delivery or try again later.'
+        );
+        return;
+      }
+
       // Card payment: show Stripe Payment Sheet
       if (clientSecret && paymentMethod === 'stripe') {
         setIsPaymentSheetOpen(true);
@@ -266,6 +273,7 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
           const { error: initError } = await initPaymentSheet({
             paymentIntentClientSecret: clientSecret,
             merchantDisplayName: MERCHANT_DISPLAY_NAME,
+            returnURL: STRIPE_RETURN_URL,
           });
           if (initError) {
             showToast.error(initError.message || 'Could not load payment form');

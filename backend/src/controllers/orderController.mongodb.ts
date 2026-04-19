@@ -168,6 +168,15 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
     const selectedMethod = selectedMethodRaw === 'stripe' ? 'card' : selectedMethodRaw;
     const isCardPayment = selectedMethod === 'card';
 
+    if (isCardPayment && !stripe) {
+      errorResponse(
+        res,
+        'Card payment is unavailable (Stripe is not configured on the server). Use cash on delivery or contact support.',
+        503
+      );
+      return;
+    }
+
     // Calculate totals, validate payment method and stock
     let subtotal = 0;
     let lineShippingTotal = 0;

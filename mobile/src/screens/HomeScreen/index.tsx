@@ -259,13 +259,16 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     bannersLoading,
   ]);
   // Brand banners (swipable, Shop Now → brand page) - same visual style as main hero
+  const homeHeroFallbackByIndex = (index: number) =>
+    index % 2 === 1 ? images.discoverNewClothes : images.homesliderimage;
+
   const brandCarouselData = (Array.isArray(brandBannersArray) ? brandBannersArray : [])
     .sort((a: any, b: any) => (a.order ?? 999) - (b.order ?? 999))
     .map((banner: any, index: number) => ({
       id: banner.id || banner._id || `brand-banner-${index}`,
       title: banner.title || '',
       subtitle: banner.subtitle || '',
-      image: getImageSource(banner.imageUrl || banner.image, images.homesliderimage),
+      image: getImageSource(banner.imageUrl || banner.image, homeHeroFallbackByIndex(index)),
       linkUrl: banner.linkUrl || banner.link,
     }));
 
@@ -284,7 +287,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           subtitle: banner.subtitle || '', // Use empty string if no subtitle
           cta: banner.subtitle || '', // Use subtitle as CTA, or empty if no subtitle
           // Backend returns imageUrl, not image - map it correctly
-          image: getImageSource(banner.imageUrl || banner.image, images.homesliderimage),
+          image: getImageSource(banner.imageUrl || banner.image, homeHeroFallbackByIndex(index)),
           // Backend returns linkUrl, not link - map it correctly
           link: banner.linkUrl || banner.link,
         }))
@@ -297,10 +300,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   }, [carouselData.length]);
 
   const renderCarouselItem = ({ item }: { item: any }) => {
-    const imageSource = typeof item.image === 'object' && item.image?.uri 
-      ? item.image 
-      : images.homesliderimage;
-    
+    const src = item.image;
+    const imageSource =
+      src != null &&
+      (typeof src === 'number' ||
+        (typeof src === 'object' && src !== null && 'uri' in src && (src as { uri?: string }).uri))
+        ? src
+        : images.homesliderimage;
+
     return (
       <TouchableOpacity 
         style={[styles.heroImageContainer, { width: screenWidth }]}
@@ -1002,7 +1009,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               snapToAlignment="start"
               decelerationRate="fast"
               renderItem={({ item }: { item: any }) => {
-                const imageSource = typeof item.image === 'object' && item.image?.uri ? item.image : images.homesliderimage;
+                const src = item.image;
+                const imageSource =
+                  src != null &&
+                  (typeof src === 'number' ||
+                    (typeof src === 'object' && src !== null && 'uri' in src && (src as { uri?: string }).uri))
+                    ? src
+                    : images.homesliderimage;
                 const storeId = item.linkUrl?.trim?.();
                 return (
                   <TouchableOpacity

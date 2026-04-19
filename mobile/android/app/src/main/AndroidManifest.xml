@@ -21,6 +21,13 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
+        <!-- Stripe Payment Sheet: return from 3DS / browser (must match STRIPE_RETURN_URL host) -->
+        <intent-filter>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="com.fashionapp" android:host="safepay" />
+        </intent-filter>
       </activity>
     </application>
 </manifest>
