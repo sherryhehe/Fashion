@@ -743,8 +743,15 @@ export default function ProductAdd() {
 
                     {/* Variations - User Friendly */}
                     <div className="col-12 mb-3">
+                      <div className="alert alert-info border-info py-2 px-3 mb-3">
+                        <strong className="d-block mb-1">Sizes, stock &amp; variants</strong>
+                        <span className="small">
+                          Add rows below for per-size stock on the mobile app. If you skip variants, only the main stock
+                          quantity above is used.
+                        </span>
+                      </div>
                       <label className="form-label">Product Variations</label>
-                      <div className="border rounded p-3">
+                      <div className="border rounded p-3 border-primary">
                         {/* Add New Variation */}
                         <div className="row g-2 mb-2">
                           <div className="col-md-3">

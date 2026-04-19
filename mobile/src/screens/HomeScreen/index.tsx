@@ -34,6 +34,9 @@ import { CommonActions, useFocusEffect } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
 
 const { width: screenWidth } = Dimensions.get('window');
+/** Inset promo banners like the previous app (rounded card, not edge-to-edge crop) */
+const HERO_CARD_INSET = 16;
+const heroBannerSlideWidth = screenWidth - HERO_CARD_INSET * 2;
 
 /** Shuffle array so product order varies each time (e.g. on app open / data load). Works on both Android and iOS. */
 function shuffleArray<T>(arr: T[]): T[] {
@@ -310,7 +313,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
     return (
       <TouchableOpacity 
-        style={[styles.heroImageContainer, { width: screenWidth }]}
+        style={[styles.heroImageContainer, { width: heroBannerSlideWidth }]}
         activeOpacity={item.link ? 0.8 : 1}
         onPress={() => {
           if (item.link) {
@@ -359,7 +362,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         } catch (error) {
           // Fallback to scrollToOffset if scrollToIndex fails
           flatListRef.current?.scrollToOffset({
-            offset: nextSlide * screenWidth,
+            offset: nextSlide * heroBannerSlideWidth,
             animated: true,
           });
         }
@@ -919,11 +922,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
         {/* Hero Banner Section - Full Width Carousel */}
         {bannersLoading ? (
-          <View style={styles.heroSection}>
-            <View style={{ width: screenWidth, height: 200, backgroundColor: '#F2F2F7', borderRadius: 16 }} />
+          <View style={[styles.heroSection, { paddingHorizontal: HERO_CARD_INSET }]}>
+            <View style={{ width: heroBannerSlideWidth, height: 232, backgroundColor: '#F2F2F7', borderRadius: 14 }} />
           </View>
         ) : carouselData.length > 0 ? (
-          <View style={styles.heroSection}>
+          <View style={[styles.heroSection, { paddingHorizontal: HERO_CARD_INSET }]}>
             <FlatList
               ref={flatListRef}
               data={carouselData}
@@ -937,19 +940,19 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               onScrollBeginDrag={handleScrollBeginDrag}
               onScrollEndDrag={handleScrollEndDrag}
               onMomentumScrollEnd={(event) => {
-                const index = Math.round(event.nativeEvent.contentOffset.x / screenWidth);
+                const index = Math.round(event.nativeEvent.contentOffset.x / heroBannerSlideWidth);
                 if (index >= 0 && index < carouselData.length) {
                   setCurrentSlide(index);
                 }
               }}
               getItemLayout={(data, index) => ({
-                length: screenWidth,
-                offset: screenWidth * index,
+                length: heroBannerSlideWidth,
+                offset: heroBannerSlideWidth * index,
                 index,
               })}
               style={styles.carousel}
               decelerationRate="fast"
-              snapToInterval={screenWidth}
+              snapToInterval={heroBannerSlideWidth}
               snapToAlignment="start"
               scrollEventThrottle={16}
               removeClippedSubviews={false}
@@ -974,7 +977,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                       } catch (error) {
                         // Fallback to scrollToOffset if scrollToIndex fails
                         flatListRef.current?.scrollToOffset({
-                          offset: index * screenWidth,
+                          offset: index * heroBannerSlideWidth,
                           animated: true,
                         });
                       }
@@ -989,8 +992,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             )}
           </View>
         ) : (
-          <View style={styles.heroSection}>
-            <View style={{ width: screenWidth, height: 200, backgroundColor: '#F2F2F7', borderRadius: 16, justifyContent: 'center', alignItems: 'center' }}>
+          <View style={[styles.heroSection, { paddingHorizontal: HERO_CARD_INSET }]}>
+            <View style={{ width: heroBannerSlideWidth, height: 232, backgroundColor: '#F2F2F7', borderRadius: 14, justifyContent: 'center', alignItems: 'center' }}>
               <Text style={{ color: '#8E8E93', fontSize: 14 }}>No banners available</Text>
             </View>
           </View>
@@ -998,14 +1001,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
         {/* Brand promo banners — full-bleed image only (tap opens store when linked) */}
         {brandCarouselData.length > 0 && (
-          <View style={[styles.heroSection, { marginTop: 12 }]}>
+          <View style={[styles.heroSection, { marginTop: 12, paddingHorizontal: HERO_CARD_INSET }]}>
             <FlatList
               data={brandCarouselData}
               horizontal
               pagingEnabled
               showsHorizontalScrollIndicator={false}
               keyExtractor={(item) => item.id}
-              snapToInterval={screenWidth}
+              snapToInterval={heroBannerSlideWidth}
               snapToAlignment="start"
               decelerationRate="fast"
               renderItem={({ item }: { item: any }) => {
@@ -1019,7 +1022,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 const storeId = item.linkUrl?.trim?.();
                 return (
                   <TouchableOpacity
-                    style={[styles.heroImageContainer, { width: screenWidth }]}
+                    style={[styles.heroImageContainer, { width: heroBannerSlideWidth }]}
                     activeOpacity={storeId ? 0.92 : 1}
                     onPress={() => {
                       if (storeId) navigation.getParent()?.navigate('StoreDetail', { storeId });

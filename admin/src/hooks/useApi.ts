@@ -304,8 +304,11 @@ export const useShippingSettings = () => {
 
 export const useUpdateShippingSettings = () => {
   return useMutation({
-    mutationFn: (data: { shippingCost?: number; estimatedDelivery?: string }) =>
-      apiRequest('/settings/shipping', { method: 'PATCH', body: JSON.stringify(data) }),
+    mutationFn: (data: {
+      platformFee?: number;
+      shippingCost?: number;
+      estimatedDelivery?: string;
+    }) => apiRequest('/settings/shipping', { method: 'PATCH', body: JSON.stringify(data) }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['settings', 'shipping'] }),
   });
 };

@@ -401,7 +401,9 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
                         {qty} × PKR {productPrice.toLocaleString()} = PKR {lineTotal.toLocaleString()}
                       </Text>
                       {meta && meta.shipping > 0 ? (
-                        <Text style={styles.cartItemExtra}>Shipping: PKR {meta.shipping.toLocaleString()}</Text>
+                        <Text style={styles.cartItemExtra}>
+                          Shipping (once per line): PKR {meta.shipping.toLocaleString()}
+                        </Text>
                       ) : null}
                       {meta?.shippingTime ? (
                         <Text style={styles.cartItemExtraMuted}>Est. delivery: {meta.shippingTime}</Text>
@@ -565,11 +567,6 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
                 : 'Free'}
             </Text>
           </View>
-          {shippingSettings?.estimatedDelivery ? (
-            <Text style={styles.shippingEta}>
-              Est. delivery: {shippingSettings.estimatedDelivery}
-            </Text>
-          ) : null}
           {checkoutPricing.cardFee > 0 && (
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Card fee (5%)</Text>
@@ -580,6 +577,12 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
             <Text style={styles.summaryTotalLabel}>Total</Text>
             <Text style={styles.summaryTotalValue}>PKR {checkoutPricing.total.toLocaleString()}</Text>
           </View>
+          {shippingSettings?.estimatedDelivery ? (
+            <Text style={styles.deliveryNoteFootnote}>
+              Store-wide delivery note: {shippingSettings.estimatedDelivery}. Item-specific times are shown
+              under each product above.
+            </Text>
+          ) : null}
         </View>
 
         {/* Submit Order Button */}
@@ -888,6 +891,12 @@ borderColor: '#E8ECF4',
   summaryLabel: { fontSize: 15, color: '#2C2C2E' },
   summaryValue: { fontSize: 15, color: '#2C2C2E' },
   shippingEta: { fontSize: 12, color: '#8E8E93', marginBottom: 8 },
+  deliveryNoteFootnote: {
+    fontSize: 12,
+    color: '#8E8E93',
+    marginTop: 10,
+    lineHeight: 17,
+  },
   summaryTotalRow: { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#E5E5E7' },
   summaryTotalLabel: { fontSize: 17, fontWeight: 'bold', color: '#2C2C2E' },
   summaryTotalValue: { fontSize: 17, fontWeight: 'bold', color: '#2C2C2E' },

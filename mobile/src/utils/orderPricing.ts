@@ -1,6 +1,7 @@
 /**
  * Aligns cart/checkout totals with backend `orderController.createOrder`:
- * total = items + sum(product.shippingFees × qty) + platformFee + optional card % on items only.
+ * total = items + sum(per-line product shipping, once per cart line) + platformFee + optional card % on items only.
+ * Per-line shipping is the product's shipping fee once per line (not multiplied by quantity).
  */
 
 export const CARD_FEE_PERCENT = 0.05;
@@ -33,7 +34,7 @@ export function computeOrderAmounts(
           : 0;
     itemsSubtotal += Math.round(price * qty);
     const unitShip = Math.max(0, Number(product.shippingFees) || 0);
-    const lineShip = Math.round(unitShip * qty);
+    const lineShip = Math.round(unitShip);
     shippingSum += lineShip;
     const name = product.name || item.productName || 'Item';
     const notes = typeof product.notes === 'string' ? product.notes.trim() : '';

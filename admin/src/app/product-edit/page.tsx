@@ -755,8 +755,15 @@ export default function ProductEdit() {
                       <small className="text-muted">Set to 0 to show as out of stock to customers.</small>
                     </div>
                     <div className="col-12 mb-3">
+                      <div className="alert alert-info border-info py-2 px-3 mb-3">
+                        <strong className="d-block mb-1">Sizes, stock &amp; variants</strong>
+                        <span className="small">
+                          Use the table below so the mobile app can enforce stock per size/color. If you leave this empty,
+                          only the main <strong>Inventory quantity</strong> above applies.
+                        </span>
+                      </div>
                       <label className="form-label">Size / color variants & stock</label>
-                      <div className="border rounded p-3 bg-light">
+                      <div className="border rounded p-3 bg-light border-primary">
                         <div className="row g-2 mb-3">
                           <div className="col-md-3">
                             <input

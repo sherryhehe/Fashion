@@ -216,7 +216,7 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
         const itemTotal = unitPrice * qty;
         subtotal += itemTotal;
         const unitShip = Math.max(0, Number((product as any).shippingFees) || 0);
-        const lineShip = Math.round(unitShip * qty);
+        const lineShip = Math.round(unitShip);
         lineShippingTotal += lineShip;
         const notesSnap =
           typeof (product as any).notes === 'string'

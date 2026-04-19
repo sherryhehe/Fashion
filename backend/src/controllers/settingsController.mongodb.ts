@@ -84,9 +84,15 @@ export const updateShippingSettings = async (req: AuthRequest, res: Response): P
         errorResponse(res, 'platformFee must be a number between 0 and 1e9', 400);
         return;
       }
+      const rounded = Math.round(n);
       await Setting.findOneAndUpdate(
         { key: PLATFORM_FEE_KEY },
-        { $set: { value: Math.round(n) } },
+        { $set: { value: rounded } },
+        { upsert: true, new: true }
+      );
+      await Setting.findOneAndUpdate(
+        { key: SHIPPING_COST_KEY },
+        { $set: { value: rounded } },
         { upsert: true, new: true }
       );
     }

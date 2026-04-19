@@ -23,7 +23,7 @@ export default function Settings() {
   const [currentPassword, setCurrentPassword] = useState<string>('');
   const [newPassword, setNewPassword] = useState<string>('');
   const [confirmPassword, setConfirmPassword] = useState<string>('');
-  const [shippingCost, setShippingCost] = useState<string>('100');
+  const [platformFee, setPlatformFee] = useState<string>('100');
   const [estimatedDelivery, setEstimatedDelivery] = useState<string>('');
 
   useEffect(() => {
@@ -31,9 +31,14 @@ export default function Settings() {
   }, [paymentData?.currency]);
 
   useEffect(() => {
-    if (shippingData && typeof shippingData.shippingCost === 'number') {
-      setShippingCost(String(shippingData.shippingCost));
-    }
+    const pf =
+      shippingData &&
+      typeof (shippingData as { platformFee?: number }).platformFee === 'number'
+        ? (shippingData as { platformFee: number }).platformFee
+        : typeof shippingData?.shippingCost === 'number'
+          ? shippingData.shippingCost
+          : null;
+    if (pf !== null) setPlatformFee(String(pf));
     if (shippingData?.estimatedDelivery) {
       setEstimatedDelivery(shippingData.estimatedDelivery);
     }
@@ -41,17 +46,17 @@ export default function Settings() {
 
   const handleShippingSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cost = Number(shippingCost);
+    const cost = Number(platformFee);
     if (!Number.isFinite(cost) || cost < 0) {
-      addNotification('error', 'Shipping cost must be a valid number ≥ 0');
+      addNotification('error', 'Platform fee must be a valid number ≥ 0');
       return;
     }
     try {
       await updateShipping.mutateAsync({
-        shippingCost: Math.round(cost),
+        platformFee: Math.round(cost),
         estimatedDelivery: estimatedDelivery.trim(),
       });
-      addNotification('success', 'Shipping settings saved — values apply to new orders and the mobile app');
+      addNotification('success', 'Fees & delivery note saved — applies to new orders and the app');
     } catch (err: any) {
       addNotification('error', err?.message || 'Failed to save');
     }
@@ -200,40 +205,45 @@ export default function Settings() {
           <div className="col-md-6">
             <div className="card">
               <div className="card-body">
-                <h4 className="card-title">Shipping &amp; delivery</h4>
+                <h4 className="card-title">Platform fee &amp; delivery copy</h4>
                 <p className="text-muted small">
-                  Sets the flat shipping charge added to every order and the estimated delivery message shown in the mobile app (cart and checkout).
+                  <strong>Platform fee</strong> is the per-order service line shown as &quot;Platform fees&quot; in the app (not product shipping).
+                  Per-product shipping is set on each product. The text field below is an optional <strong>general</strong> note — item-specific
+                  delivery times still come from each product&apos;s &quot;Shipping time&quot; field.
                 </p>
                 {shippingLoading ? (
                   <p className="text-muted">Loading...</p>
                 ) : (
                   <form onSubmit={handleShippingSave}>
                     <div className="mb-3">
-                      <label className="form-label">Shipping cost (same currency as your store)</label>
+                      <label className="form-label">Platform / service fee per order (PKR or your store currency)</label>
                       <input
                         type="number"
                         min={0}
                         step={1}
                         className="form-control"
-                        value={shippingCost}
-                        onChange={(e) => setShippingCost(e.target.value)}
+                        value={platformFee}
+                        onChange={(e) => setPlatformFee(e.target.value)}
                         required
                       />
-                      <small className="text-muted">Previously fixed at 100 PKR; now stored in the database.</small>
+                      <small className="text-muted">Shown in checkout as &quot;Platform fees&quot;. Product-level shipping is separate.</small>
                     </div>
                     <div className="mb-3">
-                      <label className="form-label">Estimated delivery time (shown to customers)</label>
+                      <label className="form-label">Optional general delivery note (store-wide)</label>
                       <input
                         type="text"
                         className="form-control"
-                        placeholder="e.g. 3–5 business days"
+                        placeholder="e.g. Nationwide dispatch within 2–3 working days"
                         value={estimatedDelivery}
                         onChange={(e) => setEstimatedDelivery(e.target.value)}
                         maxLength={200}
                       />
+                      <small className="text-muted">
+                        Shown after the order total as a store-wide note. For exact lines per product, edit each product&apos;s shipping time.
+                      </small>
                     </div>
                     <button type="submit" className="btn btn-primary" disabled={updateShipping.isPending}>
-                      {updateShipping.isPending ? 'Saving...' : 'Save shipping settings'}
+                      {updateShipping.isPending ? 'Saving...' : 'Save fee & delivery settings'}
                     </button>
                   </form>
                 )}

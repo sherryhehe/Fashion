@@ -199,7 +199,9 @@ const CartScreen: React.FC<CartScreenProps> = ({ navigation }) => {
             )}
           </View>
           {lineShip > 0 ? (
-            <Text style={styles.itemShippingLine}>Shipping: {lineShip.toLocaleString()} PKR</Text>
+            <Text style={styles.itemShippingLine}>
+              Shipping (once per line): {lineShip.toLocaleString()} PKR
+            </Text>
           ) : null}
           {lineShipTime ? (
             <Text style={styles.itemNoteLine}>Est. delivery: {lineShipTime}</Text>
@@ -308,16 +310,17 @@ const CartScreen: React.FC<CartScreenProps> = ({ navigation }) => {
                   {pfRounded > 0 ? `${pfRounded.toLocaleString()} PKR` : 'Free'}
                 </Text>
               </View>
-              {shippingSettings?.estimatedDelivery ? (
-                <Text style={styles.shippingEta}>
-                  Est. delivery: {shippingSettings.estimatedDelivery}
-                </Text>
-              ) : null}
               <View style={styles.separator} />
               <View style={styles.summaryRow}>
                 <Text style={styles.totalLabel}>Total Cost</Text>
                 <Text style={styles.totalValue}>{total.toLocaleString()} PKR</Text>
               </View>
+              {shippingSettings?.estimatedDelivery ? (
+                <Text style={styles.deliveryNoteFootnote}>
+                  Store-wide delivery note: {shippingSettings.estimatedDelivery}. Use each line above for
+                  product-specific delivery times.
+                </Text>
+              ) : null}
             </View>
           </View>
         )}

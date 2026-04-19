@@ -221,6 +221,12 @@ export const styles = StyleSheet.create({
     marginTop: -6,
     marginBottom: 8,
   },
+  deliveryNoteFootnote: {
+    fontSize: 12,
+    color: '#8E8E93',
+    marginTop: 12,
+    lineHeight: 17,
+  },
   separator: {
     height: 1,
     backgroundColor: '#E0E0E0',
