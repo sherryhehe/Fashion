@@ -292,7 +292,10 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
       }
     }
 
-    await Cart.deleteMany({ userId: req.user!.id });
+    // For COD clear cart now; for card payments clear only after successful payment.
+    if (!useStripe) {
+      await Cart.deleteMany({ userId: req.user!.id });
+    }
 
     if (useStripe && paymentIntentId && stripe) {
       const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
@@ -358,6 +361,22 @@ async function markOrderPaidAndDecrementStock(order: any): Promise<void> {
     if (!product) continue;
     await decrementStockForSelection(product, item.quantity, item.size, item.color);
   }
+  // Clear cart only after a successful card payment confirmation.
+  await Cart.deleteMany({ userId: order.userId });
+}
+
+/**
+ * Mark a pending card payment as failed/cancelled.
+ */
+async function markOrderPaymentFailed(order: any, reason: string): Promise<void> {
+  if (order.paymentStatus !== 'pending') return;
+  order.paymentStatus = 'failed';
+  order.timeline.push({
+    status: 'payment_failed',
+    date: new Date().toISOString(),
+    description: reason,
+  });
+  await order.save();
 }
 
 export const confirmOrderPayment = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -378,6 +397,11 @@ export const confirmOrderPayment = async (req: AuthRequest, res: Response): Prom
     }
     if (stripe) {
       const pi = await stripe.paymentIntents.retrieve((order as any).paymentIntentId);
+      if (pi.status === 'canceled' || pi.status === 'requires_payment_method') {
+        await markOrderPaymentFailed(order, `Payment ${pi.status.replace(/_/g, ' ')}`);
+        errorResponse(res, 'Payment failed or was canceled', 400);
+        return;
+      }
       if (pi.status !== 'succeeded') {
         errorResponse(res, 'Payment not completed yet', 400);
         return;
@@ -432,7 +456,8 @@ export const cancelOrder = async (req: AuthRequest, res: Response): Promise<void
 /**
  * Stripe webhook handler. Must be mounted with express.raw({ type: 'application/json' }) so req.body is the raw Buffer.
  * In Stripe Dashboard: add endpoint with URL https://your-api-domain.com/api/orders/stripe-webhook
- * Select event: payment_intent.succeeded. Copy the "Signing secret" (whsec_...) to STRIPE_WEBHOOK_SECRET in .env.
+ * Select events: payment_intent.succeeded, payment_intent.payment_failed, payment_intent.canceled.
+ * Copy the "Signing secret" (whsec_...) to STRIPE_WEBHOOK_SECRET in .env.
  */
 export const stripeWebhook = async (req: Request, res: Response): Promise<void> => {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -477,6 +502,24 @@ export const stripeWebhook = async (req: Request, res: Response): Promise<void> 
     } catch (err) {
       console.error('Stripe webhook: error marking order paid', err);
       res.status(500).json({ error: 'Failed to process payment_intent.succeeded' });
+      return;
+    }
+  } else if (event.type === 'payment_intent.payment_failed' || event.type === 'payment_intent.canceled') {
+    const paymentIntent = event.data.object as Stripe.PaymentIntent;
+    const paymentIntentId = paymentIntent.id;
+    try {
+      const order = await Order.findOne({ paymentIntentId });
+      if (order) {
+        const reason =
+          event.type === 'payment_intent.canceled'
+            ? 'Payment was canceled'
+            : paymentIntent.last_payment_error?.message || 'Payment failed';
+        await markOrderPaymentFailed(order, reason);
+        console.log(`Stripe webhook: order ${order.orderNumber} marked as failed (PaymentIntent ${paymentIntentId})`);
+      }
+    } catch (err) {
+      console.error('Stripe webhook: error marking order failed', err);
+      res.status(500).json({ error: `Failed to process ${event.type}` });
       return;
     }
   }
