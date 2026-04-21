@@ -31,39 +31,12 @@ export const getBrandByExactName = async (req: Request, res: Response): Promise<
 };
 
 /**
- * Get allowed payment methods for a list of brand names (intersection).
- * Used at checkout to show only payment options allowed by all brands in cart.
+ * Allowed payment methods for checkout.
+ * Card (Stripe) and cash are always offered for every brand/product; per-brand lists are not used to restrict checkout.
  */
-export const getAllowedPaymentMethods = async (req: Request, res: Response): Promise<void> => {
+export const getAllowedPaymentMethods = async (_req: Request, res: Response): Promise<void> => {
   try {
-    const names = req.query.names || req.body?.brandNames;
-    const brandNames = typeof names === 'string'
-      ? names.split(',').map((n: string) => n.trim()).filter(Boolean)
-      : Array.isArray(names)
-        ? names.map((n: string) => String(n).trim()).filter(Boolean)
-        : [];
-    if (brandNames.length === 0) {
-      successResponse(res, { allowedPaymentMethods: ['card', 'cash'] });
-      return;
-    }
-    // Start from full set; intersect with each brand that defines methods.
-    const brands = await Brand.find({
-      $or: brandNames.map((n: string) => ({ name: new RegExp(`^${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') })),
-    })
-      .select('allowedPaymentMethods')
-      .lean();
-    let allowed: string[] = ['card', 'cash'];
-    for (const b of brands) {
-      const methods = (b as any).allowedPaymentMethods;
-      if (Array.isArray(methods) && methods.length > 0) {
-        const normalized = methods.map((m: string) => String(m).toLowerCase());
-        allowed = allowed.filter((m) => normalized.includes(m));
-      }
-    }
-    if (allowed.length === 0) {
-      allowed = ['cash'];
-    }
-    successResponse(res, { allowedPaymentMethods: allowed });
+    successResponse(res, { allowedPaymentMethods: ['card', 'cash'] });
   } catch (error) {
     console.error('Get allowed payment methods error:', error);
     errorResponse(res, 'Failed to get allowed payment methods', 500);

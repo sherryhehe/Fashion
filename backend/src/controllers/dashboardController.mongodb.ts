@@ -3,6 +3,28 @@ import { User, Product, Order, Category } from '../models';
 import { successResponse, errorResponse } from '../utils/responseHelper';
 import { AuthRequest } from '../middleware/auth';
 
+const LOW_STOCK_THRESHOLD = 20;
+
+type RawVariation = {
+  size?: string;
+  color?: string;
+  stock?: number;
+};
+
+const toSafeStock = (value: unknown): number | null => {
+  if (typeof value !== 'number' || Number.isNaN(value)) return null;
+  return Math.max(0, value);
+};
+
+const getVariationLabel = (variation: RawVariation): string => {
+  const size = typeof variation.size === 'string' ? variation.size.trim() : '';
+  const color = typeof variation.color === 'string' ? variation.color.trim() : '';
+  if (size && color) return `Size ${size} / ${color}`;
+  if (size) return `Size ${size}`;
+  if (color) return `Color ${color}`;
+  return 'Variation';
+};
+
 /**
  * Get dashboard statistics
  */
@@ -52,12 +74,56 @@ export const getDashboardStats = async (req: AuthRequest, res: Response): Promis
       .limit(5)
       .lean();
 
-    // Get top products by stock
-    const lowStockProducts = await Product.find({ stock: { $lt: 20 } })
-      .sort({ stock: 1 })
-      .limit(5)
-      .select('name stock sku')
+    // Low stock alerts: include both product-level and size/color variation-level stock
+    const productsForStock = await Product.find({})
+      .select('name stock sku variations')
       .lean();
+
+    const lowStockProducts = productsForStock
+      .flatMap((product: any) => {
+        const alerts: Array<{
+          _id: string;
+          productId: string;
+          name: string;
+          sku: string;
+          stock: number;
+          variantLabel?: string;
+        }> = [];
+
+        const productId = String(product._id);
+        const productName = product.name || 'Product';
+        const sku = product.sku || '-';
+        const productStock = Math.max(0, Number(product.stock) || 0);
+
+        if (productStock < LOW_STOCK_THRESHOLD) {
+          alerts.push({
+            _id: `${productId}-base`,
+            productId,
+            name: productName,
+            sku,
+            stock: productStock,
+            variantLabel: 'Base Stock',
+          });
+        }
+
+        const variations: RawVariation[] = Array.isArray(product.variations) ? product.variations : [];
+        variations.forEach((variation, index) => {
+          const variationStock = toSafeStock(variation?.stock);
+          if (variationStock === null || variationStock >= LOW_STOCK_THRESHOLD) return;
+          alerts.push({
+            _id: `${productId}-var-${index}`,
+            productId,
+            name: productName,
+            sku,
+            stock: variationStock,
+            variantLabel: getVariationLabel(variation),
+          });
+        });
+
+        return alerts;
+      })
+      .sort((a, b) => a.stock - b.stock)
+      .slice(0, 5);
 
     // Order stats by status
     const pendingOrders = await Order.countDocuments({ status: 'pending' });

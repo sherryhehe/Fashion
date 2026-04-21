@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -15,11 +15,12 @@ import { icons } from '../../assets/icons';
 import images from '../../assets/images';
 import styles from './styles';
 
-import { useRecentlyAddedProducts, useRecommendedProducts } from '../../hooks/useProducts';
+import { useRandomProducts } from '../../hooks/useProducts';
 import { useTopBrands } from '../../hooks/useBrands';
 import { useAddToWishlist, useRemoveFromWishlist, useWishlist } from '../../hooks/useWishlist';
 import { getFirstImageSource, getImageSource } from '../../utils/imageHelper';
 import { requireAuthOrPromptLogin } from '../../utils/guestHelper';
+import { useFocusEffect } from '@react-navigation/native';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -31,33 +32,44 @@ interface ExploreScreenProps {
 
 const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
   const [recommendedLayout, setRecommendedLayout] = useState<'list' | 'grid'>('list');
+  const [focusShuffleKey, setFocusShuffleKey] = useState(0);
+
+  useFocusEffect(
+    useCallback(() => {
+      setFocusShuffleKey((k) => k + 1);
+    }, [])
+  );
 
   const { data: topBrandsAPIData, isLoading: brandsLoading } = useTopBrands();
-  const { data: recentlyViewedData } = useRecentlyAddedProducts(6);
-  const { data: recommendedData } = useRecommendedProducts(8);
+  const { data: randomRowData } = useRandomProducts(6, focusShuffleKey);
+  const { data: randomRecommendedData } = useRandomProducts(8, focusShuffleKey + 100);
   const addToWishlistMutation = useAddToWishlist();
   const removeFromWishlistMutation = useRemoveFromWishlist();
   const { data: wishlistData } = useWishlist();
 
   const formatPrice = (price: number) => `Rs.${(price || 0).toLocaleString()}`;
 
-  const recentlyViewedProducts = recentlyViewedData?.data?.map((product: any) => ({
-    id: product._id,
-    name: product.name,
-    price: formatPrice(product.price),
-    brand: product.brand || '',
-    category: product.category || '',
-    image: getFirstImageSource(product.images, images.bottomList.casual),
-  })) || [];
+  const recentlyViewedProducts = useMemo(() => (
+    randomRowData?.data?.map((product: any) => ({
+      id: product._id,
+      name: product.name,
+      price: formatPrice(product.price),
+      brand: product.brand || '',
+      category: product.category || '',
+      image: getFirstImageSource(product.images, images.bottomList.casual),
+    })) || []
+  ), [randomRowData]);
 
-  const recommendedProducts = recommendedData?.data?.map((product: any) => ({
-    id: product._id,
-    name: product.name,
-    price: formatPrice(product.price),
-    brand: product.brand || '',
-    category: product.category || '',
-    image: getFirstImageSource(product.images, images.bottomList.casual),
-  })) || [];
+  const recommendedProducts = useMemo(() => (
+    randomRecommendedData?.data?.map((product: any) => ({
+      id: product._id,
+      name: product.name,
+      price: formatPrice(product.price),
+      brand: product.brand || '',
+      category: product.category || '',
+      image: getFirstImageSource(product.images, images.bottomList.casual),
+    })) || []
+  ), [randomRecommendedData]);
 
   const topBrandsData = topBrandsAPIData?.data?.slice(0, 8).map((brand: any, index: number) => ({
     id: brand._id,
@@ -217,10 +229,10 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
           )}
         </View>
 
-        {/* 2. Recently Viewed - View All on right, horizontal product cards */}
+        {/* 2. Random Picks - View All on right, horizontal product cards */}
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Recently Viewed</Text>
+            <Text style={styles.sectionTitle}>Random Picks</Text>
             <TouchableOpacity onPress={() => navigation.getParent()?.navigate('Search', { autoFocus: false })}>
               <Text style={styles.viewAllLink}>View All</Text>
             </TouchableOpacity>
@@ -236,7 +248,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
             />
           ) : (
             <View style={styles.emptySection}>
-              <Text style={styles.emptyText}>No recently viewed items.</Text>
+              <Text style={styles.emptyText}>No random products available.</Text>
             </View>
           )}
         </View>

@@ -2,7 +2,6 @@ import { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import Stripe from 'stripe';
 import { Order, Product, Cart, User } from '../models';
-import Brand from '../models/Brand';
 import Setting from '../models/Setting';
 import { successResponse, errorResponse } from '../utils/responseHelper';
 import { AuthRequest } from '../middleware/auth';
@@ -201,16 +200,6 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
           );
         }
         requestedQuantityBySelection.set(key, totalRequested);
-        // Validate payment method for this product's brand
-        if (product.brand) {
-          const brand = await Brand.findOne({ name: new RegExp(`^${String(product.brand).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }).lean();
-          if (brand && Array.isArray((brand as any).allowedPaymentMethods) && (brand as any).allowedPaymentMethods.length > 0) {
-            const allowed = (brand as any).allowedPaymentMethods.map((m: string) => String(m).toLowerCase());
-            if (!allowed.includes(selectedMethod)) {
-              throw new Error(`Brand "${product.brand}" does not accept ${selectedMethod} payment. Allowed: ${allowed.join(', ')}`);
-            }
-          }
-        }
         // Use price from request (what customer saw) or fallback to product price
         const unitPrice = typeof item.price === 'number' && item.price >= 0 ? item.price : product.price;
         const itemTotal = unitPrice * qty;

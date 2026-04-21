@@ -289,9 +289,11 @@ export interface DashboardStats {
   }>;
   lowStockProducts: Array<{
     _id: string;
+    productId?: string;
     name: string;
     stock: number;
     sku: string;
+    variantLabel?: string;
   }>;
   categories: number;
 }

@@ -328,6 +328,7 @@ export default function Home() {
                       <tr>
                         <th>Product</th>
                         <th>SKU</th>
+                        <th>Variant</th>
                         <th>Stock</th>
                       </tr>
                     </thead>
@@ -336,6 +337,7 @@ export default function Home() {
                         <tr key={product._id}>
                           <td>{product.name}</td>
                           <td>{product.sku}</td>
+                          <td>{product.variantLabel || 'Base Stock'}</td>
                           <td>
                             <span className="badge bg-danger">{product.stock}</span>
                           </td>

@@ -10,6 +10,7 @@ import {
   FlatList,
   RefreshControl,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { CachedImage } from '../../components';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -21,7 +22,7 @@ import useStyles from './styles';
 
 // API Hooks
 import { useCategories } from '../../hooks/useCategories';
-import { useFeaturedProducts, useRecommendedProducts, useRandomProducts, useRecentlyAddedProducts, usePersonalizedProducts, useInfiniteProducts } from '../../hooks/useProducts';
+import { useFeaturedProducts, useRecommendedProducts, useRandomProducts, usePersonalizedProducts, useInfiniteProducts } from '../../hooks/useProducts';
 import { useTopBrands, useFeaturedBrands, useBrands } from '../../hooks/useBrands';
 import { useAddToWishlist, useRemoveFromWishlist, useIsInWishlist, useWishlist } from '../../hooks/useWishlist';
 import { requireAuthOrPromptLogin } from '../../utils/guestHelper';
@@ -34,9 +35,6 @@ import { CommonActions, useFocusEffect } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
 
 const { width: screenWidth } = Dimensions.get('window');
-/** Inset promo banners like the previous app (rounded card, not edge-to-edge crop) */
-const HERO_CARD_INSET = 16;
-const heroBannerSlideWidth = screenWidth - HERO_CARD_INSET * 2;
 
 /** Shuffle array so product order varies each time (e.g. on app open / data load). Works on both Android and iOS. */
 function shuffleArray<T>(arr: T[]): T[] {
@@ -46,6 +44,15 @@ function shuffleArray<T>(arr: T[]): T[] {
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
+}
+
+/** Deterministic hash so product order is stable per focus seed, but changes on next app open/focus. */
+function hashString(input: string): number {
+  let hash = 0;
+  for (let i = 0; i < input.length; i++) {
+    hash = (hash * 31 + input.charCodeAt(i)) % 2147483647;
+  }
+  return hash;
 }
 
 type HomeScreenNavigationProp = StackNavigationProp<HomeStackParamList, 'Home'>;
@@ -105,7 +112,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   );
   const { data: randomProductsData, isLoading: randomLoading } = useRandomProducts(10, focusShuffleKey);
   const { data: personalizedProductsData, isLoading: personalizedLoading } = usePersonalizedProducts(10, hasToken);
-  const { data: recentlyAddedData, isLoading: recentlyAddedLoading, refetch: refetchRecentlyAdded } = useRecentlyAddedProducts(8);
+  const { data: homeRandomProductsData, isLoading: homeRandomProductsLoading, refetch: refetchHomeRandomProducts } = useRandomProducts(8, focusShuffleKey + 1000);
   const { data: topBrandsData, isLoading: topBrandsLoading, refetch: refetchTopBrands } = useTopBrands();
   const { data: featuredStylesData, isLoading: featuredStylesLoading, refetch: refetchStyles } = useFeaturedStyles();
   const {
@@ -117,7 +124,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     refetch: refetchAllProducts,
   } = useInfiniteProducts({ status: 'active' });
   const { data: bannersData, isLoading: bannersLoading, refetch: refetchBanners } = useBanners('homepage', 'active');
-  const { data: brandBannersData } = useBanners('homepage_brand', 'active');
   const { data: allBrandsData, refetch: refetchAllBrands } = useBrands(); // Fetch all brands to get logos
   const { data: homeCategoriesData } = useHomeCategoriesForApp();
   
@@ -128,7 +134,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   // Map API data arrays - now safe to use after API hooks
   const bannersArray = bannersData?.data || [];
-  const brandBannersArray = brandBannersData?.data || [];
   const categoriesArray = categoriesData?.data || [];
   const stylesArray = featuredStylesData?.data || [];
   const recommendedArray = recommendedProductsData?.data || [];
@@ -261,20 +266,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     allProductsLoading,
     bannersLoading,
   ]);
-  // Brand banners (swipable, Shop Now → brand page) - same visual style as main hero
-  const homeHeroFallbackByIndex = (index: number) =>
-    index % 2 === 1 ? images.discoverNewClothes : images.homesliderimage;
-
-  const brandCarouselData = (Array.isArray(brandBannersArray) ? brandBannersArray : [])
-    .sort((a: any, b: any) => (a.order ?? 999) - (b.order ?? 999))
-    .map((banner: any, index: number) => ({
-      id: banner.id || banner._id || `brand-banner-${index}`,
-      title: banner.title || '',
-      subtitle: banner.subtitle || '',
-      image: getImageSource(banner.imageUrl || banner.image, homeHeroFallbackByIndex(index)),
-      linkUrl: banner.linkUrl || banner.link,
-    }));
-
   // Sort banners by order if available, then map to carousel data
   const carouselData = bannersArray.length > 0
     ? bannersArray
@@ -287,10 +278,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         .map((banner, index) => ({
           id: banner.id || banner._id || `banner-${index}`,
           title: banner.title || '', // Use empty string if no title
+          brandName: banner.brandName || banner.brand?.name || banner.title || '',
+          brandLogo: getImageSource(
+            banner.brandLogo || banner.logo || banner.brand?.logo || banner.brand?.image,
+            null
+          ),
           subtitle: banner.subtitle || '', // Use empty string if no subtitle
           cta: banner.subtitle || '', // Use subtitle as CTA, or empty if no subtitle
           // Backend returns imageUrl, not image - map it correctly
-          image: getImageSource(banner.imageUrl || banner.image, homeHeroFallbackByIndex(index)),
+          image: getImageSource(banner.imageUrl || banner.image, images.homesliderimage),
           // Backend returns linkUrl, not link - map it correctly
           link: banner.linkUrl || banner.link,
         }))
@@ -302,6 +298,29 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   }, [carouselData.length]);
 
+  const handleHeroBannerPress = async (link?: string) => {
+    if (!link || typeof link !== 'string') return;
+    const trimmedLink = link.trim();
+    if (!trimmedLink) return;
+
+    try {
+      if (/^https?:\/\//i.test(trimmedLink)) {
+        await Linking.openURL(trimmedLink);
+        return;
+      }
+
+      const parsedStoreId = trimmedLink.includes('/')
+        ? trimmedLink.split('/').filter(Boolean).pop()
+        : trimmedLink;
+
+      if (parsedStoreId) {
+        navigation.getParent()?.navigate('StoreDetail', { storeId: parsedStoreId });
+      }
+    } catch (error) {
+      console.log('Hero banner redirect failed:', error);
+    }
+  };
+
   const renderCarouselItem = ({ item }: { item: any }) => {
     const src = item.image;
     const imageSource =
@@ -310,17 +329,23 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         (typeof src === 'object' && src !== null && 'uri' in src && (src as { uri?: string }).uri))
         ? src
         : images.homesliderimage;
+    const brandLogoSource =
+      item.brandLogo != null &&
+      (typeof item.brandLogo === 'number' ||
+        (typeof item.brandLogo === 'object' &&
+          item.brandLogo !== null &&
+          'uri' in item.brandLogo &&
+          (item.brandLogo as { uri?: string }).uri))
+        ? item.brandLogo
+        : null;
+    const brandName = typeof item.brandName === 'string' ? item.brandName.trim() : '';
+    const hasBrandInfo = !!brandLogoSource || !!brandName;
 
     return (
       <TouchableOpacity 
-        style={[styles.heroImageContainer, { width: heroBannerSlideWidth }]}
+        style={[styles.heroImageContainer, { width: screenWidth }]}
         activeOpacity={item.link ? 0.8 : 1}
-        onPress={() => {
-          if (item.link) {
-            // Handle banner link navigation if needed
-            console.log('Banner link:', item.link);
-          }
-        }}
+        onPress={() => handleHeroBannerPress(item.link)}
       >
         <CachedImage
           source={imageSource}
@@ -329,7 +354,27 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           priority="high"
           cache="immutable"
         />
-        
+        <View style={styles.heroCtaCenterWrap}>
+          {hasBrandInfo && (
+            <View style={styles.heroBrandRow}>
+              {brandLogoSource ? (
+                <Image source={brandLogoSource} style={styles.heroBrandLogo} resizeMode="contain" />
+              ) : null}
+              {brandName ? (
+                <Text style={styles.heroBrandText} numberOfLines={1}>
+                  {brandName}
+                </Text>
+              ) : null}
+            </View>
+          )}
+          <TouchableOpacity
+            style={styles.heroShopButton}
+            activeOpacity={0.85}
+            onPress={() => handleHeroBannerPress(item.link)}
+          >
+            <Text style={styles.heroShopButtonText}>SHOP NOW</Text>
+          </TouchableOpacity>
+        </View>
       </TouchableOpacity>
     );
   };
@@ -362,7 +407,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         } catch (error) {
           // Fallback to scrollToOffset if scrollToIndex fails
           flatListRef.current?.scrollToOffset({
-            offset: nextSlide * heroBannerSlideWidth,
+            offset: nextSlide * screenWidth,
             animated: true,
           });
         }
@@ -503,11 +548,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   // Custom home categories (from admin) - each has name + products
   const homeCategoriesArray = homeCategoriesData?.data || [];
 
-  // Recently added products: shuffle so order varies each time user opens/focuses home
-  const recentlyAddedArray = recentlyAddedData?.data || [];
-  const displayRecentlyAddedProducts = useMemo(() => {
-    if (!Array.isArray(recentlyAddedArray) || recentlyAddedArray.length === 0) return [];
-    return shuffleArray(recentlyAddedArray).map(product => ({
+  // Random products for this section (new set each time user opens/focuses home)
+  const displayHomeRandomProducts = useMemo(() => {
+    const randomProducts = homeRandomProductsData?.data || [];
+    if (!Array.isArray(randomProducts) || randomProducts.length === 0) return [];
+    return randomProducts.map(product => ({
       id: product._id,
       name: product.name,
       brand: product.brand || '',
@@ -515,12 +560,19 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       rating: formatRating(product.rating ?? 0, product.reviewCount ?? 0),
       image: getFirstImageSource(product.images, images.minicrossbody),
     }));
-  }, [recentlyAddedArray, focusShuffleKey]);
+  }, [homeRandomProductsData]);
 
-  // Bottom grid products: sorted by recently added (infinite scroll); no shuffle so load-more is consistent
+  // Bottom grid products: randomized per focus/app open, but stable while user stays on the same session.
   const displayBottomGridProducts = useMemo(() => {
     if (!Array.isArray(allProductsArray) || allProductsArray.length === 0) return [];
-    return allProductsArray.map((product: any) => {
+    const seed = focusShuffleKey || 0;
+    const randomizedProducts = [...allProductsArray].sort((a: any, b: any) => {
+      const aId = a?._id || a?.id || '';
+      const bId = b?._id || b?.id || '';
+      return hashString(`${seed}:${aId}`) - hashString(`${seed}:${bId}`);
+    });
+
+    return randomizedProducts.map((product: any) => {
       const brandName = product.brand || '';
       const brandInfo = brandName ? brandMap.get(brandName) : null;
       const brandLogo = brandInfo?.logo ? getImageSource(brandInfo.logo, images.shopLogo) : null;
@@ -535,7 +587,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         image: getFirstImageSource(product.images, images.bottomList.image1),
       };
     });
-  }, [allProductsArray, brandMap]);
+  }, [allProductsArray, brandMap, focusShuffleKey]);
 
   const handleScroll = (e: any) => {
     const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
@@ -851,7 +903,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         refetchCategories(),
         refetchFeatured(),
         refetchRecommended(),
-        refetchRecentlyAdded(),
+        refetchHomeRandomProducts(),
         refetchTopBrands(),
         refetchStyles(),
         refetchAllProducts(),
@@ -864,7 +916,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     } finally {
       setRefreshing(false);
     }
-  }, [queryClient, refetchCategories, refetchFeatured, refetchRecommended, refetchRecentlyAdded, refetchTopBrands, refetchStyles, refetchAllProducts, refetchBanners, refetchAllBrands]);
+  }, [queryClient, refetchCategories, refetchFeatured, refetchRecommended, refetchHomeRandomProducts, refetchTopBrands, refetchStyles, refetchAllProducts, refetchBanners, refetchAllBrands]);
 
   return (
     <SafeView style={styles.container}>
@@ -922,11 +974,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
         {/* Hero Banner Section - Full Width Carousel */}
         {bannersLoading ? (
-          <View style={[styles.heroSection, { paddingHorizontal: HERO_CARD_INSET }]}>
-            <View style={{ width: heroBannerSlideWidth, height: 232, backgroundColor: '#F2F2F7', borderRadius: 14 }} />
+          <View style={styles.heroSection}>
+            <View style={{ width: screenWidth, height: 416, backgroundColor: '#F2F2F7' }} />
           </View>
         ) : carouselData.length > 0 ? (
-          <View style={[styles.heroSection, { paddingHorizontal: HERO_CARD_INSET }]}>
+          <View style={styles.heroSection}>
             <FlatList
               ref={flatListRef}
               data={carouselData}
@@ -940,19 +992,19 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               onScrollBeginDrag={handleScrollBeginDrag}
               onScrollEndDrag={handleScrollEndDrag}
               onMomentumScrollEnd={(event) => {
-                const index = Math.round(event.nativeEvent.contentOffset.x / heroBannerSlideWidth);
+                const index = Math.round(event.nativeEvent.contentOffset.x / screenWidth);
                 if (index >= 0 && index < carouselData.length) {
                   setCurrentSlide(index);
                 }
               }}
               getItemLayout={(data, index) => ({
-                length: heroBannerSlideWidth,
-                offset: heroBannerSlideWidth * index,
+                length: screenWidth,
+                offset: screenWidth * index,
                 index,
               })}
               style={styles.carousel}
               decelerationRate="fast"
-              snapToInterval={heroBannerSlideWidth}
+              snapToInterval={screenWidth}
               snapToAlignment="start"
               scrollEventThrottle={16}
               removeClippedSubviews={false}
@@ -977,7 +1029,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                       } catch (error) {
                         // Fallback to scrollToOffset if scrollToIndex fails
                         flatListRef.current?.scrollToOffset({
-                          offset: index * heroBannerSlideWidth,
+                          offset: index * screenWidth,
                           animated: true,
                         });
                       }
@@ -992,47 +1044,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             )}
           </View>
         ) : (
-          <View style={[styles.heroSection, { paddingHorizontal: HERO_CARD_INSET }]}>
-            <View style={{ width: heroBannerSlideWidth, height: 232, backgroundColor: '#F2F2F7', borderRadius: 14, justifyContent: 'center', alignItems: 'center' }}>
+          <View style={styles.heroSection}>
+            <View style={{ width: screenWidth, height: 416, backgroundColor: '#F2F2F7', justifyContent: 'center', alignItems: 'center' }}>
               <Text style={{ color: '#8E8E93', fontSize: 14 }}>No banners available</Text>
             </View>
-          </View>
-        )}
-
-        {/* Brand promo banners — full-bleed image only (tap opens store when linked) */}
-        {brandCarouselData.length > 0 && (
-          <View style={[styles.heroSection, { marginTop: 12, paddingHorizontal: HERO_CARD_INSET }]}>
-            <FlatList
-              data={brandCarouselData}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              keyExtractor={(item) => item.id}
-              snapToInterval={heroBannerSlideWidth}
-              snapToAlignment="start"
-              decelerationRate="fast"
-              renderItem={({ item }: { item: any }) => {
-                const src = item.image;
-                const imageSource =
-                  src != null &&
-                  (typeof src === 'number' ||
-                    (typeof src === 'object' && src !== null && 'uri' in src && (src as { uri?: string }).uri))
-                    ? src
-                    : images.homesliderimage;
-                const storeId = item.linkUrl?.trim?.();
-                return (
-                  <TouchableOpacity
-                    style={[styles.heroImageContainer, { width: heroBannerSlideWidth }]}
-                    activeOpacity={storeId ? 0.92 : 1}
-                    onPress={() => {
-                      if (storeId) navigation.getParent()?.navigate('StoreDetail', { storeId });
-                    }}
-                  >
-                    <CachedImage source={imageSource} style={styles.heroImage} resizeMode="cover" priority="high" cache="immutable" />
-                  </TouchableOpacity>
-                );
-              }}
-            />
           </View>
         )}
 
@@ -1212,16 +1227,16 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           );
         })}
 
-        {/* Recently Added Section */}
+        {/* Random Picks Section */}
         <View style={styles.sectionContainer}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recently Added</Text>
+            <Text style={styles.sectionTitle}>Random Picks</Text>
           </View>
-          {recentlyAddedLoading ? (
+          {homeRandomProductsLoading ? (
             <ShimmerHorizontalList count={2} />
-          ) : displayRecentlyAddedProducts.length > 0 ? (
+          ) : displayHomeRandomProducts.length > 0 ? (
             <FlatList
-              data={displayRecentlyAddedProducts}
+              data={displayHomeRandomProducts}
               renderItem={renderRecommendedItem}
               keyExtractor={(item) => item.id}
               horizontal
@@ -1231,7 +1246,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             />
           ) : (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>No recently added products</Text>
+              <Text style={styles.emptyStateText}>No random products available</Text>
             </View>
           )}
         </View>
