@@ -48,13 +48,12 @@ export default function ProductEdit() {
   });
 
   const [variations, setVariations] = useState<
-    Array<{ id: string | number; size?: string; color?: string; price?: number; stock?: number }>
+    Array<{ id: string | number; size?: string; color?: string; price?: number; outOfStock?: boolean }>
   >([]);
   const [newVariation, setNewVariation] = useState({
     size: '',
     color: '',
     price: '',
-    stock: '',
   });
 
   const handleAddVariation = () => {
@@ -64,10 +63,16 @@ export default function ProductEdit() {
       size: newVariation.size || undefined,
       color: newVariation.color || undefined,
       price: newVariation.price ? parseFloat(newVariation.price) : undefined,
-      stock: newVariation.stock !== '' ? parseInt(newVariation.stock, 10) : undefined,
+      outOfStock: false,
     };
     setVariations([...variations, variation]);
-    setNewVariation({ size: '', color: '', price: '', stock: '' });
+    setNewVariation({ size: '', color: '', price: '' });
+  };
+
+  const handleToggleVariationOOS = (id: string | number) => {
+    setVariations(variations.map((v) =>
+      v.id === id ? { ...v, outOfStock: !v.outOfStock } : v
+    ));
   };
 
   const handleRemoveVariation = (id: string | number) => {
@@ -161,7 +166,7 @@ export default function ProductEdit() {
           size: v.size,
           color: v.color,
           price: typeof v.price === 'number' ? v.price : undefined,
-          stock: typeof v.stock === 'number' ? v.stock : undefined,
+          outOfStock: v.outOfStock === true || v.stock === 0,
         }))
       );
 
@@ -375,7 +380,11 @@ export default function ProductEdit() {
         ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length 
         : 0;
 
-      const variationsArray = variations.map(({ id: _id, ...rest }) => rest);
+      const variationsArray = variations.map(({ id: _id, outOfStock, ...rest }) => ({
+        ...rest,
+        outOfStock: outOfStock ?? false,
+        stock: outOfStock ? 0 : undefined,
+      }));
 
       const productData = {
         name: formData.productName,
@@ -756,29 +765,29 @@ export default function ProductEdit() {
                     </div>
                     <div className="col-12 mb-3">
                       <div className="alert alert-info border-info py-2 px-3 mb-3">
-                        <strong className="d-block mb-1">Sizes, stock &amp; variants</strong>
+                        <strong className="d-block mb-1">Sizes &amp; availability</strong>
                         <span className="small">
-                          Use the table below so the mobile app can enforce stock per size/color. If you leave this empty,
-                          only the main <strong>Inventory quantity</strong> above applies.
+                          Add each size/color below. Use the <strong>In Stock / Out of Stock</strong> toggle per row to control
+                          what customers can select in the mobile app.
                         </span>
                       </div>
-                      <label className="form-label">Size / color variants & stock</label>
+                      <label className="form-label">Size / color variants</label>
                       <div className="border rounded p-3 bg-light border-primary">
                         <div className="row g-2 mb-3">
-                          <div className="col-md-3">
+                          <div className="col-md-4">
                             <input
                               type="text"
                               className="form-control form-control-sm"
-                              placeholder="Size (e.g. M)"
+                              placeholder="Size (e.g. M, L, XL)"
                               value={newVariation.size}
                               onChange={(e) => setNewVariation({ ...newVariation, size: e.target.value })}
                             />
                           </div>
-                          <div className="col-md-3">
+                          <div className="col-md-4">
                             <input
                               type="text"
                               className="form-control form-control-sm"
-                              placeholder="Color"
+                              placeholder="Color (optional)"
                               value={newVariation.color}
                               onChange={(e) => setNewVariation({ ...newVariation, color: e.target.value })}
                             />
@@ -791,15 +800,6 @@ export default function ProductEdit() {
                               step="0.01"
                               value={newVariation.price}
                               onChange={(e) => setNewVariation({ ...newVariation, price: e.target.value })}
-                            />
-                          </div>
-                          <div className="col-md-2">
-                            <input
-                              type="number"
-                              className="form-control form-control-sm"
-                              placeholder="Stock"
-                              value={newVariation.stock}
-                              onChange={(e) => setNewVariation({ ...newVariation, stock: e.target.value })}
                             />
                           </div>
                           <div className="col-md-2">
@@ -816,17 +816,26 @@ export default function ProductEdit() {
                                   <th>Size</th>
                                   <th>Color</th>
                                   <th>Price</th>
-                                  <th>Stock</th>
+                                  <th>Status</th>
                                   <th style={{ width: 48 }} />
                                 </tr>
                               </thead>
                               <tbody>
                                 {variations.map((v) => (
-                                  <tr key={String(v.id)}>
+                                  <tr key={String(v.id)} className={v.outOfStock ? 'table-danger' : ''}>
                                     <td>{v.size || '—'}</td>
                                     <td>{v.color || '—'}</td>
                                     <td>{v.price != null ? formatCurrency(v.price) : '—'}</td>
-                                    <td>{v.stock ?? '—'}</td>
+                                    <td>
+                                      <button
+                                        type="button"
+                                        className={`btn btn-xs btn-sm py-0 px-2 ${v.outOfStock ? 'btn-danger' : 'btn-outline-success'}`}
+                                        onClick={() => handleToggleVariationOOS(v.id)}
+                                        title={v.outOfStock ? 'Click to mark as in stock' : 'Click to mark as out of stock'}
+                                      >
+                                        {v.outOfStock ? 'Out of Stock' : 'In Stock'}
+                                      </button>
+                                    </td>
                                     <td>
                                       <button
                                         type="button"
@@ -842,10 +851,10 @@ export default function ProductEdit() {
                             </table>
                           </div>
                         ) : (
-                          <p className="text-muted small mb-0 text-center">No variants yet — optional override for base inventory.</p>
+                          <p className="text-muted small mb-0 text-center">No variants yet — add sizes above.</p>
                         )}
                       </div>
-                      <small className="text-muted">Each variant can have its own stock; mobile checkout uses these levels.</small>
+                      <small className="text-muted">Add sizes/colors and toggle each one in or out of stock as needed.</small>
                     </div>
                     <div className="col-12 mb-3">
                       <label htmlFor="description" className="form-label">Description</label>

@@ -53,13 +53,12 @@ export default function ProductAdd() {
     size?: string;
     color?: string;
     price?: number;
-    stock?: number;
+    outOfStock?: boolean;
   }>>([]);
   const [newVariation, setNewVariation] = useState({
     size: '',
     color: '',
     price: '',
-    stock: '',
   });
 
   // Image upload
@@ -197,15 +196,21 @@ export default function ProductAdd() {
         size: newVariation.size || undefined,
         color: newVariation.color || undefined,
         price: newVariation.price ? parseFloat(newVariation.price) : undefined,
-        stock: newVariation.stock ? parseInt(newVariation.stock) : undefined,
+        outOfStock: false,
       };
       setVariations([...variations, variation]);
-      setNewVariation({ size: '', color: '', price: '', stock: '' });
+      setNewVariation({ size: '', color: '', price: '' });
     }
   };
 
   const handleRemoveVariation = (id: number) => {
     setVariations(variations.filter(v => v.id !== id));
+  };
+
+  const handleToggleVariationOOS = (id: number) => {
+    setVariations(variations.map((v) =>
+      v.id === id ? { ...v, outOfStock: !v.outOfStock } : v
+    ));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -249,7 +254,11 @@ export default function ProductAdd() {
       });
 
       // Clean up variations
-      const variationsArray = variations.map(({ id, ...rest }) => rest);
+      const variationsArray = variations.map(({ id, outOfStock, ...rest }) => ({
+        ...rest,
+        outOfStock: outOfStock ?? false,
+        stock: outOfStock ? 0 : undefined,
+      }));
 
       const shippingFees = parseFloat(formData.shippingFees || '0');
       if (Number.isNaN(shippingFees) || shippingFees < 0) {
@@ -744,30 +753,30 @@ export default function ProductAdd() {
                     {/* Variations - User Friendly */}
                     <div className="col-12 mb-3">
                       <div className="alert alert-info border-info py-2 px-3 mb-3">
-                        <strong className="d-block mb-1">Sizes, stock &amp; variants</strong>
+                        <strong className="d-block mb-1">Sizes &amp; availability</strong>
                         <span className="small">
-                          Add rows below for per-size stock on the mobile app. If you skip variants, only the main stock
-                          quantity above is used.
+                          Add each size/color below. Use the <strong>In Stock / Out of Stock</strong> toggle per row to control
+                          what customers can select in the mobile app.
                         </span>
                       </div>
                       <label className="form-label">Product Variations</label>
                       <div className="border rounded p-3 border-primary">
                         {/* Add New Variation */}
                         <div className="row g-2 mb-2">
-                          <div className="col-md-3">
+                          <div className="col-md-4">
                             <input 
                               type="text" 
                               className="form-control form-control-sm" 
-                              placeholder="Size (e.g., S, M, L)"
+                              placeholder="Size (e.g., S, M, L, XL)"
                               value={newVariation.size}
                               onChange={(e) => setNewVariation({...newVariation, size: e.target.value})}
                             />
                           </div>
-                          <div className="col-md-3">
+                          <div className="col-md-4">
                             <input 
                               type="text" 
                               className="form-control form-control-sm" 
-                              placeholder="Color (e.g., Red)"
+                              placeholder="Color (optional)"
                               value={newVariation.color}
                               onChange={(e) => setNewVariation({...newVariation, color: e.target.value})}
                             />
@@ -780,15 +789,6 @@ export default function ProductAdd() {
                               step="0.01"
                               value={newVariation.price}
                               onChange={(e) => setNewVariation({...newVariation, price: e.target.value})}
-                            />
-                          </div>
-                          <div className="col-md-2">
-                            <input 
-                              type="number" 
-                              className="form-control form-control-sm" 
-                              placeholder="Stock"
-                              value={newVariation.stock}
-                              onChange={(e) => setNewVariation({...newVariation, stock: e.target.value})}
                             />
                           </div>
                           <div className="col-md-2">
@@ -813,17 +813,26 @@ export default function ProductAdd() {
                                     <th>Size</th>
                                     <th>Color</th>
                                     <th>Price</th>
-                                    <th>Stock</th>
+                                    <th>Status</th>
                                     <th width="50">Action</th>
                                   </tr>
                                 </thead>
                                 <tbody>
                                   {variations.map((variation) => (
-                                    <tr key={variation.id}>
+                                    <tr key={variation.id} className={variation.outOfStock ? 'table-danger' : ''}>
                                       <td>{variation.size || '-'}</td>
                                       <td>{variation.color || '-'}</td>
                                       <td>{variation.price ? formatCurrency(variation.price) : '-'}</td>
-                                      <td>{variation.stock || '-'}</td>
+                                      <td>
+                                        <button
+                                          type="button"
+                                          className={`btn btn-xs btn-sm py-0 px-2 ${variation.outOfStock ? 'btn-danger' : 'btn-outline-success'}`}
+                                          onClick={() => handleToggleVariationOOS(variation.id)}
+                                          title={variation.outOfStock ? 'Click to mark as in stock' : 'Click to mark as out of stock'}
+                                        >
+                                          {variation.outOfStock ? 'Out of Stock' : 'In Stock'}
+                                        </button>
+                                      </td>
                                       <td>
                                         <button 
                                           type="button"
@@ -879,7 +888,7 @@ export default function ProductAdd() {
                         features: '',
                         tags: '',
                         status: 'active',
-                      });
+                      } as any);
                     }}>
                       <i className="bx bx-reset me-1"></i>Reset Form
                     </button>
