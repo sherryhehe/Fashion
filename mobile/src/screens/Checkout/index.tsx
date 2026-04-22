@@ -402,7 +402,7 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
                       </Text>
                       {meta && meta.shipping > 0 ? (
                         <Text style={styles.cartItemExtra}>
-                          Shipping (once per line): PKR {meta.shipping.toLocaleString()}
+                          Shipping: PKR {meta.shipping.toLocaleString()}
                         </Text>
                       ) : null}
                       {meta?.shippingTime ? (

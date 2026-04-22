@@ -200,7 +200,7 @@ const CartScreen: React.FC<CartScreenProps> = ({ navigation }) => {
           </View>
           {lineShip > 0 ? (
             <Text style={styles.itemShippingLine}>
-              Shipping (once per line): {lineShip.toLocaleString()} PKR
+              Shipping: {lineShip.toLocaleString()} PKR
             </Text>
           ) : null}
           {lineShipTime ? (
@@ -315,12 +315,12 @@ const CartScreen: React.FC<CartScreenProps> = ({ navigation }) => {
                 <Text style={styles.totalLabel}>Total Cost</Text>
                 <Text style={styles.totalValue}>{total.toLocaleString()} PKR</Text>
               </View>
-              {shippingSettings?.estimatedDelivery ? (
+              {/* {shippingSettings?.estimatedDelivery ? (
                 <Text style={styles.deliveryNoteFootnote}>
                   Store-wide delivery note: {shippingSettings.estimatedDelivery}. Use each line above for
                   product-specific delivery times.
                 </Text>
-              ) : null}
+              ) : null} */}
             </View>
           </View>
         )}
