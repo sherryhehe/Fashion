@@ -91,6 +91,9 @@ const useStyles = ()=>{
     overflow: 'hidden',
     height: 416,
   },
+  heroImageSpacing: {
+    marginBottom: 12,
+  },
   heroImage: {
     width: '100%',
     height: '100%',

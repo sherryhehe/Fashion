@@ -84,7 +84,7 @@ const CachedImage: React.FC<CachedImageProps> = ({
   // Remote image — show placeholder/spinner over it until it loads.
   return (
     <View style={[{ position: 'relative' }, style]}>
-      {isLoading && !hasError && (placeholder || showLoadingIndicator) && (
+      {(isLoading || hasError) && (placeholder || showLoadingIndicator) && (
         <View
           style={[
             {
@@ -106,7 +106,7 @@ const CachedImage: React.FC<CachedImageProps> = ({
               style={style}
               resizeMode={resizeMode as ImageProps['resizeMode']}
             />
-          ) : showLoadingIndicator ? (
+          ) : isLoading && showLoadingIndicator ? (
             <ActivityIndicator size="small" color="#999999" />
           ) : null}
         </View>

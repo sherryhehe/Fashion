@@ -256,8 +256,28 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
   const sizes = getSizesFromVariations();
 
   const normalizedSelectedColor = (selectedColor || '').trim().toLowerCase();
+  const fallbackSelectionStock = Math.max(0, Number(product?.stock) || 0);
   const hasVariantStockData = Array.isArray(product.variations)
-    && product.variations.some((variation) => typeof variation?.stock === 'number');
+    && product.variations.some((variation) => (
+      typeof variation?.stock === 'number' || typeof variation?.outOfStock === 'boolean'
+    ));
+
+  const getVariationEffectiveStock = (variation: any): number | null => {
+    if (typeof variation?.stock === 'number') {
+      return Math.max(0, Number(variation.stock) || 0);
+    }
+
+    if (variation?.outOfStock === true) {
+      return 0;
+    }
+
+    if (variation?.outOfStock === false) {
+      // Keep UI aligned with backend fallback stock constraints.
+      return fallbackSelectionStock;
+    }
+
+    return null;
+  };
 
   const getVariationStockForSize = (size: string) => {
     if (!hasVariantStockData) {
@@ -266,7 +286,7 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
 
     const normalizedSize = (size || '').trim().toLowerCase();
     const matchingBySize = (product.variations || []).filter((variation: any) => (
-      typeof variation?.stock === 'number'
+      getVariationEffectiveStock(variation) !== null
       && (variation?.size || '').trim().toLowerCase() === normalizedSize
     ));
 
@@ -279,10 +299,10 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ navigation, r
       : [];
 
     const stockSource = matchingByColor.length > 0 ? matchingByColor : matchingBySize;
-    return stockSource.reduce(
-      (sum: number, variation: any) => sum + Math.max(0, Number(variation?.stock) || 0),
-      0
-    );
+    return stockSource.reduce((sum: number, variation: any) => {
+      const variationStock = getVariationEffectiveStock(variation) ?? 0;
+      return sum + variationStock;
+    }, 0);
   };
 
   const selectedStock = hasVariantStockData && selectedSize

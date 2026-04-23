@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -64,12 +64,8 @@ interface HomeScreenProps {
 const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const styles = useStyles()
   const queryClient = useQueryClient();
-  const [currentSlide, setCurrentSlide] = useState(0);
-  const flatListRef = useRef<FlatList>(null);
-  const autoScrollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
   const [hasToken, setHasToken] = useState(false);
-  const [isAutoScrolling, setIsAutoScrolling] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   // Get user name and auth token from AsyncStorage (for personalization)
@@ -123,7 +119,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     isFetchingNextPage,
     refetch: refetchAllProducts,
   } = useInfiniteProducts({ status: 'active' });
-  const { data: bannersData, isLoading: bannersLoading, refetch: refetchBanners } = useBanners('homepage', 'active');
+  const { data: bannersData, isLoading: bannersLoading, refetch: refetchBanners } = useBanners('homepage,homepage_brand', 'active');
   const { data: allBrandsData, refetch: refetchAllBrands } = useBrands(); // Fetch all brands to get logos
   const { data: homeCategoriesData } = useHomeCategoriesForApp();
   
@@ -321,7 +317,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   };
 
-  const renderCarouselItem = ({ item }: { item: any }) => {
+  const renderBannerItem = ({ item, index, total }: { item: any; index: number; total: number }) => {
     const src = item.image;
     const imageSource =
       src != null &&
@@ -343,7 +339,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
     return (
       <TouchableOpacity 
-        style={[styles.heroImageContainer, { width: screenWidth }]}
+        style={[styles.heroImageContainer, index < total - 1 ? styles.heroImageSpacing : null]}
         activeOpacity={item.link ? 0.8 : 1}
         onPress={() => handleHeroBannerPress(item.link)}
       >
@@ -353,6 +349,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           resizeMode="cover"
           priority="high"
           cache="immutable"
+          placeholder={images.homesliderimage}
+          fallback={true}
         />
         <View style={styles.heroCtaCenterWrap}>
           {hasBrandInfo && (
@@ -377,64 +375,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         </View>
       </TouchableOpacity>
     );
-  };
-
-  const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
-    if (viewableItems.length > 0 && viewableItems[0].index !== null) {
-      setCurrentSlide(viewableItems[0].index);
-    }
-  }).current;
-
-  const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 50,
-  }).current;
-
-  // Auto-scroll carousel for multiple banners
-  useEffect(() => {
-    if (carouselData.length <= 1 || !isAutoScrolling) {
-      return;
-    }
-
-    // Auto-scroll every 5 seconds
-    autoScrollTimerRef.current = setInterval(() => {
-      setCurrentSlide((prevSlide) => {
-        const nextSlide = (prevSlide + 1) % carouselData.length;
-        try {
-          flatListRef.current?.scrollToIndex({
-            index: nextSlide,
-            animated: true,
-          });
-        } catch (error) {
-          // Fallback to scrollToOffset if scrollToIndex fails
-          flatListRef.current?.scrollToOffset({
-            offset: nextSlide * screenWidth,
-            animated: true,
-          });
-        }
-        return nextSlide;
-      });
-    }, 5000);
-
-    return () => {
-      if (autoScrollTimerRef.current) {
-        clearInterval(autoScrollTimerRef.current);
-      }
-    };
-  }, [carouselData.length, isAutoScrolling]);
-
-  // Reset auto-scroll when user manually scrolls
-  const handleScrollBeginDrag = () => {
-    setIsAutoScrolling(false);
-    if (autoScrollTimerRef.current) {
-      clearInterval(autoScrollTimerRef.current);
-    }
-  };
-
-  const handleScrollEndDrag = () => {
-    // Resume auto-scroll after 8 seconds of inactivity
-    setTimeout(() => {
-      setIsAutoScrolling(true);
-    }, 8000);
   };
 
   // Map API categories to display format - use actual images from API
@@ -979,69 +919,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </View>
         ) : carouselData.length > 0 ? (
           <View style={styles.heroSection}>
-            <FlatList
-              ref={flatListRef}
-              data={carouselData}
-              renderItem={renderCarouselItem}
-              keyExtractor={(item) => item.id}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              onViewableItemsChanged={onViewableItemsChanged}
-              viewabilityConfig={viewabilityConfig}
-              onScrollBeginDrag={handleScrollBeginDrag}
-              onScrollEndDrag={handleScrollEndDrag}
-              onMomentumScrollEnd={(event) => {
-                const index = Math.round(event.nativeEvent.contentOffset.x / screenWidth);
-                if (index >= 0 && index < carouselData.length) {
-                  setCurrentSlide(index);
-                }
-              }}
-              getItemLayout={(data, index) => ({
-                length: screenWidth,
-                offset: screenWidth * index,
-                index,
-              })}
-              style={styles.carousel}
-              decelerationRate="fast"
-              snapToInterval={screenWidth}
-              snapToAlignment="start"
-              scrollEventThrottle={16}
-              removeClippedSubviews={false}
-            />
-            {carouselData.length > 1 && (
-              <View style={styles.carouselIndicators}>
-                {carouselData.map((_, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={[
-                      styles.indicator,
-                      index === currentSlide && styles.activeIndicator
-                    ]}
-                    onPress={() => {
-                      setIsAutoScrolling(false);
-                      setCurrentSlide(index);
-                      try {
-                        flatListRef.current?.scrollToIndex({ 
-                          index, 
-                          animated: true 
-                        });
-                      } catch (error) {
-                        // Fallback to scrollToOffset if scrollToIndex fails
-                        flatListRef.current?.scrollToOffset({
-                          offset: index * screenWidth,
-                          animated: true,
-                        });
-                      }
-                      // Resume auto-scroll after manual navigation
-                      setTimeout(() => {
-                        setIsAutoScrolling(true);
-                      }, 8000);
-                    }}
-                  />
-                ))}
-              </View>
-            )}
+            {carouselData.map((item: any, index: number) => (
+              <React.Fragment key={item.id}>
+                {renderBannerItem({ item, index, total: carouselData.length })}
+              </React.Fragment>
+            ))}
           </View>
         ) : (
           <View style={styles.heroSection}>

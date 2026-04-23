@@ -6,7 +6,17 @@ export async function listBanners(req: Request, res: Response) {
 	try {
 		const { position, status } = req.query as { position?: string; status?: string };
 		const filter: Record<string, any> = {};
-		if (position) filter.position = position;
+		if (position) {
+			const positions = position
+				.split(',')
+				.map((item) => item.trim())
+				.filter(Boolean);
+			if (positions.length > 1) {
+				filter.position = { $in: positions };
+			} else if (positions.length === 1) {
+				filter.position = positions[0];
+			}
+		}
 		if (status) filter.status = status;
 		const banners = await Banner.find(filter).sort({ createdAt: -1 });
 		// Convert MongoDB _id to id for frontend consistency

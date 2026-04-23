@@ -4,6 +4,7 @@ type RawVariation = {
   size?: string;
   color?: string;
   stock?: number;
+  outOfStock?: boolean;
 };
 
 const normalize = (value?: string): string => (value || '').trim().toLowerCase();
@@ -11,6 +12,19 @@ const normalize = (value?: string): string => (value || '').trim().toLowerCase()
 const toStockNumber = (value: unknown): number | null => {
   if (typeof value !== 'number' || Number.isNaN(value)) return null;
   return Math.max(0, value);
+};
+
+const getVariationAvailableStock = (
+  variation: RawVariation,
+  fallbackStock: number
+): number | null => {
+  const numericStock = toStockNumber(variation?.stock);
+  if (numericStock !== null) return numericStock;
+
+  if (variation?.outOfStock === true) return 0;
+  if (variation?.outOfStock === false) return Math.max(0, fallbackStock);
+
+  return null;
 };
 
 const getVariations = (product: IProduct): RawVariation[] => {
@@ -32,6 +46,7 @@ const findVariationIndex = (
 ): number => {
   const variations = getVariations(product);
   if (variations.length === 0) return -1;
+  const fallbackStock = Math.max(0, Number(product.stock) || 0);
 
   const normalizedSize = normalize(size);
   const normalizedColor = normalize(color);
@@ -43,7 +58,7 @@ const findVariationIndex = (
       return (
         normalize(variation.size) === normalizedSize &&
         normalize(variation.color) === normalizedColor &&
-        toStockNumber(variation.stock) !== null
+        getVariationAvailableStock(variation, fallbackStock) !== null
       );
     });
     if (exactIndex !== -1) return exactIndex;
@@ -53,7 +68,7 @@ const findVariationIndex = (
     const sizeOnlyIndex = variations.findIndex((variation) => {
       return (
         normalize(variation.size) === normalizedSize &&
-        toStockNumber(variation.stock) !== null
+        getVariationAvailableStock(variation, fallbackStock) !== null
       );
     });
     if (sizeOnlyIndex !== -1) return sizeOnlyIndex;
@@ -63,7 +78,7 @@ const findVariationIndex = (
     const colorOnlyIndex = variations.findIndex((variation) => {
       return (
         normalize(variation.color) === normalizedColor &&
-        toStockNumber(variation.stock) !== null
+        getVariationAvailableStock(variation, fallbackStock) !== null
       );
     });
     if (colorOnlyIndex !== -1) return colorOnlyIndex;
@@ -77,13 +92,16 @@ export const getAvailableStockForSelection = (
   size?: string,
   color?: string
 ): number => {
+  const fallbackStock = Math.max(0, Number(product.stock) || 0);
   const variationIndex = findVariationIndex(product, size, color);
   if (variationIndex !== -1) {
-    const variationStock = toStockNumber(getVariations(product)[variationIndex]?.stock);
-    return variationStock ?? 0;
+    const variation = getVariations(product)[variationIndex];
+    const variationStock = getVariationAvailableStock(variation, fallbackStock);
+    if (variationStock === null) return fallbackStock;
+    return Math.min(fallbackStock, variationStock);
   }
 
-  return Math.max(0, product.stock ?? 0);
+  return fallbackStock;
 };
 
 export const decrementStockForSelection = async (
@@ -95,13 +113,14 @@ export const decrementStockForSelection = async (
   const safeQuantity = Math.max(0, Number(quantity) || 0);
   if (safeQuantity <= 0) return;
 
-  product.stock = Math.max(0, (product.stock ?? 0) - safeQuantity);
+  const previousProductStock = Math.max(0, Number(product.stock) || 0);
+  product.stock = Math.max(0, previousProductStock - safeQuantity);
 
   const variationIndex = findVariationIndex(product, size, color);
   if (variationIndex !== -1) {
     const variations = getVariations(product);
     const variation = variations[variationIndex];
-    const variationStock = toStockNumber(variation.stock) ?? 0;
+    const variationStock = getVariationAvailableStock(variation, previousProductStock) ?? 0;
     variation.stock = Math.max(0, variationStock - safeQuantity);
     product.set('variations', variations);
   }
