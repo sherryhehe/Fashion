@@ -1,6 +1,7 @@
 import { StyleSheet, Dimensions } from 'react-native';
 
 const { width: screenWidth } = Dimensions.get('window');
+const HERO_BANNER_HEIGHT = 500; // Taller hero banner to match design reference
 
 const useStyles = ()=>{
   return StyleSheet.create({
@@ -84,64 +85,16 @@ const useStyles = ()=>{
     position: 'relative',
   },
   carousel: {
-    height: 416,
+    height: HERO_BANNER_HEIGHT,
   },
   heroImageContainer: {
     position: 'relative',
     overflow: 'hidden',
-    height: 416,
-  },
-  heroImageSpacing: {
-    marginBottom: 12,
+    height: HERO_BANNER_HEIGHT,
   },
   heroImage: {
     width: '100%',
     height: '100%',
-  },
-  heroCtaCenterWrap: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  heroBrandRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-    maxWidth: '80%',
-  },
-  heroBrandLogo: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    marginRight: 8,
-    backgroundColor: 'rgba(255,255,255,0.85)',
-  },
-  heroBrandText: {
-    color: '#FFFFFF',
-    fontSize: 28,
-    fontWeight: '700',
-    letterSpacing: 1,
-    textShadowColor: 'rgba(0,0,0,0.35)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  heroShopButton: {
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    backgroundColor: 'rgba(0, 0, 0, 0.12)',
-    paddingVertical: 8,
-    paddingHorizontal: 24,
-    borderRadius: 2,
-  },
-  heroShopButtonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '700',
-    letterSpacing: 0.8,
   },
   brandBannerOverlay: {
     position: 'absolute',
@@ -182,6 +135,52 @@ const useStyles = ()=>{
     fontSize: 15,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  brandBannerSection: {
+    paddingVertical: 0,
+    backgroundColor: '#FFFFFF',
+  },
+  brandBannerList: {
+    paddingHorizontal: 0,
+  },
+  brandBannerCard: {
+    aspectRatio: 1.6,
+    borderRadius: 0,
+    overflow: 'hidden',
+    marginBottom: 10,
+    backgroundColor: '#F2F2F7',
+  },
+  brandBannerImage: {
+    width: '100%',
+    height: '100%',
+  },
+  brandBannerSkeleton: {
+    aspectRatio: 1.6,
+    marginHorizontal: 0,
+    borderRadius: 0,
+    backgroundColor: '#F2F2F7',
+  },
+  bottomBannerCtaOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bottomBannerCta: {
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    backgroundColor: 'rgba(0, 0, 0, 0.12)',
+  },
+  bottomBannerCtaText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+    textTransform: 'uppercase',
   },
   heroOverlay: {
     position: 'absolute',
@@ -551,6 +550,26 @@ const useStyles = ()=>{
     fontSize: 16,
     fontWeight: 'bold',
     color: '#2C2C2E',
+  },
+  loadMoreButton: {
+    marginTop: 4,
+    marginHorizontal: 8,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: '#2C2C2E',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadMoreButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  noMoreProductsText: {
+    marginTop: 8,
+    textAlign: 'center',
+    color: '#8E8E93',
+    fontSize: 13,
   },
 
   // Empty State Styles

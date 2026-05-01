@@ -1,16 +1,14 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
   ScrollView,
   Image,
   TouchableOpacity,
-  TextInput,
-  Dimensions,
   FlatList,
   RefreshControl,
   ActivityIndicator,
-  Linking,
+  useWindowDimensions,
 } from 'react-native';
 import { CachedImage } from '../../components';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -22,19 +20,19 @@ import useStyles from './styles';
 
 // API Hooks
 import { useCategories } from '../../hooks/useCategories';
-import { useFeaturedProducts, useRecommendedProducts, useRandomProducts, usePersonalizedProducts, useInfiniteProducts } from '../../hooks/useProducts';
-import { useTopBrands, useFeaturedBrands, useBrands } from '../../hooks/useBrands';
-import { useAddToWishlist, useRemoveFromWishlist, useIsInWishlist, useWishlist } from '../../hooks/useWishlist';
+import { useFeaturedProducts, useRecommendedProducts, useRandomProducts, useRecentlyAddedProducts, usePersonalizedProducts, useInfiniteProducts } from '../../hooks/useProducts';
+import { useTopBrands, useBrands } from '../../hooks/useBrands';
+import { useAddToWishlist, useRemoveFromWishlist, useWishlist } from '../../hooks/useWishlist';
 import { requireAuthOrPromptLogin } from '../../utils/guestHelper';
 import { useFeaturedStyles, usePopularStyles } from '../../hooks/useStyles';
 import { useBanners } from '../../hooks/useBanners';
 import { useHomeCategoriesForApp } from '../../hooks/useHomeCategories';
 import { getFirstImageSource, getImageSource, preloadImages, getImageUrl } from '../../utils/imageHelper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { CommonActions, useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
 
-const { width: screenWidth } = Dimensions.get('window');
+const HERO_BANNER_HEIGHT = 500; // Taller hero banner to match design reference
 
 /** Shuffle array so product order varies each time (e.g. on app open / data load). Works on both Android and iOS. */
 function shuffleArray<T>(arr: T[]): T[] {
@@ -46,7 +44,6 @@ function shuffleArray<T>(arr: T[]): T[] {
   return a;
 }
 
-/** Deterministic hash so product order is stable per focus seed, but changes on next app open/focus. */
 function hashString(input: string): number {
   let hash = 0;
   for (let i = 0; i < input.length; i++) {
@@ -63,9 +60,15 @@ interface HomeScreenProps {
 
 const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const styles = useStyles()
+  const { width: screenWidth } = useWindowDimensions();
   const queryClient = useQueryClient();
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const flatListRef = useRef<FlatList>(null);
+  const autoScrollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const resumeAutoScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
   const [hasToken, setHasToken] = useState(false);
+  const [isAutoScrolling, setIsAutoScrolling] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   // Get user name and auth token from AsyncStorage (for personalization)
@@ -107,8 +110,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }, [])
   );
   const { data: randomProductsData, isLoading: randomLoading } = useRandomProducts(10, focusShuffleKey);
+  const {
+    data: randomPicksData,
+    isLoading: randomPicksLoading,
+    refetch: refetchRandomPicks,
+  } = useRandomProducts(20, focusShuffleKey + 1000);
   const { data: personalizedProductsData, isLoading: personalizedLoading } = usePersonalizedProducts(10, hasToken);
-  const { data: homeRandomProductsData, isLoading: homeRandomProductsLoading, refetch: refetchHomeRandomProducts } = useRandomProducts(8, focusShuffleKey + 1000);
+  const { refetch: refetchRecentlyAdded } = useRecentlyAddedProducts(8);
   const { data: topBrandsData, isLoading: topBrandsLoading, refetch: refetchTopBrands } = useTopBrands();
   const { data: featuredStylesData, isLoading: featuredStylesLoading, refetch: refetchStyles } = useFeaturedStyles();
   const {
@@ -119,7 +127,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     isFetchingNextPage,
     refetch: refetchAllProducts,
   } = useInfiniteProducts({ status: 'active' });
-  const { data: bannersData, isLoading: bannersLoading, refetch: refetchBanners } = useBanners('homepage,homepage_brand', 'active');
+  const { data: bannersData, isLoading: bannersLoading, refetch: refetchBanners } = useBanners('homepage', 'active');
+  const {
+    data: brandBannersData,
+    isLoading: brandBannersLoading,
+    refetch: refetchBrandBanners,
+  } = useBanners('homepage_brand', 'active');
   const { data: allBrandsData, refetch: refetchAllBrands } = useBrands(); // Fetch all brands to get logos
   const { data: homeCategoriesData } = useHomeCategoriesForApp();
   
@@ -129,7 +142,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const { data: wishlistData } = useWishlist(); // Subscribe to wishlist changes for immediate UI updates
 
   // Map API data arrays - now safe to use after API hooks
-  const bannersArray = bannersData?.data || [];
+  const bannersArray = useMemo(() => bannersData?.data || [], [bannersData?.data]);
+  const brandBannersArray = useMemo(() => brandBannersData?.data || [], [brandBannersData?.data]);
   const categoriesArray = categoriesData?.data || [];
   const stylesArray = featuredStylesData?.data || [];
   const recommendedArray = recommendedProductsData?.data || [];
@@ -142,6 +156,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const topBrandsArray = topBrandsData?.data || [];
   const allProductsArray = infiniteProductsData?.pages?.flatMap((p: any) => p?.data ?? []) ?? [];
   const allBrandsArray = allBrandsData?.data || [];
+  const homeCategoriesArray = homeCategoriesData?.data || [];
 
   // Create a map of brand name -> brand object for quick lookup
   const brandMap = React.useMemo(() => {
@@ -262,31 +277,45 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     allProductsLoading,
     bannersLoading,
   ]);
+  const mapBannerToDisplayItem = useCallback((banner: any, index: number, fallbackPrefix: string) => ({
+    id: String(banner.id || banner._id || `${fallbackPrefix}-${index}`),
+    title: banner.title || '',
+    subtitle: banner.subtitle || '',
+    cta: banner.subtitle || '',
+    image: getImageSource(banner.imageUrl || banner.image, images.homesliderimage),
+    link: banner.linkUrl || banner.link,
+  }), []);
+
+  const sortBannersByOrder = useCallback((items: any[]) => (
+    [...items].sort((a, b) => {
+      const orderA = a.order ?? 999;
+      const orderB = b.order ?? 999;
+      return orderA - orderB;
+    })
+  ), []);
+
   // Sort banners by order if available, then map to carousel data
-  const carouselData = bannersArray.length > 0
-    ? bannersArray
+  const carouselData = useMemo(() => (
+    bannersArray.length > 0
+      ? [...bannersArray]
+        .filter((banner) => !banner.position || banner.position === 'homepage')
         .sort((a, b) => {
           // Sort by order field if available (lower order = appears first)
           const orderA = a.order ?? 999;
           const orderB = b.order ?? 999;
           return orderA - orderB;
         })
-        .map((banner, index) => ({
-          id: banner.id || banner._id || `banner-${index}`,
-          title: banner.title || '', // Use empty string if no title
-          brandName: banner.brandName || banner.brand?.name || banner.title || '',
-          brandLogo: getImageSource(
-            banner.brandLogo || banner.logo || banner.brand?.logo || banner.brand?.image,
-            null
-          ),
-          subtitle: banner.subtitle || '', // Use empty string if no subtitle
-          cta: banner.subtitle || '', // Use subtitle as CTA, or empty if no subtitle
-          // Backend returns imageUrl, not image - map it correctly
-          image: getImageSource(banner.imageUrl || banner.image, images.homesliderimage),
-          // Backend returns linkUrl, not link - map it correctly
-          link: banner.linkUrl || banner.link,
-        }))
-    : [];
+        .map((banner, index) => mapBannerToDisplayItem(banner, index, 'banner'))
+      : []
+  ), [bannersArray, mapBannerToDisplayItem]);
+
+  const brandBannerData = useMemo(() => (
+    brandBannersArray.length > 0
+      ? sortBannersByOrder(brandBannersArray)
+        .filter((banner) => !banner.position || banner.position === 'homepage_brand')
+        .map((banner, index) => mapBannerToDisplayItem(banner, index, 'brand-banner'))
+      : []
+  ), [brandBannersArray, mapBannerToDisplayItem, sortBannersByOrder]);
 
   useEffect(() => {
     if (__DEV__ && carouselData.length > 0) {
@@ -294,54 +323,25 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   }, [carouselData.length]);
 
-  const handleHeroBannerPress = async (link?: string) => {
-    if (!link || typeof link !== 'string') return;
-    const trimmedLink = link.trim();
-    if (!trimmedLink) return;
+  const renderCarouselItem = ({ item }: { item: any }) => {
+    const imageSource = typeof item.image === 'object' && item.image?.uri 
+      ? item.image 
+      : images.homesliderimage;
+    const storeId = item.link?.trim?.();
+    const brandName = item.title?.trim?.() || item.subtitle?.trim?.() || '';
 
-    try {
-      if (/^https?:\/\//i.test(trimmedLink)) {
-        await Linking.openURL(trimmedLink);
-        return;
+    const handleBannerPress = () => {
+      if (storeId) {
+        navigation.getParent()?.navigate('StoreDetail', { storeId });
       }
-
-      const parsedStoreId = trimmedLink.includes('/')
-        ? trimmedLink.split('/').filter(Boolean).pop()
-        : trimmedLink;
-
-      if (parsedStoreId) {
-        navigation.getParent()?.navigate('StoreDetail', { storeId: parsedStoreId });
-      }
-    } catch (error) {
-      console.log('Hero banner redirect failed:', error);
-    }
-  };
-
-  const renderBannerItem = ({ item, index, total }: { item: any; index: number; total: number }) => {
-    const src = item.image;
-    const imageSource =
-      src != null &&
-      (typeof src === 'number' ||
-        (typeof src === 'object' && src !== null && 'uri' in src && (src as { uri?: string }).uri))
-        ? src
-        : images.homesliderimage;
-    const brandLogoSource =
-      item.brandLogo != null &&
-      (typeof item.brandLogo === 'number' ||
-        (typeof item.brandLogo === 'object' &&
-          item.brandLogo !== null &&
-          'uri' in item.brandLogo &&
-          (item.brandLogo as { uri?: string }).uri))
-        ? item.brandLogo
-        : null;
-    const brandName = typeof item.brandName === 'string' ? item.brandName.trim() : '';
-    const hasBrandInfo = !!brandLogoSource || !!brandName;
-
+    };
+    
     return (
       <TouchableOpacity 
-        style={[styles.heroImageContainer, index < total - 1 ? styles.heroImageSpacing : null]}
-        activeOpacity={item.link ? 0.8 : 1}
-        onPress={() => handleHeroBannerPress(item.link)}
+        style={[styles.heroImageContainer, { width: screenWidth }]}
+        activeOpacity={storeId ? 0.8 : 1}
+        disabled={!storeId}
+        onPress={handleBannerPress}
       >
         <CachedImage
           source={imageSource}
@@ -349,33 +349,136 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           resizeMode="cover"
           priority="high"
           cache="immutable"
-          placeholder={images.homesliderimage}
-          fallback={true}
         />
-        <View style={styles.heroCtaCenterWrap}>
-          {hasBrandInfo && (
-            <View style={styles.heroBrandRow}>
-              {brandLogoSource ? (
-                <Image source={brandLogoSource} style={styles.heroBrandLogo} resizeMode="contain" />
-              ) : null}
-              {brandName ? (
-                <Text style={styles.heroBrandText} numberOfLines={1}>
-                  {brandName}
-                </Text>
+        {(brandName || storeId) ? (
+          <View style={styles.heroOverlay}>
+            <View style={styles.heroTextContainer}>
+              {brandName ? <Text style={styles.heroTitle}>{brandName}</Text> : null}
+              {storeId ? (
+                <View style={styles.brandBannerCta}>
+                  <Text style={styles.brandBannerCtaText}>Shop Now</Text>
+                </View>
               ) : null}
             </View>
-          )}
-          <TouchableOpacity
-            style={styles.heroShopButton}
-            activeOpacity={0.85}
-            onPress={() => handleHeroBannerPress(item.link)}
-          >
-            <Text style={styles.heroShopButtonText}>SHOP NOW</Text>
-          </TouchableOpacity>
-        </View>
+          </View>
+        ) : null}
       </TouchableOpacity>
     );
   };
+
+  const renderBrandBannerItem = ({ item }: { item: any }) => {
+    const imageSource = typeof item.image === 'object' && item.image?.uri
+      ? item.image
+      : images.homesliderimage;
+    const storeId = item.link?.trim?.();
+
+    const handleBannerPress = () => {
+      if (storeId) {
+        navigation.getParent()?.navigate('StoreDetail', { storeId });
+      }
+    };
+
+    return (
+      <TouchableOpacity
+        style={[styles.brandBannerCard, { width: screenWidth }]}
+        activeOpacity={storeId ? 0.85 : 1}
+        disabled={!storeId}
+        onPress={handleBannerPress}
+      >
+        <CachedImage
+          source={imageSource}
+          style={styles.brandBannerImage}
+          resizeMode="cover"
+          priority="normal"
+          cache="immutable"
+        />
+        {storeId ? (
+          <View style={styles.bottomBannerCtaOverlay}>
+            <View style={styles.bottomBannerCta}>
+              <Text style={styles.bottomBannerCtaText}>Shop Now</Text>
+            </View>
+          </View>
+        ) : null}
+      </TouchableOpacity>
+    );
+  };
+
+  const scrollToCarouselIndex = useCallback((index: number, animated = true) => {
+    flatListRef.current?.scrollToOffset({
+      offset: index * screenWidth,
+      animated,
+    });
+  }, [screenWidth]);
+
+  // Auto-scroll carousel for multiple banners
+  useEffect(() => {
+    if (carouselData.length <= 1 || !isAutoScrolling) {
+      return;
+    }
+
+    if (autoScrollTimerRef.current) {
+      clearInterval(autoScrollTimerRef.current);
+    }
+
+    // Auto-scroll every 5 seconds
+    autoScrollTimerRef.current = setInterval(() => {
+      setCurrentSlide((prevSlide) => {
+        const nextSlide = (prevSlide + 1) % carouselData.length;
+        scrollToCarouselIndex(nextSlide);
+        return nextSlide;
+      });
+    }, 5000);
+
+    return () => {
+      if (autoScrollTimerRef.current) {
+        clearInterval(autoScrollTimerRef.current);
+      }
+    };
+  }, [carouselData.length, isAutoScrolling, scrollToCarouselIndex]);
+
+  const scheduleAutoScrollResume = useCallback(() => {
+    if (resumeAutoScrollTimerRef.current) {
+      clearTimeout(resumeAutoScrollTimerRef.current);
+    }
+    resumeAutoScrollTimerRef.current = setTimeout(() => {
+      setIsAutoScrolling(true);
+    }, 8000);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (autoScrollTimerRef.current) {
+        clearInterval(autoScrollTimerRef.current);
+      }
+      if (resumeAutoScrollTimerRef.current) {
+        clearTimeout(resumeAutoScrollTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Reset auto-scroll when user manually scrolls
+  const handleScrollBeginDrag = () => {
+    setIsAutoScrolling(false);
+    if (autoScrollTimerRef.current) {
+      clearInterval(autoScrollTimerRef.current);
+    }
+    if (resumeAutoScrollTimerRef.current) {
+      clearTimeout(resumeAutoScrollTimerRef.current);
+    }
+  };
+
+  const handleScrollEndDrag = () => {
+    // Resume auto-scroll after 8 seconds of inactivity
+    scheduleAutoScrollResume();
+  };
+
+  const handleMomentumScrollEnd = useCallback((event: any) => {
+    const index = Math.round(event.nativeEvent.contentOffset.x / screenWidth);
+    if (index >= 0 && index < carouselData.length) {
+      setCurrentSlide(index);
+    }
+    scheduleAutoScrollResume();
+  }, [carouselData.length, scheduleAutoScrollResume, screenWidth]);
 
   // Map API categories to display format - use actual images from API
   // Show ALL categories (no limit)
@@ -449,6 +552,19 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }));
   }, [recommendedSourceArray, focusShuffleKey]);
 
+  const displayRandomPicks = useMemo(() => {
+    const randomPicksArray = randomPicksData?.data || [];
+    if (!Array.isArray(randomPicksArray) || randomPicksArray.length === 0) return [];
+    return shuffleArray(randomPicksArray).map(product => ({
+      id: product._id,
+      name: product.name,
+      brand: product.brand || '',
+      price: formatPrice(product.price),
+      rating: formatRating(product.rating ?? 0, product.reviewCount ?? 0),
+      image: getFirstImageSource(product.images, images.minicrossbody),
+    }));
+  }, [randomPicksData, focusShuffleKey]);
+
   // Check if top brands data exists and is an array
   // Show ALL brands (no limit)
   const displayTopBrands = Array.isArray(topBrandsArray) && topBrandsArray.length > 0
@@ -485,24 +601,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }));
   }, [featuredArray, focusShuffleKey]);
 
-  // Custom home categories (from admin) - each has name + products
-  const homeCategoriesArray = homeCategoriesData?.data || [];
-
-  // Random products for this section (new set each time user opens/focuses home)
-  const displayHomeRandomProducts = useMemo(() => {
-    const randomProducts = homeRandomProductsData?.data || [];
-    if (!Array.isArray(randomProducts) || randomProducts.length === 0) return [];
-    return randomProducts.map(product => ({
-      id: product._id,
-      name: product.name,
-      brand: product.brand || '',
-      price: formatPrice(product.price),
-      rating: formatRating(product.rating ?? 0, product.reviewCount ?? 0),
-      image: getFirstImageSource(product.images, images.minicrossbody),
-    }));
-  }, [homeRandomProductsData]);
-
-  // Bottom grid products: randomized per focus/app open, but stable while user stays on the same session.
+  // Bottom grid products: randomized per focus/app open, but backed by the paginated products feed.
   const displayBottomGridProducts = useMemo(() => {
     if (!Array.isArray(allProductsArray) || allProductsArray.length === 0) return [];
     const seed = focusShuffleKey || 0;
@@ -528,15 +627,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       };
     });
   }, [allProductsArray, brandMap, focusShuffleKey]);
-
-  const handleScroll = (e: any) => {
-    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
-    const padding = 400;
-    const nearBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - padding;
-    if (nearBottom && hasNextPage && !isFetchingNextPage) {
-      fetchNextPage();
-    }
-  };
 
   // Navigation handlers for "See More" buttons
   const handleSeeMoreCategories = () => {
@@ -687,7 +777,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       style={styles.recommendedItem}
       onPress={() => navigation.getParent()?.navigate('ProductDetail', { productId: item.id })}
     >
-      <CachedImage source={item.image} style={styles.recommendedImage} priority="high" cache="immutable" />
+      <CachedImage
+        source={item.image}
+        style={styles.recommendedImage}
+        priority="high"
+        cache="immutable"
+        placeholder={images.velvetShawl}
+        fallback={true}
+      />
       <View style={styles.recommendedContent}>
         {item.brand ? <Text style={styles.brandLogo}>{item.brand}</Text> : null}
         <Text style={styles.recommendedPrice}>{item.price}</Text>
@@ -782,6 +879,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             priority="low"
             cache="immutable"
             resizeMode="cover"
+            placeholder={images.bottomList.image1}
+            fallback={true}
           />
           <TouchableOpacity 
             style={styles.cartIconContainer}
@@ -843,11 +942,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         refetchCategories(),
         refetchFeatured(),
         refetchRecommended(),
-        refetchHomeRandomProducts(),
+        refetchRandomPicks(),
+        refetchRecentlyAdded(),
         refetchTopBrands(),
         refetchStyles(),
         refetchAllProducts(),
         refetchBanners(),
+        refetchBrandBanners(),
         refetchAllBrands(),
         queryClient.invalidateQueries({ queryKey: ['home-categories'] }),
       ]);
@@ -856,7 +957,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     } finally {
       setRefreshing(false);
     }
-  }, [queryClient, refetchCategories, refetchFeatured, refetchRecommended, refetchHomeRandomProducts, refetchTopBrands, refetchStyles, refetchAllProducts, refetchBanners, refetchAllBrands]);
+  }, [queryClient, refetchCategories, refetchFeatured, refetchRecommended, refetchRandomPicks, refetchRecentlyAdded, refetchTopBrands, refetchStyles, refetchAllProducts, refetchBanners, refetchBrandBanners, refetchAllBrands]);
 
   return (
     <SafeView style={styles.container}>
@@ -884,9 +985,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         </View>
       </View>
       <ScrollView 
+        nestedScrollEnabled
         contentContainerStyle={styles.scrollContent}
-        onScroll={handleScroll}
-        scrollEventThrottle={200}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -915,23 +1015,84 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         {/* Hero Banner Section - Full Width Carousel */}
         {bannersLoading ? (
           <View style={styles.heroSection}>
-            <View style={{ width: screenWidth, height: 416, backgroundColor: '#F2F2F7' }} />
+            <View style={{ width: screenWidth, height: HERO_BANNER_HEIGHT, backgroundColor: '#F2F2F7', borderRadius: 12 }} />
           </View>
         ) : carouselData.length > 0 ? (
           <View style={styles.heroSection}>
-            {carouselData.map((item: any, index: number) => (
-              <React.Fragment key={item.id}>
-                {renderBannerItem({ item, index, total: carouselData.length })}
-              </React.Fragment>
-            ))}
+            <FlatList
+              ref={flatListRef}
+              data={carouselData}
+              renderItem={renderCarouselItem}
+              keyExtractor={(item) => item.id}
+              horizontal
+              nestedScrollEnabled
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onScrollBeginDrag={handleScrollBeginDrag}
+              onScrollEndDrag={handleScrollEndDrag}
+              onMomentumScrollEnd={handleMomentumScrollEnd}
+              getItemLayout={(data, index) => ({
+                length: screenWidth,
+                offset: screenWidth * index,
+                index,
+              })}
+              style={styles.carousel}
+              decelerationRate="fast"
+              scrollEventThrottle={16}
+              removeClippedSubviews={false}
+            />
+            {carouselData.length > 1 && (
+              <View style={styles.carouselIndicators}>
+                {carouselData.map((_, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={[
+                      styles.indicator,
+                      index === currentSlide && styles.activeIndicator
+                    ]}
+                    onPress={() => {
+                      setIsAutoScrolling(false);
+                      setCurrentSlide(index);
+                      scrollToCarouselIndex(index);
+                      // Resume auto-scroll after manual navigation
+                      scheduleAutoScrollResume();
+                    }}
+                  />
+                ))}
+              </View>
+            )}
           </View>
         ) : (
           <View style={styles.heroSection}>
-            <View style={{ width: screenWidth, height: 416, backgroundColor: '#F2F2F7', justifyContent: 'center', alignItems: 'center' }}>
+            <View style={{ width: screenWidth, height: HERO_BANNER_HEIGHT, backgroundColor: '#F2F2F7', borderRadius: 12, justifyContent: 'center', alignItems: 'center' }}>
               <Text style={{ color: '#8E8E93', fontSize: 14 }}>No banners available</Text>
             </View>
           </View>
         )}
+
+        {/* Random Picks Section */}
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Random Picks</Text>
+          </View>
+          {randomPicksLoading ? (
+            <ShimmerHorizontalList count={4} cardWidth={screenWidth * 0.75} />
+          ) : displayRandomPicks.length > 0 ? (
+            <FlatList
+              data={displayRandomPicks}
+              renderItem={renderRecommendedItem}
+              keyExtractor={(item) => item.id}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.recommendedList}
+              style={styles.horizontalList}
+            />
+          ) : (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>No random products available</Text>
+            </View>
+          )}
+        </View>
 
         {/* Browse by Category Section */}
         <View style={styles.sectionContainer}>
@@ -1080,7 +1241,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           )}
         </View>
 
-        {/* Custom Home Categories (below Featured) */}
+        {/* Other Custom Categories */}
         {Array.isArray(homeCategoriesArray) && homeCategoriesArray.length > 0 && homeCategoriesArray.map((cat: any) => {
           const products = (cat.products || []).map((p: any) => ({
             id: p._id,
@@ -1109,31 +1270,25 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           );
         })}
 
-        {/* Random Picks Section */}
-        <View style={styles.sectionContainer}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Random Picks</Text>
+        {/* Bottom Banners */}
+        {(brandBannersLoading || brandBannerData.length > 0) && (
+          <View style={styles.brandBannerSection}>
+            {brandBannersLoading ? (
+              <View style={styles.brandBannerSkeleton} />
+            ) : (
+              <FlatList
+                data={brandBannerData}
+                renderItem={renderBrandBannerItem}
+                keyExtractor={(item) => item.id}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.brandBannerList}
+                scrollEnabled={false}
+              />
+            )}
           </View>
-          {homeRandomProductsLoading ? (
-            <ShimmerHorizontalList count={2} />
-          ) : displayHomeRandomProducts.length > 0 ? (
-            <FlatList
-              data={displayHomeRandomProducts}
-              renderItem={renderRecommendedItem}
-              keyExtractor={(item) => item.id}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.recommendedList}
-              style={styles.horizontalList}
-            />
-          ) : (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>No random products available</Text>
-            </View>
-          )}
-        </View>
+        )}
 
-        {/* Bottom Grid Section - Infinite scroll (load more when near bottom) */}
+        {/* Randomly Sorted Bottom Grid Section - Manual load more */}
         <View style={styles.bottomGridContainer}>
           {allProductsLoading ? (
             <ShimmerGrid columns={2} count={4} />
@@ -1154,10 +1309,21 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 initialNumToRender={6}
                 windowSize={5}
               />
-              {isFetchingNextPage && (
-                <View style={{ paddingVertical: 16, alignItems: 'center' }}>
-                  <ActivityIndicator size="small" color="#007AFF" />
-                </View>
+              {hasNextPage ? (
+                <TouchableOpacity
+                  style={styles.loadMoreButton}
+                  onPress={() => fetchNextPage()}
+                  disabled={isFetchingNextPage}
+                  activeOpacity={0.8}
+                >
+                  {isFetchingNextPage ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.loadMoreButtonText}>Load More</Text>
+                  )}
+                </TouchableOpacity>
+              ) : (
+                <Text style={styles.noMoreProductsText}></Text>
               )}
             </>
           ) : (

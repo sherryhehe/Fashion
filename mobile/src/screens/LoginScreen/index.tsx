@@ -12,7 +12,6 @@ import LoadingScreen from '../../components/LoadingScreen';
 import { AuthStackParamList } from '../../navigation/AuthNavigator';
 import { useLogin } from '../../hooks/useAuth';
 import { showToast } from '../../utils/toast';
-import authService from '../../services/auth.service';
 import { styles } from './styles';
 
 type LoginScreenNavigationProp = StackNavigationProp<AuthStackParamList, 'Login'>;
@@ -82,24 +81,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation, route }) => {
     navigation.navigate('ForgotPassword');
   };
 
-  const handleContinueAsGuest = async () => {
-    try {
-      console.log('👤 Enabling guest mode...');
-      // Enable guest mode
-      await authService.enableGuestMode();
-      console.log('✅ Guest mode enabled!');
-      showToast.success('Welcome! Continue browsing as a guest', 'Guest Mode');
-      
-      // Navigate to main app as guest
-      if (setIsAuthenticated) {
-        setIsAuthenticated(true);
-      }
-    } catch (error) {
-      console.log('❌ Error enabling guest mode:', error);
-      showToast.error('Unable to continue as guest. Please try again.');
-    }
-  };
-
   const handleSignUp = () => {
     navigation.navigate('SignUp');
   };
@@ -151,20 +132,20 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation, route }) => {
         disabled={loginMutation.isPending}
       />
 
-      {/* OR Separator */}
+      {/*
       <View style={styles.separatorContainer}>
         <View style={styles.separatorLine} />
         <Text style={styles.separatorText}>OR</Text>
         <View style={styles.separatorLine} />
       </View>
 
-      {/* Continue as Guest Button */}
       <Button
         title="Continue as Guest"
         onPress={handleContinueAsGuest}
         variant="outline"
         style={styles.guestButton}
       />
+      */}
 
       {/* Sign Up Link */}
       <View style={styles.signUpContainer}>
