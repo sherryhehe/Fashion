@@ -2,35 +2,35 @@
  * CachedImage Component
  *
  * Thin wrapper around React Native's built-in <Image> that adds:
- *   - a placeholder / loading indicator while the image is resolving
- *   - graceful fallback on error
+ *   - graceful fallback to a placeholder when the remote image fails
+ *   - optional loading indicator (off by default to avoid flashing the
+ *     placeholder over cached images)
  *
  * Previously this wrapped `react-native-fast-image`, which is incompatible
- * with the New Architecture (Fabric) on RN 0.81 — its view manager props
- * don't wire up, so images render as blank boxes. React Native's built-in
- * Image component uses Fresco on Android and NSURLCache on iOS, so disk
- * caching still works out of the box.
+ * with the New Architecture (Fabric) on RN 0.81. React Native's built-in
+ * Image uses Fresco on Android and NSURLCache on iOS, so disk caching
+ * still works out of the box.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   ActivityIndicator,
   Image,
   ImageProps,
   ImageStyle,
   StyleProp,
+  StyleSheet,
   View,
+  NativeSyntheticEvent,
+  ImageErrorEventData,
 } from 'react-native';
 
 interface CachedImageProps extends Omit<ImageProps, 'source'> {
   source: ImageProps['source'] | { uri: string };
   style?: StyleProp<ImageStyle>;
   resizeMode?: 'contain' | 'cover' | 'stretch' | 'center';
-  /** Kept for API compatibility with previous FastImage-based version. */
   priority?: 'low' | 'normal' | 'high';
-  /** Kept for API compatibility with previous FastImage-based version. */
   cache?: 'immutable' | 'web' | 'cacheOnly';
-  /** Kept for API compatibility; always falls back gracefully on error now. */
   fallback?: boolean;
   placeholder?: ImageProps['source'];
   showLoadingIndicator?: boolean;
@@ -42,89 +42,168 @@ const CachedImage: React.FC<CachedImageProps> = ({
   style,
   resizeMode = 'cover',
   placeholder,
-  showLoadingIndicator = true,
-  loadingIndicatorColor = '#E0E0E0',
+  showLoadingIndicator = false,
+  loadingIndicatorColor = '#F2F2F7',
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   priority: _priority,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   cache: _cache,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   fallback: _fallback,
+  onError: parentOnError,
+  onLoad: parentOnLoad,
   ...props
 }) => {
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasError, setHasError] = useState(false);
-
-  // Local images (require(...)) — render directly, no loading state needed.
   if (typeof source === 'number') {
     return (
       <Image
         source={source}
         style={style}
         resizeMode={resizeMode as ImageProps['resizeMode']}
+        onError={parentOnError}
+        onLoad={parentOnLoad}
         {...props}
       />
     );
   }
 
-  const imageSource = source as { uri?: string };
+  const imageSource = source as { uri?: string } | null | undefined;
 
-  // Local image object without a URI — pass through.
   if (!imageSource?.uri) {
     return (
       <Image
-        source={source as ImageProps['source']}
+        source={(source as ImageProps['source']) || (placeholder as ImageProps['source'])}
         style={style}
         resizeMode={resizeMode as ImageProps['resizeMode']}
+        onError={parentOnError}
+        onLoad={parentOnLoad}
         {...props}
       />
     );
   }
 
-  // Remote image — show placeholder/spinner over it until it loads.
+  const uri = imageSource.uri;
+
   return (
-    <View style={[{ position: 'relative' }, style]}>
-      {(isLoading || (hasError && !!placeholder)) && (placeholder || showLoadingIndicator) && (
-        <View
-          style={[
-            {
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              justifyContent: 'center',
-              alignItems: 'center',
-              backgroundColor: loadingIndicatorColor,
-            },
-            style,
-          ]}
-        >
-          {placeholder ? (
-            <Image
-              source={placeholder}
-              style={style}
-              resizeMode={resizeMode as ImageProps['resizeMode']}
-            />
-          ) : isLoading && showLoadingIndicator ? (
-            <ActivityIndicator size="small" color="#999999" />
-          ) : null}
-        </View>
-      )}
+    <RemoteImage
+      uri={uri}
+      style={style}
+      resizeMode={resizeMode}
+      placeholder={placeholder}
+      showLoadingIndicator={showLoadingIndicator}
+      loadingIndicatorColor={loadingIndicatorColor}
+      parentOnError={parentOnError}
+      parentOnLoad={parentOnLoad}
+      passthrough={props}
+    />
+  );
+};
+
+interface RemoteImageProps {
+  uri: string;
+  style?: StyleProp<ImageStyle>;
+  resizeMode: 'contain' | 'cover' | 'stretch' | 'center';
+  placeholder?: ImageProps['source'];
+  showLoadingIndicator: boolean;
+  loadingIndicatorColor: string;
+  parentOnError?: ImageProps['onError'];
+  parentOnLoad?: ImageProps['onLoad'];
+  passthrough: Record<string, any>;
+}
+
+const RemoteImage: React.FC<RemoteImageProps> = ({
+  uri,
+  style,
+  resizeMode,
+  placeholder,
+  showLoadingIndicator,
+  loadingIndicatorColor,
+  parentOnError,
+  parentOnLoad,
+  passthrough,
+}) => {
+  const [hasError, setHasError] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
+
+  useEffect(() => {
+    setHasError(false);
+    setHasLoaded(false);
+  }, [uri]);
+
+  const handleError = useCallback(
+    (event: NativeSyntheticEvent<ImageErrorEventData>) => {
+      setHasError(true);
+      parentOnError?.(event);
+    },
+    [parentOnError],
+  );
+
+  const handleLoad = useCallback(
+    (event: any) => {
+      setHasLoaded(true);
+      parentOnLoad?.(event);
+    },
+    [parentOnLoad],
+  );
+
+  if (hasError && placeholder) {
+    return (
       <Image
-        source={{ uri: imageSource.uri }}
+        source={placeholder}
         style={style}
         resizeMode={resizeMode as ImageProps['resizeMode']}
-        onLoadStart={() => setIsLoading(true)}
-        onLoadEnd={() => setIsLoading(false)}
-        onError={() => {
-          setIsLoading(false);
-          setHasError(true);
-        }}
-        {...props}
+        {...passthrough}
       />
+    );
+  }
+
+  if (!showLoadingIndicator) {
+    return (
+      <Image
+        source={{ uri }}
+        style={style}
+        resizeMode={resizeMode as ImageProps['resizeMode']}
+        onError={handleError}
+        onLoad={handleLoad}
+        {...passthrough}
+      />
+    );
+  }
+
+  return (
+    <View style={[localStyles.container, style]}>
+      <Image
+        source={{ uri }}
+        style={[StyleSheet.absoluteFillObject, style]}
+        resizeMode={resizeMode as ImageProps['resizeMode']}
+        onError={handleError}
+        onLoad={handleLoad}
+        {...passthrough}
+      />
+      {!hasLoaded && (
+        <View
+          style={[
+            StyleSheet.absoluteFillObject,
+            localStyles.loadingOverlay,
+            { backgroundColor: loadingIndicatorColor },
+          ]}
+          pointerEvents="none"
+        >
+          <ActivityIndicator size="small" color="#999999" />
+        </View>
+      )}
     </View>
   );
 };
+
+const localStyles = StyleSheet.create({
+  container: {
+    overflow: 'hidden',
+  },
+  loadingOverlay: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+});
 
 export default CachedImage;

@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import {
   View,
   Text,
-  ScrollView,
   Image,
   TouchableOpacity,
   FlatList,
@@ -32,9 +31,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
 
-const HERO_BANNER_HEIGHT = 500; // Taller hero banner to match design reference
+const HERO_BANNER_HEIGHT = 500;
 
-/** Shuffle array so product order varies each time (e.g. on app open / data load). Works on both Android and iOS. */
+const bottomGridColumnWrapper = {
+  justifyContent: 'space-between' as const,
+  paddingHorizontal: 20,
+};
+
 function shuffleArray<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -59,7 +62,7 @@ interface HomeScreenProps {
 }
 
 const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
-  const styles = useStyles()
+  const styles = useStyles();
   const { width: screenWidth } = useWindowDimensions();
   const queryClient = useQueryClient();
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -71,7 +74,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [isAutoScrolling, setIsAutoScrolling] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Get user name and auth token from AsyncStorage (for personalization)
   useEffect(() => {
     const loadUserAndToken = async () => {
       try {
@@ -91,16 +93,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     loadUserAndToken();
   }, []);
 
-  // Get greeting based on time of day
-  const getGreeting = () => {
+  const greeting = useMemo(() => {
     const hour = new Date().getHours();
     if (hour < 12) return 'Good morning';
     if (hour < 17) return 'Good afternoon';
     return 'Good evening';
-  };
+  }, []);
 
-  // API Hooks - MUST be called before using the data
-  const { data: categoriesData, isLoading: categoriesLoading, error: categoriesError, refetch: refetchCategories } = useCategories();
+  const { data: categoriesData, isLoading: categoriesLoading, refetch: refetchCategories } = useCategories();
   const { data: featuredProductsData, isLoading: featuredLoading, refetch: refetchFeatured } = useFeaturedProducts(8);
   const { data: recommendedProductsData, isLoading: recommendedLoading, refetch: refetchRecommended } = useRecommendedProducts(10);
   const [focusShuffleKey, setFocusShuffleKey] = useState(0);
@@ -133,33 +133,40 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     isLoading: brandBannersLoading,
     refetch: refetchBrandBanners,
   } = useBanners('homepage_brand', 'active');
-  const { data: allBrandsData, refetch: refetchAllBrands } = useBrands(); // Fetch all brands to get logos
+  const { data: allBrandsData, refetch: refetchAllBrands } = useBrands();
   const { data: homeCategoriesData } = useHomeCategoriesForApp();
-  
-  // Wishlist mutations and data
+
   const addToWishlistMutation = useAddToWishlist();
   const removeFromWishlistMutation = useRemoveFromWishlist();
-  const { data: wishlistData } = useWishlist(); // Subscribe to wishlist changes for immediate UI updates
+  const { data: wishlistData } = useWishlist();
 
-  // Map API data arrays - now safe to use after API hooks
   const bannersArray = useMemo(() => bannersData?.data || [], [bannersData?.data]);
   const brandBannersArray = useMemo(() => brandBannersData?.data || [], [brandBannersData?.data]);
-  const categoriesArray = categoriesData?.data || [];
-  const stylesArray = featuredStylesData?.data || [];
-  const recommendedArray = recommendedProductsData?.data || [];
-  const personalizedArray = personalizedProductsData?.data || [];
-  // For "Recommended for You": when logged in use personalized; else use random products (new set each time user opens home)
-  const randomArray = randomProductsData?.data || [];
-  const recommendedSourceArray = (hasToken && Array.isArray(personalizedArray) && personalizedArray.length > 0)
-    ? personalizedArray
-    : (Array.isArray(randomArray) && randomArray.length > 0 ? randomArray : recommendedArray);
-  const topBrandsArray = topBrandsData?.data || [];
-  const allProductsArray = infiniteProductsData?.pages?.flatMap((p: any) => p?.data ?? []) ?? [];
-  const allBrandsArray = allBrandsData?.data || [];
-  const homeCategoriesArray = homeCategoriesData?.data || [];
+  const categoriesArray = useMemo(() => categoriesData?.data || [], [categoriesData?.data]);
+  const stylesArray = useMemo(() => featuredStylesData?.data || [], [featuredStylesData?.data]);
+  const recommendedArray = useMemo(() => recommendedProductsData?.data || [], [recommendedProductsData?.data]);
+  const personalizedArray = useMemo(() => personalizedProductsData?.data || [], [personalizedProductsData?.data]);
+  const randomArray = useMemo(() => randomProductsData?.data || [], [randomProductsData?.data]);
 
-  // Create a map of brand name -> brand object for quick lookup
-  const brandMap = React.useMemo(() => {
+  const recommendedSourceArray = useMemo(() => {
+    if (hasToken && Array.isArray(personalizedArray) && personalizedArray.length > 0) {
+      return personalizedArray;
+    }
+    if (Array.isArray(randomArray) && randomArray.length > 0) {
+      return randomArray;
+    }
+    return recommendedArray;
+  }, [hasToken, personalizedArray, randomArray, recommendedArray]);
+
+  const topBrandsArray = useMemo(() => topBrandsData?.data || [], [topBrandsData?.data]);
+  const allProductsArray = useMemo(
+    () => infiniteProductsData?.pages?.flatMap((p: any) => p?.data ?? []) ?? [],
+    [infiniteProductsData?.pages],
+  );
+  const allBrandsArray = useMemo(() => allBrandsData?.data || [], [allBrandsData?.data]);
+  const homeCategoriesArray = useMemo(() => homeCategoriesData?.data || [], [homeCategoriesData?.data]);
+
+  const brandMap = useMemo(() => {
     const map = new Map();
     if (Array.isArray(allBrandsArray)) {
       allBrandsArray.forEach((brand: any) => {
@@ -171,82 +178,49 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     return map;
   }, [allBrandsArray]);
 
-  // Debug logs only in development to avoid home screen lag
   useEffect(() => {
-    if (__DEV__ && bannersArray.length > 0) {
-      console.log('🏠 HomeScreen - Banners fetched:', bannersArray.length);
-    }
-  }, [bannersArray.length]);
+    let priorityTimer: ReturnType<typeof setTimeout> | null = null;
+    let belowFoldTimer: ReturnType<typeof setTimeout> | null = null;
 
-  // Preload images with priority: above-the-fold first, then below-the-fold
-  useEffect(() => {
-    const preloadPriorityImages = async () => {
-      const priorityUrls: string[] = [];
-
-      // Priority 1: Banner images (most visible)
-      bannersArray.forEach(banner => {
-        if (banner.imageUrl || banner.image) {
-          const url = getImageUrl(banner.imageUrl || banner.image);
-          if (url) priorityUrls.push(url);
+    const preloadPriority = () => {
+      const urls: string[] = [];
+      bannersArray.forEach((b: any) => {
+        const u = getImageUrl(b.imageUrl || b.image);
+        if (u) urls.push(u);
+      });
+      categoriesArray.forEach((c: any) => {
+        const u = getImageUrl(c.image);
+        if (u) urls.push(u);
+      });
+      stylesArray.forEach((s: any) => {
+        const u = getImageUrl(s.image);
+        if (u) urls.push(u);
+      });
+      recommendedSourceArray.forEach((p: any) => {
+        if (p.images && p.images.length > 0) {
+          const u = getImageUrl(p.images[0]);
+          if (u) urls.push(u);
         }
       });
-
-      // Priority 2: Category images (above the fold)
-      categoriesArray.forEach(category => {
-        if (category.image) {
-          const url = getImageUrl(category.image);
-          if (url) priorityUrls.push(url);
-        }
+      topBrandsArray.forEach((b: any) => {
+        const u = getImageUrl(b.logo);
+        if (u) urls.push(u);
       });
-
-      // Priority 3: Style images
-      stylesArray.forEach(style => {
-        if (style.image) {
-          const url = getImageUrl(style.image);
-          if (url) priorityUrls.push(url);
-        }
-      });
-
-      // Priority 4: Recommended product images
-      recommendedSourceArray.forEach(product => {
-        if (product.images && product.images.length > 0) {
-          const url = getImageUrl(product.images[0]);
-          if (url) priorityUrls.push(url);
-        }
-      });
-
-      // Priority 5: Brand images
-      topBrandsArray.forEach(brand => {
-        if (brand.logo) {
-          const url = getImageUrl(brand.logo);
-          if (url) priorityUrls.push(url);
-        }
-      });
-
-      if (priorityUrls.length > 0) {
-        if (__DEV__) console.log(`🚀 Preloading ${priorityUrls.length} priority images...`);
-        preloadImages(priorityUrls).then(() => {
-          if (__DEV__) console.log('✅ Priority image preloading completed');
-        }).catch(() => {});
-      }
+      if (urls.length > 0) preloadImages(urls).catch(() => {});
     };
 
-    const preloadBelowFoldImages = async () => {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      const belowFoldUrls: string[] = [];
-      allProductsArray.slice(0, 10).forEach(product => {
-        if (product.images && product.images.length > 0) {
-          const url = getImageUrl(product.images[0]);
-          if (url) belowFoldUrls.push(url);
+    const preloadBelowFold = () => {
+      const urls: string[] = [];
+      allProductsArray.slice(0, 10).forEach((p: any) => {
+        if (p.images && p.images.length > 0) {
+          const u = getImageUrl(p.images[0]);
+          if (u) urls.push(u);
         }
       });
-      if (belowFoldUrls.length > 0) {
-        preloadImages(belowFoldUrls).catch(() => {});
-      }
+      if (urls.length > 0) preloadImages(urls).catch(() => {});
     };
 
-    // Defer preload to next tick so first paint isn't blocked (reduces home lag)
-    const t = setTimeout(() => {
+    priorityTimer = setTimeout(() => {
       if (
         !categoriesLoading &&
         !featuredStylesLoading &&
@@ -255,14 +229,20 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         !bannersLoading &&
         (bannersArray.length > 0 || categoriesArray.length > 0)
       ) {
-        preloadPriorityImages();
-      }
-      if (!allProductsLoading && allProductsArray.length > 0) {
-        preloadBelowFoldImages();
+        preloadPriority();
       }
     }, 50);
 
-    return () => clearTimeout(t);
+    belowFoldTimer = setTimeout(() => {
+      if (!allProductsLoading && allProductsArray.length > 0) {
+        preloadBelowFold();
+      }
+    }, 1200);
+
+    return () => {
+      if (priorityTimer) clearTimeout(priorityTimer);
+      if (belowFoldTimer) clearTimeout(belowFoldTimer);
+    };
   }, [
     bannersArray,
     categoriesArray,
@@ -277,6 +257,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     allProductsLoading,
     bannersLoading,
   ]);
+
   const mapBannerToDisplayItem = useCallback((banner: any, index: number, fallbackPrefix: string) => ({
     id: String(banner.id || banner._id || `${fallbackPrefix}-${index}`),
     title: banner.title || '',
@@ -294,13 +275,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     })
   ), []);
 
-  // Sort banners by order if available, then map to carousel data
   const carouselData = useMemo(() => (
     bannersArray.length > 0
       ? [...bannersArray]
         .filter((banner) => !banner.position || banner.position === 'homepage')
         .sort((a, b) => {
-          // Sort by order field if available (lower order = appears first)
           const orderA = a.order ?? 999;
           const orderB = b.order ?? 999;
           return orderA - orderB;
@@ -317,15 +296,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       : []
   ), [brandBannersArray, mapBannerToDisplayItem, sortBannersByOrder]);
 
-  useEffect(() => {
-    if (__DEV__ && carouselData.length > 0) {
-      console.log('🎠 Carousel data prepared:', carouselData.length, 'items');
-    }
-  }, [carouselData.length]);
-
-  const renderCarouselItem = ({ item }: { item: any }) => {
-    const imageSource = typeof item.image === 'object' && item.image?.uri 
-      ? item.image 
+  const renderCarouselItem = useCallback(({ item }: { item: any }) => {
+    const imageSource = typeof item.image === 'object' && item.image?.uri
+      ? item.image
       : images.homesliderimage;
     const storeId = item.link?.trim?.();
     const brandName = item.title?.trim?.() || item.subtitle?.trim?.() || '';
@@ -335,9 +308,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         navigation.getParent()?.navigate('StoreDetail', { storeId });
       }
     };
-    
+
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
         style={[styles.heroImageContainer, { width: screenWidth }]}
         activeOpacity={storeId ? 0.8 : 1}
         disabled={!storeId}
@@ -364,9 +337,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         ) : null}
       </TouchableOpacity>
     );
-  };
+  }, [navigation, screenWidth, styles]);
 
-  const renderBrandBannerItem = ({ item }: { item: any }) => {
+  const renderBrandBannerItem = useCallback(({ item }: { item: any }) => {
     const imageSource = typeof item.image === 'object' && item.image?.uri
       ? item.image
       : images.homesliderimage;
@@ -401,7 +374,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         ) : null}
       </TouchableOpacity>
     );
-  };
+  }, [navigation, screenWidth, styles]);
 
   const scrollToCarouselIndex = useCallback((index: number, animated = true) => {
     flatListRef.current?.scrollToOffset({
@@ -410,7 +383,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     });
   }, [screenWidth]);
 
-  // Auto-scroll carousel for multiple banners
   useEffect(() => {
     if (carouselData.length <= 1 || !isAutoScrolling) {
       return;
@@ -420,7 +392,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       clearInterval(autoScrollTimerRef.current);
     }
 
-    // Auto-scroll every 5 seconds
     autoScrollTimerRef.current = setInterval(() => {
       setCurrentSlide((prevSlide) => {
         const nextSlide = (prevSlide + 1) % carouselData.length;
@@ -456,8 +427,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     };
   }, []);
 
-  // Reset auto-scroll when user manually scrolls
-  const handleScrollBeginDrag = () => {
+  const handleScrollBeginDrag = useCallback(() => {
     setIsAutoScrolling(false);
     if (autoScrollTimerRef.current) {
       clearInterval(autoScrollTimerRef.current);
@@ -465,12 +435,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     if (resumeAutoScrollTimerRef.current) {
       clearTimeout(resumeAutoScrollTimerRef.current);
     }
-  };
+  }, []);
 
-  const handleScrollEndDrag = () => {
-    // Resume auto-scroll after 8 seconds of inactivity
+  const handleScrollEndDrag = useCallback(() => {
     scheduleAutoScrollResume();
-  };
+  }, [scheduleAutoScrollResume]);
 
   const handleMomentumScrollEnd = useCallback((event: any) => {
     const index = Math.round(event.nativeEvent.contentOffset.x / screenWidth);
@@ -480,66 +449,49 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     scheduleAutoScrollResume();
   }, [carouselData.length, scheduleAutoScrollResume, screenWidth]);
 
-  // Map API categories to display format - use actual images from API
-  // Show ALL categories (no limit)
-  const displayCategories = Array.isArray(categoriesArray) && categoriesArray.length > 0
-    ? categoriesArray.map(category => ({
-        id: category._id,
-        name: category.name,
-        // Use actual image from API, fallback to icon if no image
-        image: category.image ? getImageSource(category.image) : null,
-        icon: category.image ? null : (() => {
-          // Fallback to icon mapping only if no image from API
-          const name = category.name.toLowerCase();
-          if (name.includes('accessor')) return icons.accessories;
-          if (name.includes('bag')) return icons.bags;
-          if (name.includes('shoe')) return icons.shoes;
-          if (name.includes('makeup') || name.includes('beauty')) return icons.makeup;
-          if (name.includes('cloth') || name.includes('dress') || name.includes('shirt')) return icons.clothes;
-          return icons.clothes;
-        })(),
-      }))
-    : [];
+  const displayCategories = useMemo(() => {
+    if (!Array.isArray(categoriesArray) || categoriesArray.length === 0) return [];
+    return categoriesArray.map((category: any) => ({
+      id: category._id,
+      name: category.name,
+      image: category.image ? getImageSource(category.image) : null,
+      icon: category.image ? null : (() => {
+        const name = category.name.toLowerCase();
+        if (name.includes('accessor')) return icons.accessories;
+        if (name.includes('bag')) return icons.bags;
+        if (name.includes('shoe')) return icons.shoes;
+        if (name.includes('makeup') || name.includes('beauty')) return icons.makeup;
+        if (name.includes('cloth') || name.includes('dress') || name.includes('shirt')) return icons.clothes;
+        return icons.clothes;
+      })(),
+    }));
+  }, [categoriesArray]);
 
-  // Map API styles to display format - use actual images from API
-  // Show ALL styles (no limit)
-  const displayStyles = Array.isArray(stylesArray) && stylesArray.length > 0
-    ? stylesArray.map(style => {
-        // Check if style has a valid image (not null, undefined, or empty string)
-        const hasImage = style.image && typeof style.image === 'string' && style.image.trim() !== '';
-        const imageSource = hasImage 
-          ? getImageSource(style.image, images.casual)
-          : (() => {
-              // Fallback to name-based mapping only if no image from API
-              const name = style.name.toLowerCase();
-              if (name.includes('casual')) return images.casual;
-              if (name.includes('desi') || name.includes('traditional')) return images.desi;
-              if (name.includes('street') || name.includes('urban')) return images.streetwear;
-              return images.casual;
-            })();
-        
-        // Debug logging for style images
-        if (__DEV__) {
-          console.log(`🎨 Style: ${style.name}`, {
-            hasImage,
-            imagePath: style.image,
-            imageSource: imageSource,
-          });
-        }
-        
-        return {
-          id: style._id,
-          name: style.name,
-          image: imageSource,
-        };
-      })
-    : [];
+  const displayStyles = useMemo(() => {
+    if (!Array.isArray(stylesArray) || stylesArray.length === 0) return [];
+    return stylesArray.map((style: any) => {
+      const hasImage = style.image && typeof style.image === 'string' && style.image.trim() !== '';
+      const imageSource = hasImage
+        ? getImageSource(style.image, images.casual)
+        : (() => {
+            const name = style.name.toLowerCase();
+            if (name.includes('casual')) return images.casual;
+            if (name.includes('desi') || name.includes('traditional')) return images.desi;
+            if (name.includes('street') || name.includes('urban')) return images.streetwear;
+            return images.casual;
+          })();
 
-  // Format recommended products data
-  const formatPrice = (price: number) => `PKR ${price.toLocaleString()}`;
-  const formatRating = (rating: number, reviewCount: number) => `${rating.toFixed(1)} (${reviewCount})`;
+      return {
+        id: style._id,
+        name: style.name,
+        image: imageSource,
+      };
+    });
+  }, [stylesArray]);
 
-  // Recommended products: shuffle so order varies each time user opens/focuses home
+  const formatPrice = useCallback((price: number) => `PKR ${price.toLocaleString()}`, []);
+  const formatRating = useCallback((rating: number, reviewCount: number) => `${rating.toFixed(1)} (${reviewCount})`, []);
+
   const displayRecommendedProducts = useMemo(() => {
     if (!Array.isArray(recommendedSourceArray) || recommendedSourceArray.length === 0) return [];
     return shuffleArray(recommendedSourceArray).map(product => ({
@@ -550,7 +502,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       rating: formatRating(product.rating ?? 0, product.reviewCount ?? 0),
       image: getFirstImageSource(product.images, images.velvetShawl),
     }));
-  }, [recommendedSourceArray, focusShuffleKey]);
+  }, [recommendedSourceArray, focusShuffleKey, formatPrice, formatRating]);
 
   const displayRandomPicks = useMemo(() => {
     const randomPicksArray = randomPicksData?.data || [];
@@ -563,32 +515,28 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       rating: formatRating(product.rating ?? 0, product.reviewCount ?? 0),
       image: getFirstImageSource(product.images, images.minicrossbody),
     }));
-  }, [randomPicksData, focusShuffleKey]);
+  }, [randomPicksData, focusShuffleKey, formatPrice, formatRating]);
 
-  // Check if top brands data exists and is an array
-  // Show ALL brands (no limit)
-  const displayTopBrands = Array.isArray(topBrandsArray) && topBrandsArray.length > 0
-    ? topBrandsArray.map(brand => {
-        // Ensure we have a valid logo - check for null, undefined, or empty string
-        const brandLogo = brand.logo && brand.logo.trim() ? brand.logo : null;
-        const brandImage = getImageSource(brandLogo, images.khussakraft);
-        
-        return {
-          id: brand._id,
-          name: brand.name,
-          description: brand.description || '', // Use empty string if no description
-          rating: formatRating(brand.rating || 0, brand.reviewCount || 0), // Use actual rating from API
-          image: brandImage || images.khussakraft, // Ensure we always have a fallback
-          storeName: brand.name,
-          storeType: brand.businessInfo?.businessType || '', // Use business type from API, or empty
-          bannerImage: brand.banner ? getImageSource(brand.banner, images.shopBanner) : images.shopBanner,
-          logoImage: getImageSource(brandLogo, images.shopLogo) || images.shopLogo,
-        };
-      })
-    : [];
+  const displayTopBrands = useMemo(() => {
+    if (!Array.isArray(topBrandsArray) || topBrandsArray.length === 0) return [];
+    return topBrandsArray.map((brand: any) => {
+      const brandLogo = brand.logo && brand.logo.trim() ? brand.logo : null;
+      const brandImage = getImageSource(brandLogo, images.khussakraft);
+      return {
+        id: brand._id,
+        name: brand.name,
+        description: brand.description || '',
+        rating: formatRating(brand.rating || 0, brand.reviewCount || 0),
+        image: brandImage || images.khussakraft,
+        storeName: brand.name,
+        storeType: brand.businessInfo?.businessType || '',
+        bannerImage: brand.banner ? getImageSource(brand.banner, images.shopBanner) : images.shopBanner,
+        logoImage: getImageSource(brandLogo, images.shopLogo) || images.shopLogo,
+      };
+    });
+  }, [topBrandsArray, formatRating]);
 
-  // Featured products: shuffle so order varies each time user opens/focuses home
-  const featuredArray = featuredProductsData?.data || [];
+  const featuredArray = useMemo(() => featuredProductsData?.data || [], [featuredProductsData?.data]);
   const displayFeaturedProducts = useMemo(() => {
     if (!Array.isArray(featuredArray) || featuredArray.length === 0) return [];
     return shuffleArray(featuredArray).map(product => ({
@@ -599,9 +547,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       rating: formatRating(product.rating ?? 0, product.reviewCount ?? 0),
       image: getFirstImageSource(product.images, images.silkDupatta),
     }));
-  }, [featuredArray, focusShuffleKey]);
+  }, [featuredArray, focusShuffleKey, formatPrice, formatRating]);
 
-  // Bottom grid products: randomized per focus/app open, but backed by the paginated products feed.
   const displayBottomGridProducts = useMemo(() => {
     if (!Array.isArray(allProductsArray) || allProductsArray.length === 0) return [];
     const seed = focusShuffleKey || 0;
@@ -626,18 +573,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         image: getFirstImageSource(product.images, images.bottomList.image1),
       };
     });
-  }, [allProductsArray, brandMap, focusShuffleKey]);
+  }, [allProductsArray, brandMap, focusShuffleKey, formatPrice, formatRating]);
 
-  // Navigation handlers for "See More" buttons
-  const handleSeeMoreCategories = () => {
-    // categoriesArray already contains ALL categories from useCategories()
+  const handleSeeMoreCategories = useCallback(() => {
     const allCategories = categoriesArray.map((cat: any) => ({
       _id: cat._id || cat.id,
       id: cat._id || cat.id,
       name: cat.name,
       image: cat.image,
     }));
-    
     navigation.getParent()?.navigate('CategoryList', {
       title: 'All Categories',
       data: allCategories,
@@ -647,17 +591,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       headerText: 'All Categories',
       searchPlaceholder: 'Search categories...',
     });
-  };
+  }, [categoriesArray, navigation]);
 
-  const handleSeeMoreStyles = () => {
-    // stylesArray contains featured styles - use what we have
+  const handleSeeMoreStyles = useCallback(() => {
     const allStyles = stylesArray.map((style: any) => ({
       _id: style._id || style.id,
       id: style._id || style.id,
       name: style.name,
       image: style.image,
     }));
-    
     navigation.getParent()?.navigate('CategoryList', {
       title: 'All Styles',
       data: allStyles,
@@ -667,10 +609,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       headerText: 'All Styles',
       searchPlaceholder: 'Search styles...',
     });
-  };
+  }, [stylesArray, navigation]);
 
-  const handleSeeMoreBrands = () => {
-    // topBrandsArray contains top brands - use what we have
+  const handleSeeMoreBrands = useCallback(() => {
     const allBrands = topBrandsArray.map((brand: any) => ({
       _id: brand._id || brand.id,
       id: brand._id || brand.id,
@@ -682,7 +623,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       banner: brand.banner,
       businessInfo: brand.businessInfo,
     }));
-    
     navigation.getParent()?.navigate('CategoryList', {
       title: 'All Brands',
       data: allBrands,
@@ -692,87 +632,53 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       headerText: 'All Brands',
       searchPlaceholder: 'Search brands...',
     });
-  };
+  }, [topBrandsArray, navigation]);
 
-  const handleSeeMoreRecommended = () => {
-    navigation.getParent()?.navigate('Search', {
-      autoFocus: false,
-      headerText: 'Recommended Products',
-      searchPlaceholder: 'Search recommended products...',
-    });
-  };
-
-  const handleSeeMoreFeatured = () => {
-    navigation.getParent()?.navigate('Search', {
-      autoFocus: false,
-      headerText: 'Featured Products',
-      searchPlaceholder: 'Search featured products...',
-    });
-  };
-
-  const handleSeeMoreRecentlyAdded = () => {
-    navigation.getParent()?.navigate('Search', {
-      autoFocus: false,
-      headerText: 'Recently Added',
-      searchPlaceholder: 'Search recently added products...',
-    });
-  };
-
-  const renderCategoryItem = ({ item, index }: { item: any, index: number }) => {
-    // Use image from API if available, otherwise use icon fallback
+  const renderCategoryItem = useCallback(({ item, index }: { item: any, index: number }) => {
     const imageSource = item.image || item.icon || icons.clothes;
-    
     return (
-      <TouchableOpacity onPress={() => navigation.getParent()?.navigate('Search',{
-        autoFocus: false,
-        headerText: item.name,
-        initialCategory: item.name, // Pass category name to pre-select it in SearchScreen
-      })} style={styles.categoryItem}>
+      <TouchableOpacity
+        onPress={() => navigation.getParent()?.navigate('Search', {
+          autoFocus: false,
+          headerText: item.name,
+          initialCategory: item.name,
+        })}
+        style={styles.categoryItem}
+      >
         <CategoryBg size={80}>
           {item.image ? (
-            <CachedImage source={imageSource} style={[styles.categoryIcon,{width: index === 4 ? 35 : 60}]} priority="high" cache="immutable" />
+            <CachedImage source={imageSource} style={[styles.categoryIcon, { width: index === 4 ? 35 : 60 }]} priority="high" cache="immutable" />
           ) : (
-            <Image source={item.icon || icons.clothes} style={[styles.categoryIcon,{width: index === 4 ? 35 : 60}]} />
+            <Image source={item.icon || icons.clothes} style={[styles.categoryIcon, { width: index === 4 ? 35 : 60 }]} />
           )}
         </CategoryBg>
         <Text style={styles.categoryName}>{item.name}</Text>
       </TouchableOpacity>
     );
-  };
+  }, [navigation, styles]);
 
-  const renderStyleItem = ({ item }: { item: any }) => {
-    // Ensure we have a valid image source - use fallback if image is null/undefined
+  const renderStyleItem = useCallback(({ item }: { item: any }) => {
     const imageSource = item.image || images.casual;
     const fallbackImage = images.casual;
-    
     return (
-      <TouchableOpacity 
-        onPress={() => navigation.getParent()?.navigate('StyleDetail', { styleName: item.name })} 
+      <TouchableOpacity
+        onPress={() => navigation.getParent()?.navigate('StyleDetail', { styleName: item.name })}
         style={styles.styleItem}
       >
-        <CachedImage 
-          source={imageSource} 
-          style={styles.styleImage} 
-          priority="high" 
+        <CachedImage
+          source={imageSource}
+          style={styles.styleImage}
+          priority="high"
           cache="immutable"
           placeholder={fallbackImage}
           fallback={true}
-          onError={(error) => {
-            if (__DEV__) {
-              console.log(`❌ Style image failed to load for "${item.name}":`, {
-                error,
-                imageSource,
-                itemImage: item.image,
-              });
-            }
-          }}
         />
         <Text style={styles.styleName}>{item.name}</Text>
       </TouchableOpacity>
     );
-  };
+  }, [navigation, styles]);
 
-  const renderRecommendedItem = ({ item }: { item: any }) => (
+  const renderRecommendedItem = useCallback(({ item }: { item: any }) => (
     <TouchableOpacity
       style={styles.recommendedItem}
       onPress={() => navigation.getParent()?.navigate('ProductDetail', { productId: item.id })}
@@ -797,27 +703,21 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         </View>
       </View>
     </TouchableOpacity>
-  );
+  ), [navigation, styles]);
 
-  const renderBrandItem = ({ item }: { item: any }) => {
-    // Ensure we have a valid image source - handle both URI objects and require() statements
+  const renderBrandItem = useCallback(({ item }: { item: any }) => {
     const imageSource = item.image || images.khussakraft;
-    
     return (
       <TouchableOpacity
         style={styles.brandItem}
         onPress={() => navigation.getParent()?.navigate('StoreDetail', { storeId: item.id })}
       >
         <View style={styles.brandImageContainer}>
-          <CachedImage 
-            source={imageSource} 
+          <CachedImage
+            source={imageSource}
             style={styles.brandImage}
             priority="high"
             cache="immutable"
-            onError={() => {
-              // If image fails to load, it will show nothing - this is handled by the fallback
-              console.log('Brand image failed to load for:', item.name);
-            }}
           />
         </View>
         <View style={styles.brandContent}>
@@ -829,28 +729,21 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             {item.name}
           </Text>
           {item.description ? (
-            <Text 
-              style={styles.brandDescription} 
-              numberOfLines={2} 
-              ellipsizeMode="tail"
-            >
+            <Text style={styles.brandDescription} numberOfLines={2} ellipsizeMode="tail">
               {item.description}
             </Text>
           ) : null}
         </View>
       </TouchableOpacity>
     );
-  };
+  }, [navigation, styles]);
 
-  // Handle wishlist toggle for product cards
-  const handleWishlistToggle = async (productId: string, isInWishlist: boolean) => {
+  const handleWishlistToggle = useCallback(async (productId: string, isInWishlist: boolean) => {
     const canProceed = await requireAuthOrPromptLogin(
       'add items to wishlist',
-      navigation.getParent() // Pass parent navigator to access root Auth screen
+      navigation.getParent()
     );
-
     if (!canProceed) return;
-
     try {
       if (isInWishlist) {
         await removeFromWishlistMutation.mutateAsync(productId);
@@ -860,29 +753,29 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     } catch (error) {
       console.log('Wishlist toggle error:', error);
     }
-  };
+  }, [navigation, addToWishlistMutation, removeFromWishlistMutation]);
 
-  const renderBottomGridItem = ({ item }: { item: any }) => {
-    const wishlistLoading = addToWishlistMutation.isPending || removeFromWishlistMutation.isPending;
-    // Use wishlistData from hook to ensure component re-renders when wishlist changes
-    const isInWishlist = wishlistData?.data?.some((w: any) => w.productId === item.id || w.product?._id === item.id) || false;
+  const wishlistItems = wishlistData?.data;
+  const wishlistLoading = addToWishlistMutation.isPending || removeFromWishlistMutation.isPending;
 
+  const renderBottomGridItem = useCallback(({ item }: { item: any }) => {
+    const isInWishlist = wishlistItems?.some((w: any) => w.productId === item.id || w.product?._id === item.id) || false;
     return (
       <TouchableOpacity
         style={styles.bottomGridItem}
         onPress={() => navigation.getParent()?.navigate('ProductDetail', { productId: item.id })}
       >
         <View style={styles.bottomImageContainer}>
-          <CachedImage 
-            source={item.image} 
-            style={styles.bottomImage} 
+          <CachedImage
+            source={item.image}
+            style={styles.bottomImage}
             priority="low"
             cache="immutable"
             resizeMode="cover"
             placeholder={images.bottomList.image1}
             fallback={true}
           />
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.cartIconContainer}
             onPress={(e) => {
               e.stopPropagation();
@@ -890,47 +783,45 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             }}
             disabled={wishlistLoading}
           >
-            <Image 
-              source={isInWishlist ? icons.headrtFilled : icons.heart} 
-              style={styles.cartIcon} 
-              tintColor={isInWishlist ? '#FF3B30' : '#FFFFFF'} 
+            <Image
+              source={isInWishlist ? icons.headrtFilled : icons.heart}
+              style={styles.cartIcon}
+              tintColor={isInWishlist ? '#FF3B30' : '#FFFFFF'}
             />
           </TouchableOpacity>
         </View>
-      <View style={styles.bottomContent}>
-        <View style={styles.bottomRatingContainer}>
-          <Image source={icons.star} style={styles.bottomStarIcon} />
-          <Text style={styles.bottomRatingText}>{item.rating}</Text>
-        </View>
-        {item.brand ? (
-          <View style={styles.bottomBrandContainer}>
-            {item.brandLogo ? (
-              <Image 
-                source={item.brandLogo} 
-                style={styles.bottomBrandLogo} 
-                resizeMode="contain"
-              />
-            ) : (
-              <View style={styles.brandLogoPlaceholder} />
-            )}
-            <Text style={styles.bottomBrandName}>{item.brand}</Text>
-            {item.brandVerified && (
-              <Image source={icons.verify} style={styles.verifyIcon} />
-            )}
+        <View style={styles.bottomContent}>
+          <View style={styles.bottomRatingContainer}>
+            <Image source={icons.star} style={styles.bottomStarIcon} />
+            <Text style={styles.bottomRatingText}>{item.rating}</Text>
           </View>
-        ) : null}
-        <Text style={styles.bottomProductName}>{item.name}</Text>
-        <Text style={styles.bottomPrice}>{item.price}</Text>
-      </View>
-    </TouchableOpacity>
+          {item.brand ? (
+            <View style={styles.bottomBrandContainer}>
+              {item.brandLogo ? (
+                <Image
+                  source={item.brandLogo}
+                  style={styles.bottomBrandLogo}
+                  resizeMode="contain"
+                />
+              ) : (
+                <View style={styles.brandLogoPlaceholder} />
+              )}
+              <Text style={styles.bottomBrandName}>{item.brand}</Text>
+              {item.brandVerified && (
+                <Image source={icons.verify} style={styles.verifyIcon} />
+              )}
+            </View>
+          ) : null}
+          <Text style={styles.bottomProductName}>{item.name}</Text>
+          <Text style={styles.bottomPrice}>{item.price}</Text>
+        </View>
+      </TouchableOpacity>
     );
-  };
+  }, [navigation, styles, wishlistItems, wishlistLoading, handleWishlistToggle]);
 
-  // Pull to refresh handler
-  const onRefresh = React.useCallback(async () => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      // Invalidate and refetch all queries
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['categories'] }),
         queryClient.invalidateQueries({ queryKey: ['products'] }),
@@ -938,7 +829,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         queryClient.invalidateQueries({ queryKey: ['styles'] }),
         queryClient.invalidateQueries({ queryKey: ['banners'] }),
         queryClient.invalidateQueries({ queryKey: ['wishlist'] }),
-        // Refetch all data
         refetchCategories(),
         refetchFeatured(),
         refetchRecommended(),
@@ -959,6 +849,372 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   }, [queryClient, refetchCategories, refetchFeatured, refetchRecommended, refetchRandomPicks, refetchRecentlyAdded, refetchTopBrands, refetchStyles, refetchAllProducts, refetchBanners, refetchBrandBanners, refetchAllBrands]);
 
+  const carouselGetItemLayout = useCallback(
+    (_: any, index: number) => ({ length: screenWidth, offset: screenWidth * index, index }),
+    [screenWidth],
+  );
+
+  const ListHeader = useMemo(() => (
+    <View>
+      <View style={styles.greetingSection}>
+        <Text style={styles.greetingText}>
+          {userName ? `${greeting}, ${userName} 👋` : `${greeting} 👋`}
+        </Text>
+        <SearchFilterBar
+          placeholder="Search brands, items or styles..."
+          isNavigational={true}
+          showFilters={false}
+          showFilterButton={true}
+        />
+      </View>
+
+      {bannersLoading ? (
+        <View style={styles.heroSection}>
+          <View style={{ width: screenWidth, height: HERO_BANNER_HEIGHT, backgroundColor: '#F2F2F7', borderRadius: 12 }} />
+        </View>
+      ) : carouselData.length > 0 ? (
+        <View style={styles.heroSection}>
+          <FlatList
+            ref={flatListRef}
+            data={carouselData}
+            renderItem={renderCarouselItem}
+            keyExtractor={(item) => item.id}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onScrollBeginDrag={handleScrollBeginDrag}
+            onScrollEndDrag={handleScrollEndDrag}
+            onMomentumScrollEnd={handleMomentumScrollEnd}
+            getItemLayout={carouselGetItemLayout}
+            style={styles.carousel}
+            decelerationRate="fast"
+            scrollEventThrottle={16}
+            removeClippedSubviews={false}
+            initialNumToRender={1}
+            maxToRenderPerBatch={2}
+            windowSize={3}
+          />
+          {carouselData.length > 1 && (
+            <View style={styles.carouselIndicators}>
+              {carouselData.map((_, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.indicator,
+                    index === currentSlide && styles.activeIndicator,
+                  ]}
+                  onPress={() => {
+                    setIsAutoScrolling(false);
+                    setCurrentSlide(index);
+                    scrollToCarouselIndex(index);
+                    scheduleAutoScrollResume();
+                  }}
+                />
+              ))}
+            </View>
+          )}
+        </View>
+      ) : (
+        <View style={styles.heroSection}>
+          <View style={{ width: screenWidth, height: HERO_BANNER_HEIGHT, backgroundColor: '#F2F2F7', borderRadius: 12, justifyContent: 'center', alignItems: 'center' }}>
+            <Text style={{ color: '#8E8E93', fontSize: 14 }}>No banners available</Text>
+          </View>
+        </View>
+      )}
+
+      <View style={styles.sectionContainer}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Random Picks</Text>
+        </View>
+        {randomPicksLoading ? (
+          <ShimmerHorizontalList count={4} cardWidth={screenWidth * 0.75} />
+        ) : displayRandomPicks.length > 0 ? (
+          <FlatList
+            data={displayRandomPicks}
+            renderItem={renderRecommendedItem}
+            keyExtractor={(item) => item.id}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.recommendedList}
+            style={styles.horizontalList}
+            removeClippedSubviews={true}
+            initialNumToRender={3}
+            maxToRenderPerBatch={4}
+            windowSize={5}
+          />
+        ) : (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateText}>No random products available</Text>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.sectionContainer}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Browse by Category</Text>
+        </View>
+        {categoriesLoading ? (
+          <View style={styles.horizontalList}>
+            <FlatList
+              data={[1, 2, 3, 4, 5]}
+              renderItem={() => <ShimmerCategoryItem />}
+              keyExtractor={(item) => item.toString()}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categoriesList}
+            />
+          </View>
+        ) : displayCategories.length > 0 ? (
+          <FlatList
+            data={displayCategories}
+            renderItem={renderCategoryItem}
+            keyExtractor={(item) => item.id}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoriesList}
+            style={styles.horizontalList}
+            removeClippedSubviews={true}
+            initialNumToRender={5}
+            maxToRenderPerBatch={6}
+            windowSize={5}
+          />
+        ) : (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateText}>No categories available</Text>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.sectionContainer}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Shop by Style</Text>
+        </View>
+        {featuredStylesLoading ? (
+          <View style={styles.horizontalList}>
+            <FlatList
+              data={[1, 2, 3]}
+              renderItem={() => <ShimmerProductCard width={140} noMargin />}
+              keyExtractor={(item) => item.toString()}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.stylesList}
+            />
+          </View>
+        ) : displayStyles.length > 0 ? (
+          <FlatList
+            data={displayStyles}
+            renderItem={renderStyleItem}
+            keyExtractor={(item) => item.id}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.stylesList}
+            style={styles.horizontalList}
+            removeClippedSubviews={true}
+            initialNumToRender={3}
+            maxToRenderPerBatch={4}
+            windowSize={5}
+          />
+        ) : (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateText}>No styles available</Text>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.sectionContainer}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Recommended for You</Text>
+        </View>
+        {(hasToken ? personalizedLoading : (randomLoading || recommendedLoading)) ? (
+          <ShimmerHorizontalList count={4} cardWidth={screenWidth * 0.75} />
+        ) : displayRecommendedProducts.length > 0 ? (
+          <FlatList
+            data={displayRecommendedProducts}
+            renderItem={renderRecommendedItem}
+            keyExtractor={(item) => item.id}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.recommendedList}
+            style={styles.horizontalList}
+            removeClippedSubviews={true}
+            initialNumToRender={3}
+            maxToRenderPerBatch={4}
+            windowSize={5}
+          />
+        ) : (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateText}>No recommended products</Text>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.sectionContainer}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Top Brands</Text>
+        </View>
+        {topBrandsLoading ? (
+          <View style={styles.horizontalList}>
+            <FlatList
+              data={[1, 2, 3]}
+              renderItem={() => <ShimmerBrandItem />}
+              keyExtractor={(item) => item.toString()}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.brandsList}
+            />
+          </View>
+        ) : displayTopBrands.length > 0 ? (
+          <FlatList
+            data={displayTopBrands}
+            renderItem={renderBrandItem}
+            keyExtractor={(item) => item.id}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.brandsList}
+            style={styles.horizontalList}
+            removeClippedSubviews={true}
+            initialNumToRender={3}
+            maxToRenderPerBatch={4}
+            windowSize={5}
+          />
+        ) : (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateText}>No brands available</Text>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.sectionContainer}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Featured Items</Text>
+        </View>
+        {featuredLoading ? (
+          <ShimmerHorizontalList count={4} cardWidth={screenWidth * 0.75} />
+        ) : displayFeaturedProducts.length > 0 ? (
+          <FlatList
+            data={displayFeaturedProducts}
+            renderItem={renderRecommendedItem}
+            keyExtractor={(item) => item.id}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.recommendedList}
+            style={styles.horizontalList}
+            removeClippedSubviews={true}
+            initialNumToRender={3}
+            maxToRenderPerBatch={4}
+            windowSize={5}
+          />
+        ) : (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateText}>No featured products</Text>
+          </View>
+        )}
+      </View>
+
+      {Array.isArray(homeCategoriesArray) && homeCategoriesArray.length > 0 && homeCategoriesArray.map((cat: any) => {
+        const products = (cat.products || []).map((p: any) => ({
+          id: p._id,
+          name: p.name,
+          brand: p.brand || '',
+          price: formatPrice(p.price),
+          rating: formatRating(p.rating ?? 0, p.reviewCount ?? 0),
+          image: getFirstImageSource(p.images, images.velvetShawl),
+        }));
+        if (products.length === 0) return null;
+        return (
+          <View key={cat._id} style={styles.sectionContainer}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>{cat.name}</Text>
+            </View>
+            <FlatList
+              data={products}
+              renderItem={renderRecommendedItem}
+              keyExtractor={(item) => item.id}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.recommendedList}
+              style={styles.horizontalList}
+              removeClippedSubviews={true}
+              initialNumToRender={3}
+              maxToRenderPerBatch={4}
+              windowSize={5}
+            />
+          </View>
+        );
+      })}
+
+      {(brandBannersLoading || brandBannerData.length > 0) && (
+        <View style={styles.brandBannerSection}>
+          {brandBannersLoading ? (
+            <View style={styles.brandBannerSkeleton} />
+          ) : (
+            <FlatList
+              data={brandBannerData}
+              renderItem={renderBrandBannerItem}
+              keyExtractor={(item) => item.id}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.brandBannerList}
+              scrollEnabled={false}
+            />
+          )}
+        </View>
+      )}
+    </View>
+  ), [
+    styles, userName, greeting, bannersLoading, screenWidth, carouselData,
+    renderCarouselItem, handleScrollBeginDrag, handleScrollEndDrag,
+    handleMomentumScrollEnd, carouselGetItemLayout, currentSlide,
+    scrollToCarouselIndex, scheduleAutoScrollResume,
+    randomPicksLoading, displayRandomPicks, renderRecommendedItem,
+    categoriesLoading, displayCategories, renderCategoryItem,
+    featuredStylesLoading, displayStyles, renderStyleItem,
+    hasToken, personalizedLoading, randomLoading, recommendedLoading,
+    displayRecommendedProducts, topBrandsLoading, displayTopBrands, renderBrandItem,
+    featuredLoading, displayFeaturedProducts, homeCategoriesArray,
+    brandBannersLoading, brandBannerData, renderBrandBannerItem,
+    formatPrice, formatRating,
+  ]);
+
+  const ListFooter = useMemo(() => {
+    if (allProductsLoading || displayBottomGridProducts.length === 0) return null;
+    if (hasNextPage) {
+      return (
+        <View style={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 24 }}>
+          <TouchableOpacity
+            style={styles.loadMoreButton}
+            onPress={() => fetchNextPage()}
+            disabled={isFetchingNextPage}
+            activeOpacity={0.8}
+          >
+            {isFetchingNextPage ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={styles.loadMoreButtonText}>Load More</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    return null;
+  }, [allProductsLoading, displayBottomGridProducts.length, hasNextPage, isFetchingNextPage, fetchNextPage, styles]);
+
+  const ListEmpty = useMemo(() => {
+    if (allProductsLoading) {
+      return (
+        <View style={styles.bottomGridContainer}>
+          <ShimmerGrid columns={2} count={4} />
+        </View>
+      );
+    }
+    return (
+      <View style={styles.emptyState}>
+        <Text style={styles.emptyStateText}>No products available</Text>
+      </View>
+    );
+  }, [allProductsLoading, styles]);
+
+  const keyExtractor = useCallback((item: any) => item.id, []);
+
   return (
     <SafeView style={styles.container}>
       <View style={styles.header}>
@@ -969,11 +1225,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           <Text style={styles.logoText}>SHOPO</Text>
         </View>
         <View style={styles.headerRight}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.headerIconButton}
             onPress={() => {
-              // Navigate to Cart tab in the Tab Navigator
-              // HomeScreen is in HomeStack, so getParent() gives us the Tab Navigator
               const tabNavigator = navigation.getParent();
               if (tabNavigator) {
                 tabNavigator.navigate('CartStack');
@@ -984,9 +1238,18 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </TouchableOpacity>
         </View>
       </View>
-      <ScrollView 
-        nestedScrollEnabled
+
+      <FlatList
+        data={displayBottomGridProducts}
+        renderItem={renderBottomGridItem}
+        keyExtractor={keyExtractor}
+        numColumns={2}
+        columnWrapperStyle={bottomGridColumnWrapper}
         contentContainerStyle={styles.scrollContent}
+        ListHeaderComponent={ListHeader}
+        ListFooterComponent={ListFooter}
+        ListEmptyComponent={ListEmpty}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -995,344 +1258,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             tintColor="#007AFF"
           />
         }
-      >
-        {/* Top Header Section */}
-
-
-        {/* Greeting and Search Section */}
-        <View style={styles.greetingSection}>
-          <Text style={styles.greetingText}>
-            {userName ? `${getGreeting()}, ${userName} 👋` : `${getGreeting()} 👋`}
-          </Text>
-          <SearchFilterBar
-            placeholder="Search brands, items or styles..."
-            isNavigational={true}
-            showFilters={false}
-            showFilterButton={true}
-          />
-        </View>
-
-        {/* Hero Banner Section - Full Width Carousel */}
-        {bannersLoading ? (
-          <View style={styles.heroSection}>
-            <View style={{ width: screenWidth, height: HERO_BANNER_HEIGHT, backgroundColor: '#F2F2F7', borderRadius: 12 }} />
-          </View>
-        ) : carouselData.length > 0 ? (
-          <View style={styles.heroSection}>
-            <FlatList
-              ref={flatListRef}
-              data={carouselData}
-              renderItem={renderCarouselItem}
-              keyExtractor={(item) => item.id}
-              horizontal
-              nestedScrollEnabled
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              onScrollBeginDrag={handleScrollBeginDrag}
-              onScrollEndDrag={handleScrollEndDrag}
-              onMomentumScrollEnd={handleMomentumScrollEnd}
-              getItemLayout={(data, index) => ({
-                length: screenWidth,
-                offset: screenWidth * index,
-                index,
-              })}
-              style={styles.carousel}
-              decelerationRate="fast"
-              scrollEventThrottle={16}
-              removeClippedSubviews={false}
-            />
-            {carouselData.length > 1 && (
-              <View style={styles.carouselIndicators}>
-                {carouselData.map((_, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={[
-                      styles.indicator,
-                      index === currentSlide && styles.activeIndicator
-                    ]}
-                    onPress={() => {
-                      setIsAutoScrolling(false);
-                      setCurrentSlide(index);
-                      scrollToCarouselIndex(index);
-                      // Resume auto-scroll after manual navigation
-                      scheduleAutoScrollResume();
-                    }}
-                  />
-                ))}
-              </View>
-            )}
-          </View>
-        ) : (
-          <View style={styles.heroSection}>
-            <View style={{ width: screenWidth, height: HERO_BANNER_HEIGHT, backgroundColor: '#F2F2F7', borderRadius: 12, justifyContent: 'center', alignItems: 'center' }}>
-              <Text style={{ color: '#8E8E93', fontSize: 14 }}>No banners available</Text>
-            </View>
-          </View>
-        )}
-
-        {/* Random Picks Section */}
-        <View style={styles.sectionContainer}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Random Picks</Text>
-          </View>
-          {randomPicksLoading ? (
-            <ShimmerHorizontalList count={4} cardWidth={screenWidth * 0.75} />
-          ) : displayRandomPicks.length > 0 ? (
-            <FlatList
-              data={displayRandomPicks}
-              renderItem={renderRecommendedItem}
-              keyExtractor={(item) => item.id}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.recommendedList}
-              style={styles.horizontalList}
-            />
-          ) : (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>No random products available</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Browse by Category Section */}
-        <View style={styles.sectionContainer}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Browse by Category</Text>
-          </View>
-          {categoriesLoading ? (
-            <View style={styles.horizontalList}>
-              <FlatList
-                data={[1, 2, 3, 4, 5]}
-                renderItem={() => <ShimmerCategoryItem />}
-                keyExtractor={(item) => item.toString()}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.categoriesList}
-              />
-            </View>
-          ) : displayCategories.length > 0 ? (
-            <FlatList
-              data={displayCategories}
-              renderItem={renderCategoryItem}
-              keyExtractor={(item) => item.id}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.categoriesList}
-              style={styles.horizontalList}
-            />
-          ) : (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>No categories available</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Shop by Style Section */}
-        <View style={styles.sectionContainer}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Shop by Style</Text>
-          </View>
-          {featuredStylesLoading ? (
-            <View style={styles.horizontalList}>
-              <FlatList
-                data={[1, 2, 3]}
-                renderItem={() => <ShimmerProductCard width={140} noMargin />}
-                keyExtractor={(item) => item.toString()}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.stylesList}
-              />
-            </View>
-          ) : displayStyles.length > 0 ? (
-            <FlatList
-              data={displayStyles}
-              renderItem={renderStyleItem}
-              keyExtractor={(item) => item.id}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.stylesList}
-              style={styles.horizontalList}
-            />
-          ) : (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>No styles available</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Recommended for You Section */}
-        <View style={styles.sectionContainer}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recommended for You</Text>
-          </View>
-          {(hasToken ? personalizedLoading : (randomLoading || recommendedLoading)) ? (
-            <ShimmerHorizontalList count={4} cardWidth={screenWidth * 0.75} />
-          ) : displayRecommendedProducts.length > 0 ? (
-            <FlatList
-              data={displayRecommendedProducts}
-              renderItem={renderRecommendedItem}
-              keyExtractor={(item) => item.id}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.recommendedList}
-              style={styles.horizontalList}
-            />
-          ) : (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>No recommended products</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Top Brands Section */}
-        <View style={styles.sectionContainer}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Top Brands</Text>
-          </View>
-          {topBrandsLoading ? (
-            <View style={styles.horizontalList}>
-              <FlatList
-                data={[1, 2, 3]}
-                renderItem={() => <ShimmerBrandItem />}
-                keyExtractor={(item) => item.toString()}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.brandsList}
-              />
-            </View>
-          ) : displayTopBrands.length > 0 ? (
-            <FlatList
-              data={displayTopBrands}
-              renderItem={renderBrandItem}
-              keyExtractor={(item) => item.id}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.brandsList}
-              style={styles.horizontalList}
-            />
-          ) : (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>No brands available</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Featured Items Section */}
-        <View style={styles.sectionContainer}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Featured Items</Text>
-          </View>
-          {featuredLoading ? (
-            <ShimmerHorizontalList count={4} cardWidth={screenWidth * 0.75} />
-          ) : displayFeaturedProducts.length > 0 ? (
-            <FlatList
-              data={displayFeaturedProducts}
-              renderItem={renderRecommendedItem}
-              keyExtractor={(item) => item.id}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.recommendedList}
-              style={styles.horizontalList}
-            />
-          ) : (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>No featured products</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Other Custom Categories */}
-        {Array.isArray(homeCategoriesArray) && homeCategoriesArray.length > 0 && homeCategoriesArray.map((cat: any) => {
-          const products = (cat.products || []).map((p: any) => ({
-            id: p._id,
-            name: p.name,
-            brand: p.brand || '',
-            price: formatPrice(p.price),
-            rating: formatRating(p.rating ?? 0, p.reviewCount ?? 0),
-            image: getFirstImageSource(p.images, images.velvetShawl),
-          }));
-          if (products.length === 0) return null;
-          return (
-            <View key={cat._id} style={styles.sectionContainer}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>{cat.name}</Text>
-              </View>
-              <FlatList
-                data={products}
-                renderItem={renderRecommendedItem}
-                keyExtractor={(item) => item.id}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.recommendedList}
-                style={styles.horizontalList}
-              />
-            </View>
-          );
-        })}
-
-        {/* Bottom Banners */}
-        {(brandBannersLoading || brandBannerData.length > 0) && (
-          <View style={styles.brandBannerSection}>
-            {brandBannersLoading ? (
-              <View style={styles.brandBannerSkeleton} />
-            ) : (
-              <FlatList
-                data={brandBannerData}
-                renderItem={renderBrandBannerItem}
-                keyExtractor={(item) => item.id}
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.brandBannerList}
-                scrollEnabled={false}
-              />
-            )}
-          </View>
-        )}
-
-        {/* Randomly Sorted Bottom Grid Section - Manual load more */}
-        <View style={styles.bottomGridContainer}>
-          {allProductsLoading ? (
-            <ShimmerGrid columns={2} count={4} />
-          ) : displayBottomGridProducts.length > 0 ? (
-            <>
-              <FlatList
-                data={displayBottomGridProducts}
-                renderItem={renderBottomGridItem}
-                keyExtractor={(item) => item.id}
-                numColumns={2}
-                showsVerticalScrollIndicator={false}
-                scrollEnabled={false}
-                columnWrapperStyle={{ justifyContent: 'space-between' }}
-                contentContainerStyle={styles.bottomGridList}
-                removeClippedSubviews={true}
-                maxToRenderPerBatch={10}
-                updateCellsBatchingPeriod={50}
-                initialNumToRender={6}
-                windowSize={5}
-              />
-              {hasNextPage ? (
-                <TouchableOpacity
-                  style={styles.loadMoreButton}
-                  onPress={() => fetchNextPage()}
-                  disabled={isFetchingNextPage}
-                  activeOpacity={0.8}
-                >
-                  {isFetchingNextPage ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <Text style={styles.loadMoreButtonText}>Load More</Text>
-                  )}
-                </TouchableOpacity>
-              ) : (
-                <Text style={styles.noMoreProductsText}></Text>
-              )}
-            </>
-          ) : (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>No products available</Text>
-            </View>
-          )}
-        </View>
-      </ScrollView>
+        removeClippedSubviews={true}
+        initialNumToRender={4}
+        maxToRenderPerBatch={6}
+        updateCellsBatchingPeriod={50}
+        windowSize={7}
+      />
     </SafeView>
   );
 };
