@@ -32,11 +32,47 @@ export const getBrandByExactName = async (req: Request, res: Response): Promise<
 
 /**
  * Allowed payment methods for checkout.
- * Card (Stripe) and cash are always offered for every brand/product; per-brand lists are not used to restrict checkout.
+ * Returns the intersection of allowedPaymentMethods across the brands in the
+ * cart, so a customer can only pick a method that every brand in the cart
+ * accepts. If no names are provided or no matching brands are found, both
+ * methods are allowed.
  */
-export const getAllowedPaymentMethods = async (_req: Request, res: Response): Promise<void> => {
+export const getAllowedPaymentMethods = async (req: Request, res: Response): Promise<void> => {
   try {
-    successResponse(res, { allowedPaymentMethods: ['card', 'cash'] });
+    const namesParam = (req.query.names as string) || '';
+    const names = namesParam
+      .split(',')
+      .map((n) => decodeURIComponent(n).trim())
+      .filter(Boolean);
+
+    if (names.length === 0) {
+      successResponse(res, { allowedPaymentMethods: ['card', 'cash'] });
+      return;
+    }
+
+    const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const nameRegexes = names.map((n) => new RegExp(`^${escapeRegex(n)}$`, 'i'));
+
+    const brands = await Brand.find({ name: { $in: nameRegexes } })
+      .select('name allowedPaymentMethods')
+      .lean();
+
+    if (brands.length === 0) {
+      successResponse(res, { allowedPaymentMethods: ['card', 'cash'] });
+      return;
+    }
+
+    const methodSets = brands.map((b: any) => {
+      const methods =
+        Array.isArray(b.allowedPaymentMethods) && b.allowedPaymentMethods.length > 0
+          ? b.allowedPaymentMethods
+          : ['card', 'cash'];
+      return new Set(methods.map((m: string) => String(m).toLowerCase()));
+    });
+
+    const intersection = ['card', 'cash'].filter((m) => methodSets.every((s) => s.has(m)));
+
+    successResponse(res, { allowedPaymentMethods: intersection });
   } catch (error) {
     console.error('Get allowed payment methods error:', error);
     errorResponse(res, 'Failed to get allowed payment methods', 500);
