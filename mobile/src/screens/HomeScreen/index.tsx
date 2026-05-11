@@ -73,6 +73,19 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [hasToken, setHasToken] = useState(false);
   const [isAutoScrolling, setIsAutoScrolling] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  // Progressively reveal home screen sections after first paint so the
+  // hero + greeting render immediately and the rest mount over a few frames
+  // instead of all at once. This is what eliminates first-paint jank on
+  // high-refresh-rate devices where Fabric mount cost (~1ms per view on
+  // Android) becomes visible in a single frame.
+  const [sectionsRevealed, setSectionsRevealed] = useState(2);
+  useEffect(() => {
+    if (sectionsRevealed >= 10) return undefined;
+    const timer = setTimeout(() => {
+      setSectionsRevealed((n) => Math.min(n + 1, 10));
+    }, 120);
+    return () => clearTimeout(timer);
+  }, [sectionsRevealed]);
 
   useEffect(() => {
     const loadUserAndToken = async () => {
@@ -183,27 +196,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     let belowFoldTimer: ReturnType<typeof setTimeout> | null = null;
 
     const preloadPriority = () => {
+      // Only prefetch banners on first paint. Everything else lazy-loads
+      // as the section reveals into view. Prefetching dozens of URLs at
+      // boot was contending with the JS thread during the initial render.
       const urls: string[] = [];
       bannersArray.forEach((b: any) => {
         const u = getImageUrl(b.imageUrl || b.image);
-        if (u) urls.push(u);
-      });
-      categoriesArray.forEach((c: any) => {
-        const u = getImageUrl(c.image);
-        if (u) urls.push(u);
-      });
-      stylesArray.forEach((s: any) => {
-        const u = getImageUrl(s.image);
-        if (u) urls.push(u);
-      });
-      recommendedSourceArray.forEach((p: any) => {
-        if (p.images && p.images.length > 0) {
-          const u = getImageUrl(p.images[0]);
-          if (u) urls.push(u);
-        }
-      });
-      topBrandsArray.forEach((b: any) => {
-        const u = getImageUrl(b.logo);
         if (u) urls.push(u);
       });
       if (urls.length > 0) preloadImages(urls).catch(() => {});
@@ -211,7 +209,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
     const preloadBelowFold = () => {
       const urls: string[] = [];
-      allProductsArray.slice(0, 10).forEach((p: any) => {
+      allProductsArray.slice(0, 4).forEach((p: any) => {
         if (p.images && p.images.length > 0) {
           const u = getImageUrl(p.images[0]);
           if (u) urls.push(u);
@@ -220,24 +218,19 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       if (urls.length > 0) preloadImages(urls).catch(() => {});
     };
 
+    // Hold off preloading until after first paint settles so the prefetch
+    // requests don't fight the initial render for the JS thread.
     priorityTimer = setTimeout(() => {
-      if (
-        !categoriesLoading &&
-        !featuredStylesLoading &&
-        !recommendedLoading &&
-        !topBrandsLoading &&
-        !bannersLoading &&
-        (bannersArray.length > 0 || categoriesArray.length > 0)
-      ) {
+      if (!bannersLoading && bannersArray.length > 0) {
         preloadPriority();
       }
-    }, 50);
+    }, 600);
 
     belowFoldTimer = setTimeout(() => {
       if (!allProductsLoading && allProductsArray.length > 0) {
         preloadBelowFold();
       }
-    }, 1200);
+    }, 2500);
 
     return () => {
       if (priorityTimer) clearTimeout(priorityTimer);
@@ -245,17 +238,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     };
   }, [
     bannersArray,
-    categoriesArray,
-    stylesArray,
-    recommendedSourceArray,
-    topBrandsArray,
-    allProductsArray,
-    categoriesLoading,
-    featuredStylesLoading,
-    recommendedLoading,
-    topBrandsLoading,
-    allProductsLoading,
     bannersLoading,
+    allProductsArray,
+    allProductsLoading,
   ]);
 
   const mapBannerToDisplayItem = useCallback((banner: any, index: number, fallbackPrefix: string) => ({
@@ -922,196 +907,208 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         </View>
       )}
 
-      <View style={styles.sectionContainer}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Random Picks</Text>
-        </View>
-        {randomPicksLoading ? (
-          <ShimmerHorizontalList count={4} cardWidth={screenWidth * 0.75} />
-        ) : displayRandomPicks.length > 0 ? (
-          <FlatList
-            data={displayRandomPicks}
-            renderItem={renderRecommendedItem}
-            keyExtractor={(item) => item.id}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.recommendedList}
-            style={styles.horizontalList}
-            removeClippedSubviews={true}
-            initialNumToRender={3}
-            maxToRenderPerBatch={4}
-            windowSize={5}
-          />
-        ) : (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateText}>No random products available</Text>
+      {sectionsRevealed >= 3 && (
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Random Picks</Text>
           </View>
-        )}
-      </View>
-
-      <View style={styles.sectionContainer}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Browse by Category</Text>
-        </View>
-        {categoriesLoading ? (
-          <View style={styles.horizontalList}>
+          {randomPicksLoading ? (
+            <ShimmerHorizontalList count={4} cardWidth={screenWidth * 0.75} />
+          ) : displayRandomPicks.length > 0 ? (
             <FlatList
-              data={[1, 2, 3, 4, 5]}
-              renderItem={() => <ShimmerCategoryItem />}
-              keyExtractor={(item) => item.toString()}
+              data={displayRandomPicks}
+              renderItem={renderRecommendedItem}
+              keyExtractor={(item) => item.id}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.recommendedList}
+              style={styles.horizontalList}
+              removeClippedSubviews={true}
+              initialNumToRender={3}
+              maxToRenderPerBatch={4}
+              windowSize={5}
+            />
+          ) : (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>No random products available</Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      {sectionsRevealed >= 4 && (
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Browse by Category</Text>
+          </View>
+          {categoriesLoading ? (
+            <View style={styles.horizontalList}>
+              <FlatList
+                data={[1, 2, 3, 4, 5]}
+                renderItem={() => <ShimmerCategoryItem />}
+                keyExtractor={(item) => item.toString()}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.categoriesList}
+              />
+            </View>
+          ) : displayCategories.length > 0 ? (
+            <FlatList
+              data={displayCategories}
+              renderItem={renderCategoryItem}
+              keyExtractor={(item) => item.id}
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.categoriesList}
+              style={styles.horizontalList}
+              removeClippedSubviews={true}
+              initialNumToRender={5}
+              maxToRenderPerBatch={6}
+              windowSize={5}
             />
-          </View>
-        ) : displayCategories.length > 0 ? (
-          <FlatList
-            data={displayCategories}
-            renderItem={renderCategoryItem}
-            keyExtractor={(item) => item.id}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoriesList}
-            style={styles.horizontalList}
-            removeClippedSubviews={true}
-            initialNumToRender={5}
-            maxToRenderPerBatch={6}
-            windowSize={5}
-          />
-        ) : (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateText}>No categories available</Text>
-          </View>
-        )}
-      </View>
-
-      <View style={styles.sectionContainer}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Shop by Style</Text>
+          ) : (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>No categories available</Text>
+            </View>
+          )}
         </View>
-        {featuredStylesLoading ? (
-          <View style={styles.horizontalList}>
+      )}
+
+      {sectionsRevealed >= 5 && (
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Shop by Style</Text>
+          </View>
+          {featuredStylesLoading ? (
+            <View style={styles.horizontalList}>
+              <FlatList
+                data={[1, 2, 3]}
+                renderItem={() => <ShimmerProductCard width={140} noMargin />}
+                keyExtractor={(item) => item.toString()}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.stylesList}
+              />
+            </View>
+          ) : displayStyles.length > 0 ? (
             <FlatList
-              data={[1, 2, 3]}
-              renderItem={() => <ShimmerProductCard width={140} noMargin />}
-              keyExtractor={(item) => item.toString()}
+              data={displayStyles}
+              renderItem={renderStyleItem}
+              keyExtractor={(item) => item.id}
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.stylesList}
+              style={styles.horizontalList}
+              removeClippedSubviews={true}
+              initialNumToRender={3}
+              maxToRenderPerBatch={4}
+              windowSize={5}
             />
-          </View>
-        ) : displayStyles.length > 0 ? (
-          <FlatList
-            data={displayStyles}
-            renderItem={renderStyleItem}
-            keyExtractor={(item) => item.id}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.stylesList}
-            style={styles.horizontalList}
-            removeClippedSubviews={true}
-            initialNumToRender={3}
-            maxToRenderPerBatch={4}
-            windowSize={5}
-          />
-        ) : (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateText}>No styles available</Text>
-          </View>
-        )}
-      </View>
-
-      <View style={styles.sectionContainer}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Recommended for You</Text>
+          ) : (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>No styles available</Text>
+            </View>
+          )}
         </View>
-        {(hasToken ? personalizedLoading : (randomLoading || recommendedLoading)) ? (
-          <ShimmerHorizontalList count={4} cardWidth={screenWidth * 0.75} />
-        ) : displayRecommendedProducts.length > 0 ? (
-          <FlatList
-            data={displayRecommendedProducts}
-            renderItem={renderRecommendedItem}
-            keyExtractor={(item) => item.id}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.recommendedList}
-            style={styles.horizontalList}
-            removeClippedSubviews={true}
-            initialNumToRender={3}
-            maxToRenderPerBatch={4}
-            windowSize={5}
-          />
-        ) : (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateText}>No recommended products</Text>
-          </View>
-        )}
-      </View>
+      )}
 
-      <View style={styles.sectionContainer}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Top Brands</Text>
-        </View>
-        {topBrandsLoading ? (
-          <View style={styles.horizontalList}>
+      {sectionsRevealed >= 6 && (
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Recommended for You</Text>
+          </View>
+          {(hasToken ? personalizedLoading : (randomLoading || recommendedLoading)) ? (
+            <ShimmerHorizontalList count={4} cardWidth={screenWidth * 0.75} />
+          ) : displayRecommendedProducts.length > 0 ? (
             <FlatList
-              data={[1, 2, 3]}
-              renderItem={() => <ShimmerBrandItem />}
-              keyExtractor={(item) => item.toString()}
+              data={displayRecommendedProducts}
+              renderItem={renderRecommendedItem}
+              keyExtractor={(item) => item.id}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.recommendedList}
+              style={styles.horizontalList}
+              removeClippedSubviews={true}
+              initialNumToRender={3}
+              maxToRenderPerBatch={4}
+              windowSize={5}
+            />
+          ) : (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>No recommended products</Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      {sectionsRevealed >= 7 && (
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Top Brands</Text>
+          </View>
+          {topBrandsLoading ? (
+            <View style={styles.horizontalList}>
+              <FlatList
+                data={[1, 2, 3]}
+                renderItem={() => <ShimmerBrandItem />}
+                keyExtractor={(item) => item.toString()}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.brandsList}
+              />
+            </View>
+          ) : displayTopBrands.length > 0 ? (
+            <FlatList
+              data={displayTopBrands}
+              renderItem={renderBrandItem}
+              keyExtractor={(item) => item.id}
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.brandsList}
+              style={styles.horizontalList}
+              removeClippedSubviews={true}
+              initialNumToRender={3}
+              maxToRenderPerBatch={4}
+              windowSize={5}
             />
-          </View>
-        ) : displayTopBrands.length > 0 ? (
-          <FlatList
-            data={displayTopBrands}
-            renderItem={renderBrandItem}
-            keyExtractor={(item) => item.id}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.brandsList}
-            style={styles.horizontalList}
-            removeClippedSubviews={true}
-            initialNumToRender={3}
-            maxToRenderPerBatch={4}
-            windowSize={5}
-          />
-        ) : (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateText}>No brands available</Text>
-          </View>
-        )}
-      </View>
-
-      <View style={styles.sectionContainer}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Featured Items</Text>
+          ) : (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>No brands available</Text>
+            </View>
+          )}
         </View>
-        {featuredLoading ? (
-          <ShimmerHorizontalList count={4} cardWidth={screenWidth * 0.75} />
-        ) : displayFeaturedProducts.length > 0 ? (
-          <FlatList
-            data={displayFeaturedProducts}
-            renderItem={renderRecommendedItem}
-            keyExtractor={(item) => item.id}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.recommendedList}
-            style={styles.horizontalList}
-            removeClippedSubviews={true}
-            initialNumToRender={3}
-            maxToRenderPerBatch={4}
-            windowSize={5}
-          />
-        ) : (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateText}>No featured products</Text>
-          </View>
-        )}
-      </View>
+      )}
 
-      {Array.isArray(homeCategoriesArray) && homeCategoriesArray.length > 0 && homeCategoriesArray.map((cat: any) => {
+      {sectionsRevealed >= 8 && (
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Featured Items</Text>
+          </View>
+          {featuredLoading ? (
+            <ShimmerHorizontalList count={4} cardWidth={screenWidth * 0.75} />
+          ) : displayFeaturedProducts.length > 0 ? (
+            <FlatList
+              data={displayFeaturedProducts}
+              renderItem={renderRecommendedItem}
+              keyExtractor={(item) => item.id}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.recommendedList}
+              style={styles.horizontalList}
+              removeClippedSubviews={true}
+              initialNumToRender={3}
+              maxToRenderPerBatch={4}
+              windowSize={5}
+            />
+          ) : (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>No featured products</Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      {sectionsRevealed >= 9 && Array.isArray(homeCategoriesArray) && homeCategoriesArray.length > 0 && homeCategoriesArray.map((cat: any) => {
         const products = (cat.products || []).map((p: any) => ({
           id: p._id,
           name: p.name,
@@ -1143,7 +1140,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         );
       })}
 
-      {(brandBannersLoading || brandBannerData.length > 0) && (
+      {sectionsRevealed >= 10 && (brandBannersLoading || brandBannerData.length > 0) && (
         <View style={styles.brandBannerSection}>
           {brandBannersLoading ? (
             <View style={styles.brandBannerSkeleton} />
@@ -1172,7 +1169,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     displayRecommendedProducts, topBrandsLoading, displayTopBrands, renderBrandItem,
     featuredLoading, displayFeaturedProducts, homeCategoriesArray,
     brandBannersLoading, brandBannerData, renderBrandBannerItem,
-    formatPrice, formatRating,
+    formatPrice, formatRating, sectionsRevealed,
   ]);
 
   const ListFooter = useMemo(() => {
