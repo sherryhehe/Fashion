@@ -25,6 +25,8 @@ import bannerRoutes from './routes/bannerRoutes.mongodb';
 import wishlistRoutes from './routes/wishlistRoutes.mongodb';
 import homeCategoryRoutes from './routes/homeCategoryRoutes.mongodb';
 import settingsRoutes from './routes/settingsRoutes.mongodb';
+import paymentMethodRoutes from './routes/paymentMethodRoutes.mongodb';
+import countryRoutes from './routes/countryRoutes.mongodb';
 
 // Load environment: .env → .env.production fills any missing keys → local.env / .env.local wins
 dotenv.config(); // .env
@@ -121,6 +123,8 @@ app.use('/api/banners', bannerRoutes);
 app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/home-categories', homeCategoryRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/payment-methods', paymentMethodRoutes);
+app.use('/api/countries', countryRoutes);
 
 // Serve uploaded files through API route (for reverse proxy compatibility)
 // This must come after all other API routes to avoid conflicts

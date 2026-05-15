@@ -318,6 +318,14 @@ export const updateBrand = async (req: Request, res: Response): Promise<void> =>
         : ['card', 'cash'];
       finalUpdateData.allowedPaymentMethods = allowed.length > 0 ? allowed : ['card', 'cash'];
     }
+    if (updateData.enabledPaymentMethods !== undefined) {
+      finalUpdateData.enabledPaymentMethods = Array.isArray(updateData.enabledPaymentMethods)
+        ? updateData.enabledPaymentMethods
+        : [];
+    }
+    if (updateData.countries !== undefined) {
+      finalUpdateData.countries = Array.isArray(updateData.countries) ? updateData.countries : [];
+    }
 
     // Explicitly handle banner field
     if (updateData.banner !== undefined) {

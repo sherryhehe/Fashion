@@ -1,4 +1,6 @@
 // Export all models from a single file
+export { default as PaymentMethod } from './PaymentMethod';
+export { default as Country } from './Country';
 export { default as User } from './User';
 export { default as Product } from './Product';
 export { default as Category } from './Category';
@@ -8,6 +10,8 @@ export { default as Review } from './Review';
 export { default as Wishlist } from './Wishlist';
 
 // Export interfaces
+export type { IPaymentMethod } from './PaymentMethod';
+export type { ICountry } from './Country';
 export type { IUser } from './User';
 export type { IProduct } from './Product';
 export type { ICategory } from './Category';

@@ -17,6 +17,10 @@ export interface IBrand extends Document {
   status: 'active' | 'inactive' | 'pending';
   /** Allowed checkout methods for this brand: 'card', 'cash'. Empty or both = allow all. */
   allowedPaymentMethods: string[];
+  /** Custom payment method IDs (refs PaymentMethod) enabled by this brand */
+  enabledPaymentMethods: mongoose.Types.ObjectId[];
+  /** Country codes this brand ships to (e.g. ['PK', 'AE']) */
+  countries: string[];
   featured: boolean;
   verified: boolean;
   rating: number;
@@ -114,6 +118,14 @@ const BrandSchema = new Schema<IBrand>(
       type: [String],
       enum: ['card', 'cash'],
       default: ['card', 'cash'],
+    },
+    enabledPaymentMethods: {
+      type: [{ type: Schema.Types.ObjectId, ref: 'PaymentMethod' }],
+      default: [],
+    },
+    countries: {
+      type: [String],
+      default: [],
     },
     featured: {
       type: Boolean,
