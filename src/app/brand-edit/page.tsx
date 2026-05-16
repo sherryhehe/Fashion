@@ -4,7 +4,7 @@ import Layout from '@/components/layout/Layout';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { brandsApi } from '@/lib/api';
+import { brandsApi, paymentMethodsApi, countriesApi } from '@/lib/api';
 import { getBrandLogoUrl, getBrandBannerUrl } from '@/utils/imageHelper';
 
 export default function BrandEdit() {
@@ -14,6 +14,11 @@ export default function BrandEdit() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  const [allPaymentMethods, setAllPaymentMethods] = useState<any[]>([]);
+  const [allCountries, setAllCountries] = useState<any[]>([]);
+  const [enabledPaymentMethods, setEnabledPaymentMethods] = useState<string[]>([]);
+  const [brandCountries, setBrandCountries] = useState<string[]>([]);
 
   const [brand, setBrand] = useState({
     name: '',
@@ -44,7 +49,19 @@ export default function BrandEdit() {
     if (brandId) {
       fetchBrand();
     }
+    fetchGlobalData();
   }, [brandId]);
+
+  const fetchGlobalData = async () => {
+    try {
+      const [pmRes, cRes] = await Promise.all([
+        paymentMethodsApi.getAll(),
+        countriesApi.getEligible(),
+      ]);
+      setAllPaymentMethods(Array.isArray(pmRes.data) ? pmRes.data.filter((m: any) => m.isActive !== false) : []);
+      setAllCountries(Array.isArray(cRes.data) ? cRes.data.filter((c: any) => c.isActive !== false) : []);
+    } catch {}
+  };
 
   const fetchBrand = async () => {
     try {
@@ -69,6 +86,9 @@ export default function BrandEdit() {
         featured: brandData.featured || false,
         popular: brandData.popular || false
       });
+
+      setEnabledPaymentMethods(Array.isArray(brandData.enabledPaymentMethods) ? brandData.enabledPaymentMethods : []);
+      setBrandCountries(Array.isArray(brandData.countries) ? brandData.countries : []);
 
       if (brandData.logo) {
         setExistingLogo(brandData.logo);
@@ -252,6 +272,8 @@ export default function BrandEdit() {
         verified: brand.verified,
         featured: brand.featured,
         popular: brand.popular,
+        enabledPaymentMethods,
+        countries: brandCountries,
       };
       
       // Only add banner if it has a value (undefined fields are excluded by JSON.stringify)
@@ -592,6 +614,86 @@ export default function BrandEdit() {
                       placeholder="Enter business description"
                     ></textarea>
                   </div>
+
+                  {/* Payment Methods */}
+                  <h5 className="mb-3 text-uppercase bg-light p-2 mt-4">
+                    <i className="bx bx-credit-card me-1"></i> Payment Methods
+                  </h5>
+                  <p className="text-muted small mb-3">Select which payment methods this brand accepts. Only checked methods will appear for customers ordering from this brand.</p>
+                  {allPaymentMethods.length === 0 ? (
+                    <div className="alert alert-info">
+                      No custom payment methods configured. <a href="/payment-methods" className="alert-link">Manage payment methods</a>
+                    </div>
+                  ) : (
+                    <div className="row mb-3">
+                      {allPaymentMethods.map((pm: any) => (
+                        <div className="col-md-6 mb-2" key={pm._id}>
+                          <div className={`border rounded p-3 ${enabledPaymentMethods.includes(pm._id) ? 'border-primary bg-soft-primary' : ''}`}>
+                            <div className="form-check">
+                              <input
+                                className="form-check-input"
+                                type="checkbox"
+                                id={`pm-${pm._id}`}
+                                checked={enabledPaymentMethods.includes(pm._id)}
+                                onChange={e => {
+                                  if (e.target.checked) {
+                                    setEnabledPaymentMethods(prev => [...prev, pm._id]);
+                                  } else {
+                                    setEnabledPaymentMethods(prev => prev.filter(id => id !== pm._id));
+                                  }
+                                }}
+                              />
+                              <label className="form-check-label fw-semibold" htmlFor={`pm-${pm._id}`}>
+                                {pm.name}
+                              </label>
+                            </div>
+                            <p className="text-muted mb-0 mt-1 small" style={{ paddingLeft: '1.5rem' }}>
+                              {pm.instructions.length > 100 ? pm.instructions.slice(0, 100) + '...' : pm.instructions}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Countries */}
+                  <h5 className="mb-3 text-uppercase bg-light p-2 mt-4">
+                    <i className="bx bx-globe me-1"></i> Countries Served
+                  </h5>
+                  <p className="text-muted small mb-3">Select the countries this brand ships to. Users from the selected countries will be able to see and order products from this brand.</p>
+                  {allCountries.length === 0 ? (
+                    <div className="alert alert-info">
+                      No eligible countries configured. <a href="/countries" className="alert-link">Manage countries</a>
+                    </div>
+                  ) : (
+                    <div className="row mb-3">
+                      {allCountries.map((c: any) => (
+                        <div className="col-md-4 mb-2" key={c.code}>
+                          <div className={`border rounded p-2 ${brandCountries.includes(c.code) ? 'border-success bg-soft-success' : ''}`}>
+                            <div className="form-check">
+                              <input
+                                className="form-check-input"
+                                type="checkbox"
+                                id={`country-${c.code}`}
+                                checked={brandCountries.includes(c.code)}
+                                onChange={e => {
+                                  if (e.target.checked) {
+                                    setBrandCountries(prev => [...prev, c.code]);
+                                  } else {
+                                    setBrandCountries(prev => prev.filter(code => code !== c.code));
+                                  }
+                                }}
+                              />
+                              <label className="form-check-label" htmlFor={`country-${c.code}`}>
+                                <span className="badge bg-light text-dark me-1 fw-bold">{c.code}</span>
+                                {c.name}
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                   <div className="d-flex gap-2 mt-4">
                     <button type="submit" className="btn btn-primary" disabled={saving}>
