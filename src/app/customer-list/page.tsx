@@ -57,13 +57,18 @@ export default function CustomerList() {
     }
   ];
 
-  const actions = [
-    {
-      label: 'View Details',
-      onClick: (item: any) => window.location.href = `/customer-detail?id=${item._id || item.id}`,
-      className: 'btn-primary btn-sm'
-    }
-  ];
+  const viewDetailsColumn = {
+    key: '_id',
+    label: 'Action',
+    render: (_: any, row: any) => (
+      <a
+        href={`/customer-detail?id=${row._id || row.id}`}
+        className="btn btn-primary btn-sm"
+      >
+        View Details
+      </a>
+    )
+  };
 
   return (
     <Layout pageTitle="Customers">
@@ -107,8 +112,8 @@ export default function CustomerList() {
               ) : (
                 <InteractiveTable
                   data={customers}
-                  columns={columns}
-                  actions={actions}
+                  columns={[...columns, viewDetailsColumn]}
+                  showActions={false}
                   itemsPerPage={15}
                 />
               )}
