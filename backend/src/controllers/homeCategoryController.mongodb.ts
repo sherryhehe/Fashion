@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import HomeCategory from '../models/HomeCategory';
 import Product from '../models/Product';
+import Brand from '../models/Brand';
 import { successResponse, errorResponse } from '../utils/responseHelper';
 import { AuthRequest } from '../middleware/auth';
 
@@ -13,9 +14,21 @@ export const getActiveForApp = async (req: Request, res: Response): Promise<void
       .sort({ order: 1, createdAt: 1 })
       .lean();
     const productIds = categories.flatMap((c: any) => c.productIds || []);
-    const products = await Product.find(
-      { _id: { $in: productIds }, status: 'active' }
-    ).lean();
+    const productQuery: any = { _id: { $in: productIds }, status: 'active' };
+    // Country gating: hide products of brands that restrict to other countries.
+    const country = req.query.country as string | undefined;
+    if (country) {
+      const countryCode = String(country).trim().toUpperCase();
+      const restricted = await Brand.find({
+        'countries.0': { $exists: true },
+        countries: { $ne: countryCode },
+      })
+        .select('name')
+        .lean();
+      const hidden = restricted.map((b: any) => b.name);
+      if (hidden.length > 0) productQuery.brand = { $nin: hidden };
+    }
+    const products = await Product.find(productQuery).lean();
     const productMap = new Map(products.map((p: any) => [p._id.toString(), p]));
     const withProducts = categories.map((cat: any) => ({
       _id: cat._id,

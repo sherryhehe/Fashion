@@ -4,6 +4,7 @@
  */
 
 import apiClient from './api.service';
+import { getUserCountry } from '../utils/userCountry';
 
 export interface Banner {
   id: string;
@@ -41,10 +42,12 @@ const bannerService = {
    * Get all banners (public endpoint)
    */
   getAll: async (position?: string, status: string = 'active'): Promise<BannerResponse> => {
+    const country = await getUserCountry();
     const buildUrl = (pos?: string) => {
       const params = new URLSearchParams();
       if (pos) params.append('position', pos);
       if (status) params.append('status', status);
+      if (country) params.append('country', country);
       const queryString = params.toString();
       return queryString ? `/banners?${queryString}` : '/banners';
     };

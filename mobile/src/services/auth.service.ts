@@ -16,6 +16,7 @@ export interface RegisterData {
   email: string;
   password: string;
   phone?: string;
+  country?: string;
 }
 
 export interface AuthResponse {

@@ -4,6 +4,13 @@
  */
 
 import apiClient from './api.service';
+import { getUserCountry } from '../utils/userCountry';
+
+/** Returns "&country=XX" (or "") for appending to product endpoints. */
+const countryParam = async (): Promise<string> => {
+  const country = await getUserCountry();
+  return country ? `&country=${encodeURIComponent(country)}` : '';
+};
 
 export interface Product {
   _id: string;
@@ -72,16 +79,22 @@ const productService = {
    */
   getAll: async (filters: ProductFilters = {}): Promise<ProductResponse> => {
     const params = new URLSearchParams();
-    
+
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
         params.append(key, value.toString());
       }
     });
 
+    // Gate by the user's selected country (unless a country was passed explicitly)
+    if (!('country' in filters)) {
+      const country = await getUserCountry();
+      if (country) params.append('country', country);
+    }
+
     const queryString = params.toString();
     const url = queryString ? `/products?${queryString}` : '/products';
-    
+
     return apiClient.get(url);
   },
 
@@ -96,7 +109,9 @@ const productService = {
    * Get featured products
    */
   getFeatured: async (limit: number = 10): Promise<ProductResponse> => {
-    return apiClient.get(`/products/featured?limit=${limit}`);
+    const country = await getUserCountry();
+    const c = country ? `&country=${encodeURIComponent(country)}` : '';
+    return apiClient.get(`/products/featured?limit=${limit}${c}`);
   },
 
   /**
@@ -112,6 +127,11 @@ const productService = {
       }
     });
 
+    if (!('country' in filters)) {
+      const country = await getUserCountry();
+      if (country) params.append('country', country);
+    }
+
     return apiClient.get(`/products/search?${params.toString()}`);
   },
 
@@ -119,28 +139,32 @@ const productService = {
    * Get recommended products (using featured for backward compatibility)
    */
   getRecommended: async (limit: number = 10): Promise<ProductResponse> => {
-    return apiClient.get(`/products/featured?limit=${limit}`);
+    const c = await countryParam();
+    return apiClient.get(`/products/featured?limit=${limit}${c}`);
   },
 
   /**
    * Get random products (new set each request - for homepage variety)
    */
   getRandom: async (limit: number = 10): Promise<ProductResponse> => {
-    return apiClient.get(`/products/random?limit=${limit}`);
+    const c = await countryParam();
+    return apiClient.get(`/products/random?limit=${limit}${c}`);
   },
 
   /**
    * Get personalized products (cart + wishlist first, then featured). Requires auth.
    */
   getPersonalized: async (limit: number = 10): Promise<ProductResponse> => {
-    return apiClient.get(`/products/personalized?limit=${limit}`);
+    const c = await countryParam();
+    return apiClient.get(`/products/personalized?limit=${limit}${c}`);
   },
 
   /**
    * Get recently added products (sorted by creation date)
    */
   getRecentlyAdded: async (limit: number = 10): Promise<ProductResponse> => {
-    return apiClient.get(`/products?limit=${limit}&sortBy=createdAt&order=desc&status=active`);
+    const c = await countryParam();
+    return apiClient.get(`/products?limit=${limit}&sortBy=createdAt&order=desc&status=active${c}`);
   },
 
   /**
@@ -148,9 +172,8 @@ const productService = {
    * TODO: Implement actual top selling logic based on sales data
    */
   getTopSelling: async (limit: number = 10): Promise<ProductResponse> => {
-    // For now, we'll use featured products as top selling
-    // In the future, this could be based on actual sales data
-    return apiClient.get(`/products/featured?limit=${limit}`);
+    const c = await countryParam();
+    return apiClient.get(`/products/featured?limit=${limit}${c}`);
   },
 };
 

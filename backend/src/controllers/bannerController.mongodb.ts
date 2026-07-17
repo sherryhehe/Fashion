@@ -4,7 +4,7 @@ import { successResponse, errorResponse } from '../utils/responseHelper';
 
 export async function listBanners(req: Request, res: Response) {
 	try {
-		const { position, status } = req.query as { position?: string; status?: string };
+		const { position, status, country } = req.query as { position?: string; status?: string; country?: string };
 		const filter: Record<string, any> = {};
 		if (position) {
 			const positions = position
@@ -18,6 +18,15 @@ export async function listBanners(req: Request, res: Response) {
 			}
 		}
 		if (status) filter.status = status;
+		// Country gating: a banner with a non-empty `countries` list only shows in
+		// those countries; an empty list shows everywhere (backward compatible).
+		if (country) {
+			const countryCode = String(country).trim().toUpperCase();
+			filter.$or = [
+				{ 'countries.0': { $exists: false } },
+				{ countries: countryCode },
+			];
+		}
 		const banners = await Banner.find(filter).sort({ createdAt: -1 });
 		// Convert MongoDB _id to id for frontend consistency
 		const formattedBanners = banners.map(banner => {

@@ -61,6 +61,23 @@ const validateAndNormalizeShippingFields = (payload: any): string | null => {
 /**
  * Get all products with pagination and filters
  */
+/**
+ * Returns the names of brands that should be hidden for a given country:
+ * brands that restrict to specific countries which do NOT include this one.
+ * Brands with an empty `countries` list serve everyone and are never hidden.
+ */
+const getHiddenBrandNamesForCountry = async (country?: string): Promise<string[]> => {
+  if (!country) return [];
+  const countryCode = String(country).trim().toUpperCase();
+  const restricted = await Brand.find({
+    'countries.0': { $exists: true },
+    countries: { $ne: countryCode },
+  })
+    .select('name')
+    .lean();
+  return restricted.map((b: any) => b.name);
+};
+
 export const getAllProducts = async (req: Request, res: Response): Promise<void> => {
   try {
     const {
@@ -72,6 +89,7 @@ export const getAllProducts = async (req: Request, res: Response): Promise<void>
       status,
       featured,
       search,
+      country,
       sortBy = 'createdAt',
       order = 'desc',
     } = req.query;
@@ -81,6 +99,23 @@ export const getAllProducts = async (req: Request, res: Response): Promise<void>
     // Filters
     if (category) query.category = category;
     if (brand) query.brand = brand;
+
+    // Country gating: hide products of brands that restrict to other countries.
+    // A brand with a non-empty `countries` list only serves those countries;
+    // a brand with an empty list serves everyone (backward compatible).
+    if (country) {
+      const hiddenNames = await getHiddenBrandNamesForCountry(country as string);
+      if (hiddenNames.length > 0) {
+        if (query.brand) {
+          // A specific brand was requested; if it's hidden, return nothing.
+          if (hiddenNames.some((n: string) => String(n).toLowerCase() === String(query.brand).toLowerCase())) {
+            query.brand = '__none__';
+          }
+        } else {
+          query.brand = { $nin: hiddenNames };
+        }
+      }
+    }
     // Only filter by style if it's provided and not empty
     if (style) {
       const styleValue = Array.isArray(style) ? style[0] : style;
@@ -406,12 +441,13 @@ export const searchProducts = async (req: Request, res: Response): Promise<void>
  */
 export const getFeaturedProducts = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { limit = 10 } = req.query;
+    const { limit = 10, country } = req.query;
 
-    const products = await Product.find({
-      featured: true,
-      status: 'active',
-    })
+    const match: any = { featured: true, status: 'active' };
+    const hidden = await getHiddenBrandNamesForCountry(country as string | undefined);
+    if (hidden.length > 0) match.brand = { $nin: hidden };
+
+    const products = await Product.find(match)
       .limit(parseInt(limit as string))
       .sort({ promoted: -1, createdAt: -1 });
 
@@ -427,11 +463,15 @@ export const getFeaturedProducts = async (req: Request, res: Response): Promise<
  */
 export const getRandomProducts = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { limit = 10 } = req.query;
+    const { limit = 10, country } = req.query;
     const limitNum = Math.min(Math.max(parseInt(limit as string) || 10, 1), 50);
 
+    const match: any = { status: 'active' };
+    const hidden = await getHiddenBrandNamesForCountry(country as string | undefined);
+    if (hidden.length > 0) match.brand = { $nin: hidden };
+
     const products = await Product.aggregate([
-      { $match: { status: 'active' } },
+      { $match: match },
       { $sample: { size: limitNum } },
     ]);
 
@@ -448,9 +488,12 @@ export const getRandomProducts = async (req: Request, res: Response): Promise<vo
  */
 export const getPersonalizedProducts = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { limit = 10 } = req.query;
+    const { limit = 10, country } = req.query;
     const limitNum = Math.min(parseInt(limit as string) || 10, 50);
     const userId = req.user!.id;
+
+    const hidden = await getHiddenBrandNamesForCountry(country as string | undefined);
+    const brandGate = hidden.length > 0 ? { brand: { $nin: hidden } } : {};
 
     const [cartItems, wishlistItems] = await Promise.all([
       Cart.find({ userId }).select('productId').lean(),
@@ -466,6 +509,7 @@ export const getPersonalizedProducts = async (req: AuthRequest, res: Response): 
       products = await Product.find({
         _id: { $in: personalIds },
         status: 'active',
+        ...brandGate,
       })
         .sort({ promoted: -1, createdAt: -1 })
         .limit(limitNum)
@@ -478,6 +522,7 @@ export const getPersonalizedProducts = async (req: AuthRequest, res: Response): 
         featured: true,
         status: 'active',
         _id: { $nin: Array.from(haveIds) },
+        ...brandGate,
       })
         .sort({ promoted: -1, createdAt: -1 })
         .limit(limitNum - products.length)
