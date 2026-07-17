@@ -36,6 +36,9 @@ export default function ProductEdit() {
     description: '',
     features: '',
     status: 'active',
+    shippingFees: '',
+    shippingTime: '',
+    notes: '',
   });
 
   // SEO data
@@ -106,6 +109,9 @@ export default function ProductEdit() {
         description: product.description || '',
         features: product.features?.join('\n') || '',
         status: product.status || 'active',
+        shippingFees: product.shippingFees?.toString() || '',
+        shippingTime: product.shippingTime || '',
+        notes: product.notes || '',
       });
 
       setSalesCount(product.salesCount || 0);
@@ -289,6 +295,9 @@ export default function ProductEdit() {
         brand: formData.brand || undefined,
         stock: parseInt(formData.inventory),
         status: formData.status,
+        shippingFees: formData.shippingFees ? parseFloat(formData.shippingFees) : 0,
+        shippingTime: formData.shippingTime || undefined,
+        notes: formData.notes || undefined,
         style: formData.style,
         features: featuresArray,
         images: finalImages,
@@ -611,8 +620,48 @@ export default function ProductEdit() {
                         name="inventory"
                         value={formData.inventory}
                         onChange={handleChange}
-                        min="0" 
+                        min="0"
                       />
+                      <small className="text-muted">Set to 0 to mark this product out of stock.</small>
+                    </div>
+                    <div className="col-md-6 mb-3">
+                      <label htmlFor="shippingFees" className="form-label">Shipping Cost</label>
+                      <input
+                        type="number"
+                        className="form-control"
+                        id="shippingFees"
+                        name="shippingFees"
+                        placeholder="0"
+                        min="0"
+                        step="0.01"
+                        value={formData.shippingFees}
+                        onChange={handleChange}
+                      />
+                      <small className="text-muted">Per-item shipping charged at checkout.</small>
+                    </div>
+                    <div className="col-md-6 mb-3">
+                      <label htmlFor="shippingTime" className="form-label">Shipping Time</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        id="shippingTime"
+                        name="shippingTime"
+                        placeholder="e.g. 3-5 business days"
+                        value={formData.shippingTime}
+                        onChange={handleChange}
+                      />
+                    </div>
+                    <div className="col-12 mb-3">
+                      <label htmlFor="notes" className="form-label">Note</label>
+                      <textarea
+                        className="form-control"
+                        id="notes"
+                        name="notes"
+                        rows={2}
+                        placeholder="Optional note shown with this product / on the order"
+                        value={formData.notes}
+                        onChange={handleChange}
+                      ></textarea>
                     </div>
                     <div className="col-12 mb-3">
                       <label htmlFor="description" className="form-label">Description</label>

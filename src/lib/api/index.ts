@@ -18,4 +18,5 @@ export { bannersApi } from './banners';
 export { searchApi } from './search';
 export { paymentMethodsApi } from './payment-methods';
 export { countriesApi } from './countries';
+export { homeCategoriesApi } from './home-categories';
 

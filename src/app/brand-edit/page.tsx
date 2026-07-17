@@ -18,6 +18,7 @@ export default function BrandEdit() {
   const [allPaymentMethods, setAllPaymentMethods] = useState<any[]>([]);
   const [allCountries, setAllCountries] = useState<any[]>([]);
   const [enabledPaymentMethods, setEnabledPaymentMethods] = useState<string[]>([]);
+  const [cardEnabled, setCardEnabled] = useState<boolean>(false);
   const [brandCountries, setBrandCountries] = useState<string[]>([]);
 
   const [brand, setBrand] = useState({
@@ -88,6 +89,7 @@ export default function BrandEdit() {
       });
 
       setEnabledPaymentMethods(Array.isArray(brandData.enabledPaymentMethods) ? brandData.enabledPaymentMethods : []);
+      setCardEnabled(Array.isArray(brandData.allowedPaymentMethods) && brandData.allowedPaymentMethods.map((m: string) => String(m).toLowerCase()).includes('card'));
       setBrandCountries(Array.isArray(brandData.countries) ? brandData.countries : []);
 
       if (brandData.logo) {
@@ -273,6 +275,7 @@ export default function BrandEdit() {
         featured: brand.featured,
         popular: brand.popular,
         enabledPaymentMethods,
+        allowedPaymentMethods: cardEnabled ? ['card'] : [],
         countries: brandCountries,
       };
       
@@ -620,6 +623,27 @@ export default function BrandEdit() {
                     <i className="bx bx-credit-card me-1"></i> Payment Methods
                   </h5>
                   <p className="text-muted small mb-3">Select which payment methods this brand accepts. Only checked methods will appear for customers ordering from this brand.</p>
+                  <div className="row mb-3">
+                    <div className="col-md-6 mb-2">
+                      <div className={`border rounded p-3 ${cardEnabled ? 'border-primary bg-soft-primary' : ''}`}>
+                        <div className="form-check">
+                          <input
+                            className="form-check-input"
+                            type="checkbox"
+                            id="pm-card"
+                            checked={cardEnabled}
+                            onChange={e => setCardEnabled(e.target.checked)}
+                          />
+                          <label className="form-check-label fw-semibold" htmlFor="pm-card">
+                            Card (Stripe)
+                          </label>
+                        </div>
+                        <p className="text-muted mb-0 mt-1 small" style={{ paddingLeft: '1.5rem' }}>
+                          Secure card payment processed by Stripe.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                   {allPaymentMethods.length === 0 ? (
                     <div className="alert alert-info">
                       No custom payment methods configured. <a href="/payment-methods" className="alert-link">Manage payment methods</a>

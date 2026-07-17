@@ -18,6 +18,7 @@ export default function CustomerList() {
       const token = localStorage.getItem('token');
       const params = new URLSearchParams();
       params.append('role', 'customer');
+      params.append('limit', '1000');
       if (statusFilter) params.append('status', statusFilter);
 
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users?${params}`, {
