@@ -32,11 +32,27 @@ export default function OrdersList() {
   };
 
   const columns = [
-    { key: 'orderNumber', label: 'Order #' },
     {
-      key: 'userId',
+      key: 'orderNumber',
+      label: 'Order #',
+      render: (value: string, row: any) => (
+        <a
+          href={`/order-detail?id=${row._id || row.id}`}
+          className="fw-medium text-decoration-none"
+        >
+          {value}
+        </a>
+      )
+    },
+    {
+      key: 'user',
       label: 'Customer',
-      render: (value: string) => `Customer #${value}`
+      render: (value: any, row: any) => (
+        <div>
+          <div className="fw-medium">{value?.name || 'Unknown'}</div>
+          {value?.email && <small className="text-muted">{value.email}</small>}
+        </div>
+      )
     },
     {
       key: 'total',
@@ -62,17 +78,29 @@ export default function OrdersList() {
       }
     },
     {
+      key: 'paymentStatus',
+      label: 'Payment',
+      render: (value: string) => {
+        const colors: any = { paid: 'success', pending: 'warning', failed: 'danger', refunded: 'secondary' };
+        return <span className={`badge bg-${colors[value] || 'secondary'}`}>{value || 'N/A'}</span>;
+      }
+    },
+    {
       key: 'createdAt',
       label: 'Date',
-      render: (value: string) => new Date(value).toLocaleString()
-    }
-  ];
-
-  const actions = [
+      render: (value: string) => new Date(value).toLocaleDateString()
+    },
     {
-      label: 'View Details',
-      onClick: (item: any) => window.location.href = `/order-detail?id=${item._id || item.id}`,
-      className: 'btn-primary btn-sm'
+      key: '_id',
+      label: 'Action',
+      render: (_: any, row: any) => (
+        <a
+          href={`/order-detail?id=${row._id || row.id}`}
+          className="btn btn-primary btn-sm"
+        >
+          View Details
+        </a>
+      )
     }
   ];
 
@@ -122,7 +150,7 @@ export default function OrdersList() {
                 <InteractiveTable
                   data={orders}
                   columns={columns}
-                  actions={actions}
+                  showActions={false}
                   itemsPerPage={15}
                 />
               )}

@@ -72,6 +72,17 @@ export default function ProductList() {
     }
   };
 
+  const handleTogglePromote = async (product: any) => {
+    const newPromoted = !product.promoted;
+    try {
+      await productsApi.setPromoted(product._id || product.id, newPromoted);
+      addNotification('success', `Product ${newPromoted ? 'promoted' : 'unpromoted'} successfully`);
+      fetchProducts();
+    } catch (error: any) {
+      addNotification('error', error?.message || 'Failed to update promoted status');
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this product?')) return;
 
@@ -141,6 +152,20 @@ export default function ProductList() {
         <span className={`badge ${value === 'active' ? 'bg-success' : 'bg-secondary'}`}>
           {value || 'inactive'}
         </span>
+      )
+    },
+    {
+      key: 'promoted',
+      label: 'Promoted',
+      render: (value: boolean, row: any) => (
+        <button
+          className={`btn btn-sm ${value ? 'btn-warning' : 'btn-outline-secondary'}`}
+          onClick={(e) => { e.stopPropagation(); handleTogglePromote(row); }}
+          title={value ? 'Click to unpromote' : 'Click to promote — appears first in search/categories/styles'}
+        >
+          <i className={`bx ${value ? 'bxs-star' : 'bx-star'} me-1`}></i>
+          {value ? 'Promoted' : 'Promote'}
+        </button>
       )
     }
   ];

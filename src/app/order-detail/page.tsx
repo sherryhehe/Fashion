@@ -3,269 +3,135 @@
 import Layout from '@/components/layout/Layout';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { formatCurrency } from '@/utils/currencyHelper';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { ordersApi } from '@/lib/api';
-
-/** Maps a real order from the API into the shape this page renders. */
-const mapOrder = (o: any) => {
-  const addr = o?.shippingAddress || {};
-  const fullName = [addr.firstName, addr.lastName].filter(Boolean).join(' ');
-  return {
-    id: o?.orderNumber || o?._id || '',
-    _id: o?._id || '',
-    status: o?.status ? String(o.status).charAt(0).toUpperCase() + String(o.status).slice(1) : '',
-    date: o?.createdAt ? new Date(o.createdAt).toLocaleString() : '',
-    customer: {
-      name: fullName || 'Customer',
-      email: addr.email || '',
-      phone: addr.phone || '',
-      address: {
-        street: addr.address || '',
-        city: addr.city || '',
-        state: addr.state || '',
-        zip: addr.zipCode || '',
-        country: addr.country || '',
-      },
-    },
-    items: (o?.items || []).map((it: any, idx: number) => ({
-      id: it._id || idx,
-      name: [it.productName, it.size ? `Size: ${it.size}` : '', it.color ? `Color: ${it.color}` : '']
-        .filter(Boolean)
-        .join(' — '),
-      image: it.productImage || '',
-      price: it.price || 0,
-      quantity: it.quantity || 0,
-      total: it.total ?? (it.price || 0) * (it.quantity || 0),
-    })),
-    shipping: {
-      method: (o?.items || []).map((i: any) => i.shippingTime).filter(Boolean)[0] || 'Standard Shipping',
-      cost: o?.shippingCost || 0,
-      tracking: o?.trackingNumber || 'N/A',
-    },
-    payment: {
-      method: o?.paymentMethod || 'N/A',
-      status: o?.paymentStatus || 'N/A',
-      transactionId: o?.paymentIntentId || 'N/A',
-    },
-    totals: {
-      subtotal: o?.subtotal || 0,
-      shipping: o?.shippingCost || 0,
-      tax: (o?.tax || 0) + (o?.platformFee || 0) + (o?.transactionFee || 0),
-      total: o?.total || 0,
-    },
-    notes: o?.notes || '',
-    timeline: (o?.timeline || []).map((t: any) => ({
-      status: t.status ? String(t.status).charAt(0).toUpperCase() + String(t.status).slice(1) : '',
-      date: t.date ? new Date(t.date).toLocaleString() : '',
-      description: t.description || '',
-    })),
-  };
-};
+import { formatCurrency } from '@/utils/currencyHelper';
+import { getProductImageUrl } from '@/utils/imageHelper';
 
 export default function OrderDetail() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const orderId = searchParams.get('id');
 
-  // State for modals and functionality
-  const [showStatusModal, setShowStatusModal] = useState(false);
-  const [showEmailModal, setShowEmailModal] = useState(false);
-  const [newStatus, setNewStatus] = useState('Processing');
-  const [emailSubject, setEmailSubject] = useState('');
-  const [emailMessage, setEmailMessage] = useState('');
+  const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState('');
-  const [order, setOrder] = useState<any>(mapOrder({}));
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [newStatus, setNewStatus] = useState('');
+  const [updatingStatus, setUpdatingStatus] = useState(false);
 
-  // Fetch the real order from the API using the ?id= query param
   useEffect(() => {
-    if (!orderId) {
-      setLoadError('No order id provided.');
-      setLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    ordersApi
-      .getById(orderId)
-      .then((res: any) => {
-        const data = res?.data ?? res;
-        if (!cancelled) {
-          if (data) {
-            setOrder(mapOrder(data));
-            setNewStatus(data.status || 'processing');
-            setLoadError('');
-          } else {
-            setLoadError('Order not found.');
-          }
-          setLoading(false);
-        }
-      })
-      .catch((e: any) => {
-        if (!cancelled) {
-          setLoadError(e?.message || 'Failed to load order.');
-          setLoading(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
+    if (orderId) fetchOrder();
   }, [orderId]);
 
-  // Handler functions for button actions
-  const handleUpdateStatus = () => {
-    setShowStatusModal(true);
+  const fetchOrder = async () => {
+    try {
+      setLoading(true);
+      const response = await ordersApi.getById(orderId!);
+      setOrder(response.data);
+      setNewStatus(response.data?.status || '');
+    } catch (error) {
+      console.error('Failed to fetch order:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleStatusChange = async () => {
-    const targetId = order?._id || orderId;
-    if (!targetId) return;
+  const handleUpdateStatus = async () => {
+    if (!newStatus) return;
     try {
-      await ordersApi.updateStatus(String(targetId), String(newStatus).toLowerCase());
-      setOrder((prev: any) => ({
-        ...prev,
-        status: String(newStatus).charAt(0).toUpperCase() + String(newStatus).slice(1),
-      }));
+      setUpdatingStatus(true);
+      await ordersApi.updateStatus(orderId!, newStatus);
+      setOrder((prev: any) => ({ ...prev, status: newStatus }));
       setShowStatusModal(false);
-      alert(`Order status updated to: ${newStatus}`);
-    } catch (e: any) {
-      alert(`Failed to update status: ${e?.message || 'Unknown error'}`);
+    } catch (error) {
+      console.error('Failed to update status:', error);
+      alert('Failed to update order status');
+    } finally {
+      setUpdatingStatus(false);
     }
   };
 
   const handlePrintInvoice = () => {
-    // Create a new window for printing
+    if (!order) return;
+    const addr = order.shippingAddress || {};
     const printWindow = window.open('', '_blank');
     if (printWindow) {
-      const invoiceHTML = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Invoice - Order ${order.id}</title>
+      printWindow.document.write(`
+        <!DOCTYPE html><html><head>
+          <title>Invoice - ${order.orderNumber}</title>
           <style>
-            body { font-family: Arial, sans-serif; margin: 20px; }
-            .header { text-align: center; margin-bottom: 30px; }
-            .invoice-details { margin-bottom: 20px; }
-            .customer-info { margin-bottom: 20px; }
-            .items-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-            .items-table th, .items-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-            .items-table th { background-color: #f2f2f2; }
-            .totals { text-align: right; margin-top: 20px; }
-            @media print { body { margin: 0; } }
+            body{font-family:Arial,sans-serif;margin:20px}
+            table{width:100%;border-collapse:collapse;margin-bottom:20px}
+            th,td{border:1px solid #ddd;padding:8px;text-align:left}
+            th{background:#f2f2f2}
+            .totals{text-align:right}
+            @media print{body{margin:0}}
           </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>INVOICE</h1>
-            <h2>Order #${order.id}</h2>
-          </div>
-          
-          <div class="invoice-details">
-            <p><strong>Date:</strong> ${order.date}</p>
-            <p><strong>Status:</strong> ${order.status}</p>
-            <p><strong>Transaction ID:</strong> ${order.payment.transactionId}</p>
-          </div>
-          
-          <div class="customer-info">
-            <h3>Bill To:</h3>
-            <p>${order.customer.name}<br>
-            ${order.customer.email}<br>
-            ${order.customer.phone}<br>
-            ${order.customer.address.street}<br>
-            ${order.customer.address.city}, ${order.customer.address.state} ${order.customer.address.zip}<br>
-            ${order.customer.address.country}</p>
-          </div>
-          
-          <table class="items-table">
-            <thead>
-              <tr>
-                <th>Product</th>
-                <th>Price</th>
-                <th>Quantity</th>
-                <th>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${order.items.map(item => `
-                <tr>
-                  <td>${item.name}</td>
-                  <td>${formatCurrency(item.price)}</td>
-                  <td>${item.quantity}</td>
-                  <td>${formatCurrency(item.total)}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-          
+        </head><body>
+          <h1 style="text-align:center">INVOICE</h1>
+          <h2 style="text-align:center">Order #${order.orderNumber}</h2>
+          <p><strong>Date:</strong> ${new Date(order.createdAt).toLocaleDateString()}</p>
+          <p><strong>Status:</strong> ${order.status}</p>
+          <h3>Ship To:</h3>
+          <p>${addr.fullName || order.user?.name || ''}<br>
+          ${addr.address || addr.street || ''}<br>
+          ${addr.city || ''}, ${addr.state || ''} ${addr.postalCode || addr.zip || ''}<br>
+          ${addr.country || ''}</p>
+          <table><thead><tr><th>Product</th><th>Size</th><th>Price</th><th>Qty</th><th>Total</th></tr></thead>
+          <tbody>${(order.items || []).map((item: any) => `
+            <tr>
+              <td>${item.productName}</td>
+              <td>${item.size || '-'}</td>
+              <td>${formatCurrency(item.price)}</td>
+              <td>${item.quantity}</td>
+              <td>${formatCurrency(item.total)}</td>
+            </tr>`).join('')}
+          </tbody></table>
           <div class="totals">
-            <p>Subtotal: ${formatCurrency(order.totals.subtotal)}</p>
-            <p>Shipping: ${formatCurrency(order.shipping.cost)}</p>
-            <p>Tax: ${formatCurrency(order.totals.tax)}</p>
-            <p><strong>Total: ${formatCurrency(order.totals.total)}</strong></p>
+            <p>Subtotal: ${formatCurrency(order.subtotal)}</p>
+            <p>Shipping: ${formatCurrency(order.shippingCost || 0)}</p>
+            ${order.platformFee ? `<p>Platform Fee: ${formatCurrency(order.platformFee)}</p>` : ''}
+            ${order.transactionFee ? `<p>Transaction Fee: ${formatCurrency(order.transactionFee)}</p>` : ''}
+            <p><strong>Total: ${formatCurrency(order.total)}</strong></p>
           </div>
-          
-          <div style="margin-top: 30px;">
-            <p><strong>Payment Method:</strong> ${order.payment.method}</p>
-            <p><strong>Shipping Method:</strong> ${order.shipping.method}</p>
-            <p><strong>Tracking Number:</strong> ${order.shipping.tracking}</p>
-          </div>
-        </body>
-        </html>
-      `;
-      
-      printWindow.document.write(invoiceHTML);
+          <p><strong>Payment:</strong> ${order.paymentMethod} — ${order.paymentStatus}</p>
+        </body></html>
+      `);
       printWindow.document.close();
       printWindow.print();
-    }
-  };
-
-  const handleSendEmail = () => {
-    setEmailSubject(`Order Update - Order #${order.id}`);
-    setEmailMessage(`Dear ${order.customer.name},\n\nWe wanted to update you on your order #${order.id}.\n\nCurrent Status: ${order.status}\n\nThank you for your business!\n\nBest regards,\nShopo Team`);
-    setShowEmailModal(true);
-  };
-
-  const handleEmailSend = () => {
-    // In a real application, you would send this via an API
-    alert(`Email sent to ${order.customer.email}!\n\nSubject: ${emailSubject}\n\nMessage: ${emailMessage}`);
-    setShowEmailModal(false);
-    setEmailSubject('');
-    setEmailMessage('');
-  };
-
-  const handleDuplicateOrder = () => {
-    if (confirm('Are you sure you want to duplicate this order?')) {
-      // In a real application, you would create a new order via API
-      const newOrderId = `ORD-${Date.now()}`;
-      alert(`Order duplicated successfully!\nNew Order ID: ${newOrderId}`);
-      // You could redirect to the new order or stay on current page
     }
   };
 
   if (loading) {
     return (
       <Layout pageTitle="Order Detail">
-        <div className="container-fluid">
-          <div className="text-center py-5">
-            <span className="spinner-border" role="status"></span>
-            <p className="mt-2 text-muted">Loading order...</p>
-          </div>
+        <div className="text-center py-5">
+          <div className="spinner-border text-primary"></div>
+          <p className="mt-2">Loading order...</p>
         </div>
       </Layout>
     );
   }
 
-  if (loadError) {
+  if (!order) {
     return (
       <Layout pageTitle="Order Detail">
-        <div className="container-fluid">
-          <div className="alert alert-danger mt-4">
-            {loadError} <Link href="/orders-list" className="alert-link">Back to orders</Link>
-          </div>
+        <div className="text-center py-5">
+          <h5>Order not found</h5>
+          <Link href="/orders-list" className="btn btn-primary mt-3">Back to Orders</Link>
         </div>
       </Layout>
     );
   }
+
+  const addr = order.shippingAddress || {};
+  const statusColors: any = {
+    pending: 'warning',
+    processing: 'info',
+    shipped: 'primary',
+    delivered: 'success',
+    cancelled: 'danger'
+  };
 
   return (
     <Layout pageTitle="Order Detail">
@@ -277,7 +143,7 @@ export default function OrderDetail() {
               <ol className="breadcrumb">
                 <li className="breadcrumb-item"><Link href="/">Home</Link></li>
                 <li className="breadcrumb-item"><Link href="/orders-list">Orders</Link></li>
-                <li className="breadcrumb-item active" aria-current="page">Order #{order.id}</li>
+                <li className="breadcrumb-item active">Order #{order.orderNumber}</li>
               </ol>
             </nav>
           </div>
@@ -288,16 +154,14 @@ export default function OrderDetail() {
           <div className="col-12">
             <div className="card">
               <div className="card-body">
-                <div className="d-flex justify-content-between align-items-start">
+                <div className="d-flex justify-content-between align-items-start flex-wrap gap-2">
                   <div>
-                    <h4 className="card-title mb-1">Order #{order.id}</h4>
-                    <p className="text-muted mb-0">Placed on {order.date}</p>
+                    <h4 className="card-title mb-1">Order #{order.orderNumber}</h4>
+                    <p className="text-muted mb-0">Placed on {new Date(order.createdAt).toLocaleString()}</p>
                   </div>
-                  <div className="text-end">
-                    <span className={`badge ${order.status === 'Processing' ? 'bg-info' : order.status === 'Delivered' ? 'bg-success' : order.status === 'Pending' ? 'bg-warning' : 'bg-danger'} fs-6`}>
-                      {order.status}
-                    </span>
-                  </div>
+                  <span className={`badge bg-${statusColors[order.status] || 'secondary'} fs-6`}>
+                    {order.status}
+                  </span>
                 </div>
               </div>
             </div>
@@ -305,7 +169,7 @@ export default function OrderDetail() {
         </div>
 
         <div className="row">
-          {/* Order Items */}
+          {/* Order Items + Timeline */}
           <div className="col-lg-8">
             <div className="card">
               <div className="card-header">
@@ -317,81 +181,104 @@ export default function OrderDetail() {
                     <thead>
                       <tr>
                         <th>Product</th>
+                        <th>Size</th>
                         <th>Price</th>
-                        <th>Quantity</th>
+                        <th>Qty</th>
                         <th>Total</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {order.items.map((item) => (
-                        <tr key={item.id}>
-                          <td>
-                            <div className="d-flex align-items-center">
-                              <img src={item.image} alt={item.name} className="img-fluid me-3" style={{ width: '60px', height: '60px', objectFit: 'cover' }} />
-                              <div>
-                                <h6 className="mb-1">{item.name}</h6>
-                                <small className="text-muted">SKU: PROD-{item.id.toString().padStart(4, '0')}</small>
+                      {(order.items || []).map((item: any, index: number) => {
+                        const imgUrl = item.productImage
+                          ? getProductImageUrl([item.productImage], 0, '/assets/images/products/product-1.png')
+                          : '/assets/images/products/product-1.png';
+                        return (
+                          <tr key={index}>
+                            <td>
+                              <div className="d-flex align-items-center">
+                                <img
+                                  src={imgUrl}
+                                  alt={item.productName}
+                                  className="me-3 rounded"
+                                  style={{ width: '60px', height: '60px', objectFit: 'cover' }}
+                                  onError={(e) => { (e.target as HTMLImageElement).src = '/assets/images/products/product-1.png'; }}
+                                />
+                                <div>
+                                  <h6 className="mb-0">{item.productName}</h6>
+                                  {item.color && <small className="text-muted">Color: {item.color}</small>}
+                                </div>
                               </div>
-                            </div>
-                          </td>
-                          <td>{formatCurrency(item.price)}</td>
-                          <td>
-                            <span className="badge bg-primary">{item.quantity}</span>
-                          </td>
-                          <td className="fw-semibold">{formatCurrency(item.total)}</td>
-                        </tr>
-                      ))}
+                            </td>
+                            <td>{item.size || '-'}</td>
+                            <td>{formatCurrency(item.price)}</td>
+                            <td><span className="badge bg-primary">{item.quantity}</span></td>
+                            <td className="fw-semibold">{formatCurrency(item.total)}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
               </div>
             </div>
 
-            {/* Order Timeline */}
-            <div className="card mt-3">
-              <div className="card-header">
-                <h5 className="card-title mb-0">Order Timeline</h5>
-              </div>
-              <div className="card-body">
-                <div className="timeline">
-                  {order.timeline.map((event, index) => (
-                    <div key={index} className="timeline-item">
-                      <div className="timeline-marker"></div>
-                      <div className="timeline-content">
-                        <h6 className="mb-1">{event.status}</h6>
-                        <p className="text-muted mb-1">{event.description}</p>
-                        <small className="text-muted">{event.date}</small>
+            {/* Timeline */}
+            {order.timeline && order.timeline.length > 0 && (
+              <div className="card mt-3">
+                <div className="card-header">
+                  <h5 className="card-title mb-0">Order Timeline</h5>
+                </div>
+                <div className="card-body">
+                  <div className="timeline">
+                    {[...order.timeline].reverse().map((event: any, index: number) => (
+                      <div key={index} className="d-flex mb-3">
+                        <div className="me-3 mt-1">
+                          <span className={`badge bg-${statusColors[event.status] || 'secondary'} rounded-circle p-2`}>
+                            <i className="bx bx-check"></i>
+                          </span>
+                        </div>
+                        <div>
+                          <h6 className="mb-1 text-capitalize">{event.status}</h6>
+                          <p className="text-muted mb-0 small">{event.description}</p>
+                          <small className="text-muted">{new Date(event.date).toLocaleString()}</small>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
 
-          {/* Order Summary */}
+          {/* Sidebar */}
           <div className="col-lg-4">
-            {/* Customer Information */}
+            {/* Customer Info */}
             <div className="card">
               <div className="card-header">
                 <h5 className="card-title mb-0">Customer Information</h5>
               </div>
               <div className="card-body">
-                <div className="d-flex align-items-center mb-3">
-                  <img src="/assets/images/users/avatar-1.jpg" alt="Customer" className="avatar-sm me-3" />
-                  <div>
-                    <h6 className="mb-0">{order.customer.name}</h6>
-                    <small className="text-muted">{order.customer.email}</small>
-                  </div>
-                </div>
                 <div className="mb-2">
-                  <strong>Phone:</strong> {order.customer.phone}
+                  <strong>Name:</strong> {order.user?.name || addr.fullName || 'N/A'}
                 </div>
-                <div>
-                  <strong>Address:</strong><br />
-                  {order.customer.address.street}<br />
-                  {order.customer.address.city}, {order.customer.address.state} {order.customer.address.zip}<br />
-                  {order.customer.address.country}
+                {order.user?.email && (
+                  <div className="mb-2">
+                    <strong>Email:</strong> {order.user.email}
+                  </div>
+                )}
+                {order.user?.phone && (
+                  <div className="mb-2">
+                    <strong>Phone:</strong> {order.user.phone}
+                  </div>
+                )}
+                <hr />
+                <strong>Shipping Address:</strong>
+                <div className="mt-1 text-muted">
+                  {addr.fullName && <div>{addr.fullName}</div>}
+                  {addr.phone && <div>{addr.phone}</div>}
+                  {(addr.address || addr.street) && <div>{addr.address || addr.street}</div>}
+                  {addr.city && <div>{addr.city}{addr.state ? `, ${addr.state}` : ''} {addr.postalCode || addr.zip || ''}</div>}
+                  {addr.country && <div>{addr.country}</div>}
                 </div>
               </div>
             </div>
@@ -404,99 +291,77 @@ export default function OrderDetail() {
               <div className="card-body">
                 <div className="d-flex justify-content-between mb-2">
                   <span>Subtotal:</span>
-                  <span>{formatCurrency(order.totals.subtotal)}</span>
+                  <span>{formatCurrency(order.subtotal)}</span>
                 </div>
                 <div className="d-flex justify-content-between mb-2">
                   <span>Shipping:</span>
-                  <span>{formatCurrency(order.shipping.cost)}</span>
+                  <span>{formatCurrency(order.shippingCost || 0)}</span>
                 </div>
-                <div className="d-flex justify-content-between mb-2">
-                  <span>Tax:</span>
-                  <span>{formatCurrency(order.totals.tax)}</span>
-                </div>
+                {order.platformFee > 0 && (
+                  <div className="d-flex justify-content-between mb-2">
+                    <span>Platform Fee:</span>
+                    <span>{formatCurrency(order.platformFee)}</span>
+                  </div>
+                )}
+                {order.transactionFee > 0 && (
+                  <div className="d-flex justify-content-between mb-2">
+                    <span>Transaction Fee:</span>
+                    <span>{formatCurrency(order.transactionFee)}</span>
+                  </div>
+                )}
+                {order.tax > 0 && (
+                  <div className="d-flex justify-content-between mb-2">
+                    <span>Tax:</span>
+                    <span>{formatCurrency(order.tax)}</span>
+                  </div>
+                )}
                 <hr />
                 <div className="d-flex justify-content-between">
                   <strong>Total:</strong>
-                  <strong>{formatCurrency(order.totals.total)}</strong>
+                  <strong>{formatCurrency(order.total)}</strong>
                 </div>
               </div>
             </div>
 
-            {/* Shipping Information */}
-            <div className="card mt-3">
-              <div className="card-header">
-                <h5 className="card-title mb-0">Shipping Information</h5>
-              </div>
-              <div className="card-body">
-                <div className="mb-2">
-                  <strong>Method:</strong> {order.shipping.method}
-                </div>
-                <div className="mb-2">
-                  <strong>Tracking:</strong> {order.shipping.tracking}
-                </div>
-                <div>
-                  <strong>Status:</strong> 
-                  <span className="badge bg-info ms-2">In Transit</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Payment Information */}
+            {/* Payment Info */}
             <div className="card mt-3">
               <div className="card-header">
                 <h5 className="card-title mb-0">Payment Information</h5>
               </div>
               <div className="card-body">
                 <div className="mb-2">
-                  <strong>Method:</strong> {order.payment.method}
-                </div>
-                <div className="mb-2">
-                  <strong>Transaction ID:</strong> {order.payment.transactionId}
+                  <strong>Method:</strong> <span className="text-capitalize">{order.paymentMethod}</span>
                 </div>
                 <div>
-                  <strong>Status:</strong> 
-                  <span className="badge bg-success ms-2">{order.payment.status}</span>
+                  <strong>Status:</strong>{' '}
+                  <span className={`badge bg-${order.paymentStatus === 'paid' ? 'success' : order.paymentStatus === 'failed' ? 'danger' : 'warning'}`}>
+                    {order.paymentStatus}
+                  </span>
                 </div>
               </div>
             </div>
 
-            {/* Order Notes */}
-            <div className="card mt-3">
-              <div className="card-header">
-                <h5 className="card-title mb-0">Order Notes</h5>
+            {/* Notes */}
+            {order.notes && (
+              <div className="card mt-3">
+                <div className="card-header">
+                  <h5 className="card-title mb-0">Order Notes</h5>
+                </div>
+                <div className="card-body">
+                  <p className="text-muted mb-0">{order.notes}</p>
+                </div>
               </div>
-              <div className="card-body">
-                <p className="text-muted">{order.notes}</p>
-              </div>
-            </div>
+            )}
 
-            {/* Action Buttons */}
+            {/* Actions */}
             <div className="card mt-3">
               <div className="card-body">
                 <div className="d-grid gap-2">
-                  <button 
-                    className="btn btn-primary"
-                    onClick={handleUpdateStatus}
-                  >
+                  <button className="btn btn-primary" onClick={() => setShowStatusModal(true)}>
                     <i className="bx bx-edit me-1"></i>Update Status
                   </button>
-                  <button 
-                    className="btn btn-outline-secondary"
-                    onClick={handlePrintInvoice}
-                  >
+                  <button className="btn btn-outline-secondary" onClick={handlePrintInvoice}>
                     <i className="bx bx-printer me-1"></i>Print Invoice
-                  </button>
-                  <button 
-                    className="btn btn-outline-info"
-                    onClick={handleSendEmail}
-                  >
-                    <i className="bx bx-send me-1"></i>Send Email
-                  </button>
-                  <button 
-                    className="btn btn-outline-warning"
-                    onClick={handleDuplicateOrder}
-                  >
-                    <i className="bx bx-copy me-1"></i>Duplicate Order
                   </button>
                 </div>
               </div>
@@ -512,130 +377,42 @@ export default function OrderDetail() {
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">Update Order Status</h5>
-                <button 
-                  type="button" 
-                  className="btn-close" 
-                  onClick={() => setShowStatusModal(false)}
-                ></button>
+                <button type="button" className="btn-close" onClick={() => setShowStatusModal(false)}></button>
               </div>
               <div className="modal-body">
                 <div className="mb-3">
-                  <label htmlFor="statusSelect" className="form-label">Select New Status:</label>
-                  <select 
-                    className="form-select" 
+                  <label className="form-label">Current Status:</label>
+                  <span className={`badge bg-${statusColors[order.status] || 'secondary'} ms-2`}>
+                    {order.status}
+                  </span>
+                </div>
+                <div className="mb-3">
+                  <label htmlFor="statusSelect" className="form-label">New Status:</label>
+                  <select
+                    className="form-select"
                     id="statusSelect"
                     value={newStatus}
                     onChange={(e) => setNewStatus(e.target.value)}
                   >
-                    <option value="Pending">Pending</option>
-                    <option value="Processing">Processing</option>
-                    <option value="Shipped">Shipped</option>
-                    <option value="Delivered">Delivered</option>
-                    <option value="Cancelled">Cancelled</option>
-                    <option value="Refunded">Refunded</option>
+                    <option value="pending">Pending</option>
+                    <option value="processing">Processing</option>
+                    <option value="shipped">Shipped</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="cancelled">Cancelled</option>
                   </select>
                 </div>
-                <div className="mb-3">
-                  <label className="form-label">Current Status:</label>
-                  <span className={`badge ${
-                    order.status === 'Processing' ? 'bg-info' : 
-                    order.status === 'Delivered' ? 'bg-success' : 
-                    order.status === 'Pending' ? 'bg-warning' : 
-                    order.status === 'Cancelled' ? 'bg-danger' : 'bg-secondary'
-                  } ms-2`}>
-                    {order.status}
-                  </span>
-                </div>
               </div>
               <div className="modal-footer">
-                <button 
-                  type="button" 
-                  className="btn btn-secondary" 
-                  onClick={() => setShowStatusModal(false)}
-                >
+                <button type="button" className="btn btn-secondary" onClick={() => setShowStatusModal(false)}>
                   Cancel
                 </button>
-                <button 
-                  type="button" 
-                  className="btn btn-primary" 
-                  onClick={handleStatusChange}
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleUpdateStatus}
+                  disabled={updatingStatus || newStatus === order.status}
                 >
-                  Update Status
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Send Email Modal */}
-      {showEmailModal && (
-        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="modal-dialog modal-lg">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">Send Email to Customer</h5>
-                <button 
-                  type="button" 
-                  className="btn-close" 
-                  onClick={() => setShowEmailModal(false)}
-                ></button>
-              </div>
-              <div className="modal-body">
-                <div className="mb-3">
-                  <label className="form-label">To:</label>
-                  <input 
-                    type="email" 
-                    className="form-control" 
-                    value={order.customer.email}
-                    readOnly
-                  />
-                </div>
-                <div className="mb-3">
-                  <label htmlFor="emailSubject" className="form-label">Subject:</label>
-                  <input 
-                    type="text" 
-                    className="form-control" 
-                    id="emailSubject"
-                    value={emailSubject}
-                    onChange={(e) => setEmailSubject(e.target.value)}
-                  />
-                </div>
-                <div className="mb-3">
-                  <label htmlFor="emailMessage" className="form-label">Message:</label>
-                  <textarea 
-                    className="form-control" 
-                    id="emailMessage"
-                    rows={8}
-                    value={emailMessage}
-                    onChange={(e) => setEmailMessage(e.target.value)}
-                  ></textarea>
-                </div>
-                <div className="alert alert-info">
-                  <i className="bx bx-info-circle me-2"></i>
-                  <strong>Tip:</strong> You can use the following placeholders in your message:
-                  <ul className="mb-0 mt-2">
-                    <li><code>{'{customer_name}'}</code> - Customer's name</li>
-                    <li><code>{'{order_id}'}</code> - Order ID</li>
-                    <li><code>{'{order_status}'}</code> - Current order status</li>
-                    <li><code>{'{tracking_number}'}</code> - Tracking number</li>
-                  </ul>
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button 
-                  type="button" 
-                  className="btn btn-secondary" 
-                  onClick={() => setShowEmailModal(false)}
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="button" 
-                  className="btn btn-primary" 
-                  onClick={handleEmailSend}
-                >
-                  <i className="bx bx-send me-1"></i>Send Email
+                  {updatingStatus ? <><span className="spinner-border spinner-border-sm me-2"></span>Updating...</> : 'Update Status'}
                 </button>
               </div>
             </div>

@@ -52,5 +52,17 @@ export const productsApi = {
    */
   setFeatured: (id: string, featured: boolean) =>
     apiClient.patch<Product>(`/products/${id}/featured`, { featured }),
+
+  /**
+   * Toggle product promoted status (appears first in search/categories/styles)
+   */
+  setPromoted: (id: string, promoted: boolean) =>
+    apiClient.patch<Product>(`/products/${id}/promoted`, { promoted }),
+
+  /**
+   * Bulk add reviews to a product
+   */
+  addBulkReviews: (id: string, data: { count: number; name?: string; rating?: number; comment?: string }) =>
+    apiClient.post<{ added: number; totalReviews: number; rating: number }>(`/products/${id}/reviews/bulk`, data),
 };
 
