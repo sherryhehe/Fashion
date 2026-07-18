@@ -99,6 +99,7 @@ export default function Sidebar({ className = '' }: SidebarProps) {
       icon: 'solar:widget-4-bold-duotone',
       children: [
         { id: 'banner-control', label: 'Banner Control', href: '/banner-control' },
+        { id: 'home-categories', label: 'Featured Categories', href: '/home-categories' },
         { id: 'payment-methods', label: 'Payment Methods', href: '/payment-methods' },
         { id: 'countries', label: 'Eligible Countries', href: '/countries' },
       ]

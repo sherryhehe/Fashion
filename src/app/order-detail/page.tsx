@@ -2,95 +2,135 @@
 
 import Layout from '@/components/layout/Layout';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { formatCurrency } from '@/utils/currencyHelper';
+import { ordersApi } from '@/lib/api';
+
+/** Maps a real order from the API into the shape this page renders. */
+const mapOrder = (o: any) => {
+  const addr = o?.shippingAddress || {};
+  const fullName = [addr.firstName, addr.lastName].filter(Boolean).join(' ');
+  return {
+    id: o?.orderNumber || o?._id || '',
+    _id: o?._id || '',
+    status: o?.status ? String(o.status).charAt(0).toUpperCase() + String(o.status).slice(1) : '',
+    date: o?.createdAt ? new Date(o.createdAt).toLocaleString() : '',
+    customer: {
+      name: fullName || 'Customer',
+      email: addr.email || '',
+      phone: addr.phone || '',
+      address: {
+        street: addr.address || '',
+        city: addr.city || '',
+        state: addr.state || '',
+        zip: addr.zipCode || '',
+        country: addr.country || '',
+      },
+    },
+    items: (o?.items || []).map((it: any, idx: number) => ({
+      id: it._id || idx,
+      name: [it.productName, it.size ? `Size: ${it.size}` : '', it.color ? `Color: ${it.color}` : '']
+        .filter(Boolean)
+        .join(' — '),
+      image: it.productImage || '',
+      price: it.price || 0,
+      quantity: it.quantity || 0,
+      total: it.total ?? (it.price || 0) * (it.quantity || 0),
+    })),
+    shipping: {
+      method: (o?.items || []).map((i: any) => i.shippingTime).filter(Boolean)[0] || 'Standard Shipping',
+      cost: o?.shippingCost || 0,
+      tracking: o?.trackingNumber || 'N/A',
+    },
+    payment: {
+      method: o?.paymentMethod || 'N/A',
+      status: o?.paymentStatus || 'N/A',
+      transactionId: o?.paymentIntentId || 'N/A',
+    },
+    totals: {
+      subtotal: o?.subtotal || 0,
+      shipping: o?.shippingCost || 0,
+      tax: (o?.tax || 0) + (o?.platformFee || 0) + (o?.transactionFee || 0),
+      total: o?.total || 0,
+    },
+    notes: o?.notes || '',
+    timeline: (o?.timeline || []).map((t: any) => ({
+      status: t.status ? String(t.status).charAt(0).toUpperCase() + String(t.status).slice(1) : '',
+      date: t.date ? new Date(t.date).toLocaleString() : '',
+      description: t.description || '',
+    })),
+  };
+};
 
 export default function OrderDetail() {
+  const searchParams = useSearchParams();
+  const orderId = searchParams.get('id');
+
   // State for modals and functionality
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [newStatus, setNewStatus] = useState('Processing');
   const [emailSubject, setEmailSubject] = useState('');
   const [emailMessage, setEmailMessage] = useState('');
-  const [order, setOrder] = useState({
-    id: 'ORD-001',
-    status: 'Processing',
-    date: '2024-01-15',
-    customer: {
-      name: 'John Doe',
-      email: 'john@example.com',
-      phone: '+1 (555) 123-4567',
-      address: {
-        street: '123 Main Street',
-        city: 'New York',
-        state: 'NY',
-        zip: '10001',
-        country: 'United States'
-      }
-    },
-    items: [
-      {
-        id: 1,
-        name: 'G15 Gaming Laptop',
-        image: '/assets/images/products/product-1(1).png',
-        price: 240.59,
-        quantity: 1,
-        total: 240.59
-      },
-      {
-        id: 2,
-        name: 'Wireless Headphones',
-        image: '/assets/images/products/product-3.png',
-        price: 89.99,
-        quantity: 2,
-        total: 179.98
-      }
-    ],
-    shipping: {
-      method: 'Standard Shipping',
-      cost: 9.99,
-      tracking: 'TRK123456789'
-    },
-    payment: {
-      method: 'Credit Card',
-      status: 'Paid',
-      transactionId: 'TXN123456789'
-    },
-    totals: {
-      subtotal: 420.57,
-      shipping: 9.99,
-      tax: 34.24,
-      total: 464.80
-    },
-    notes: 'Customer requested expedited shipping for the laptop.',
-    timeline: [
-      {
-        status: 'Order Placed',
-        date: '2024-01-15 10:30 AM',
-        description: 'Order was placed successfully'
-      },
-      {
-        status: 'Payment Confirmed',
-        date: '2024-01-15 10:32 AM',
-        description: 'Payment has been processed'
-      },
-      {
-        status: 'Processing',
-        date: '2024-01-15 11:00 AM',
-        description: 'Order is being prepared for shipment'
-      }
-    ]
-  });
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [order, setOrder] = useState<any>(mapOrder({}));
+
+  // Fetch the real order from the API using the ?id= query param
+  useEffect(() => {
+    if (!orderId) {
+      setLoadError('No order id provided.');
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    ordersApi
+      .getById(orderId)
+      .then((res: any) => {
+        const data = res?.data ?? res;
+        if (!cancelled) {
+          if (data) {
+            setOrder(mapOrder(data));
+            setNewStatus(data.status || 'processing');
+            setLoadError('');
+          } else {
+            setLoadError('Order not found.');
+          }
+          setLoading(false);
+        }
+      })
+      .catch((e: any) => {
+        if (!cancelled) {
+          setLoadError(e?.message || 'Failed to load order.');
+          setLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [orderId]);
 
   // Handler functions for button actions
   const handleUpdateStatus = () => {
     setShowStatusModal(true);
   };
 
-  const handleStatusChange = () => {
-    setOrder(prev => ({ ...prev, status: newStatus }));
-    setShowStatusModal(false);
-    alert(`Order status updated to: ${newStatus}`);
+  const handleStatusChange = async () => {
+    const targetId = order?._id || orderId;
+    if (!targetId) return;
+    try {
+      await ordersApi.updateStatus(String(targetId), String(newStatus).toLowerCase());
+      setOrder((prev: any) => ({
+        ...prev,
+        status: String(newStatus).charAt(0).toUpperCase() + String(newStatus).slice(1),
+      }));
+      setShowStatusModal(false);
+      alert(`Order status updated to: ${newStatus}`);
+    } catch (e: any) {
+      alert(`Failed to update status: ${e?.message || 'Unknown error'}`);
+    }
   };
 
   const handlePrintInvoice = () => {
@@ -201,6 +241,31 @@ export default function OrderDetail() {
       // You could redirect to the new order or stay on current page
     }
   };
+
+  if (loading) {
+    return (
+      <Layout pageTitle="Order Detail">
+        <div className="container-fluid">
+          <div className="text-center py-5">
+            <span className="spinner-border" role="status"></span>
+            <p className="mt-2 text-muted">Loading order...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <Layout pageTitle="Order Detail">
+        <div className="container-fluid">
+          <div className="alert alert-danger mt-4">
+            {loadError} <Link href="/orders-list" className="alert-link">Back to orders</Link>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout pageTitle="Order Detail">

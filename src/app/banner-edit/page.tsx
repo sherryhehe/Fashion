@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { bannersApi, type Banner } from '@/lib/api/banners';
+import { countriesApi } from '@/lib/api';
 import { useUpdateBanner } from '@/hooks/useApi';
 import { getImageUrl } from '@/utils/imageHelper';
 
@@ -18,8 +19,9 @@ export default function BannerEdit() {
   const [formData, setFormData] = useState({
     title: '',
     subtitle: '',
-    position: 'homepage' as 'header' | 'sidebar' | 'footer' | 'homepage',
+    position: 'homepage' as 'header' | 'sidebar' | 'footer' | 'homepage' | 'homepage_brand',
     status: 'active' as 'active' | 'inactive' | 'draft',
+    linkUrl: '',
     startDate: '',
     endDate: '',
   });
@@ -27,6 +29,17 @@ export default function BannerEdit() {
   const [existingImage, setExistingImage] = useState<string>('');
   const [newImageFile, setNewImageFile] = useState<File | null>(null);
   const [newImagePreview, setNewImagePreview] = useState<string>('');
+  const [allCountries, setAllCountries] = useState<any[]>([]);
+  const [bannerCountries, setBannerCountries] = useState<string[]>([]);
+
+  useEffect(() => {
+    countriesApi
+      .getEligible()
+      .then((cRes: any) => {
+        setAllCountries(Array.isArray(cRes.data) ? cRes.data.filter((c: any) => c.isActive !== false) : []);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (bannerId) {
@@ -47,9 +60,12 @@ export default function BannerEdit() {
         subtitle: bannerData.subtitle || '',
         position: bannerData.position || 'homepage',
         status: bannerData.status || 'active',
+        linkUrl: bannerData.linkUrl || '',
         startDate: bannerData.startDate ? new Date(bannerData.startDate).toISOString().slice(0, 16) : '',
         endDate: bannerData.endDate ? new Date(bannerData.endDate).toISOString().slice(0, 16) : '',
       });
+
+      setBannerCountries(Array.isArray(bannerData.countries) ? bannerData.countries : []);
 
       if (bannerData.imageUrl) {
         setExistingImage(bannerData.imageUrl);
@@ -144,6 +160,8 @@ export default function BannerEdit() {
         imageUrl: finalImageUrl,
         position: formData.position,
         status: formData.status,
+        countries: bannerCountries,
+        linkUrl: formData.linkUrl || undefined,
       };
 
       // Add dates if provided
@@ -330,7 +348,8 @@ export default function BannerEdit() {
                         onChange={handleChange}
                         required
                       >
-                        <option value="homepage">Homepage</option>
+                        <option value="homepage">Homepage (top carousel)</option>
+                        <option value="homepage_brand">Homepage - Brand strip (below)</option>
                         <option value="header">Header</option>
                         <option value="sidebar">Sidebar</option>
                         <option value="footer">Footer</option>
@@ -353,6 +372,54 @@ export default function BannerEdit() {
                       </select>
                     </div>
                   </div>
+
+                  <div className="mb-3">
+                    <label htmlFor="linkUrl" className="form-label">Store / Link URL</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      id="linkUrl"
+                      name="linkUrl"
+                      value={formData.linkUrl}
+                      onChange={handleChange}
+                      placeholder="e.g. Malbusaat (brand name) or https://..."
+                    />
+                    <small className="text-muted">Where the banner takes the customer when tapped. Enter a brand/store name to open that store, or a full URL.</small>
+                  </div>
+
+                  {/* Countries */}
+                  <h5 className="mb-3 mt-4 text-uppercase bg-light p-2">
+                    <i className="bx bx-globe me-1"></i> Countries
+                  </h5>
+                  <p className="text-muted small mb-3">Select the countries this banner should appear in. Leave all unchecked to show it in every country.</p>
+                  {allCountries.length === 0 ? (
+                    <div className="alert alert-info">No eligible countries configured. <a href="/countries" className="alert-link">Manage countries</a></div>
+                  ) : (
+                    <div className="row mb-3">
+                      {allCountries.map((c: any) => (
+                        <div className="col-md-4 mb-2" key={c.code}>
+                          <div className={`border rounded p-2 ${bannerCountries.includes(c.code) ? 'border-success bg-soft-success' : ''}`}>
+                            <div className="form-check">
+                              <input
+                                className="form-check-input"
+                                type="checkbox"
+                                id={`banner-country-${c.code}`}
+                                checked={bannerCountries.includes(c.code)}
+                                onChange={e => {
+                                  if (e.target.checked) setBannerCountries(prev => [...prev, c.code]);
+                                  else setBannerCountries(prev => prev.filter(code => code !== c.code));
+                                }}
+                              />
+                              <label className="form-check-label" htmlFor={`banner-country-${c.code}`}>
+                                <span className="badge bg-light text-dark me-1 fw-bold">{c.code}</span>
+                                {c.name}
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                   {/* Schedule (Optional) */}
                   <h5 className="mb-3 mt-4 text-uppercase bg-light p-2">

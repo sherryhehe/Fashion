@@ -54,7 +54,7 @@ export default function ProductList() {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const params: any = {};
+      const params: any = { limit: 1000 };
       if (statusFilter) params.status = statusFilter;
       if (categoryFilter) params.category = categoryFilter;
 
