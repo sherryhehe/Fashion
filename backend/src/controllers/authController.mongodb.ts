@@ -11,7 +11,7 @@ import { AuthRequest } from '../middleware/auth';
  */
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { name, email, password, role = 'customer' } = req.body;
+    const { name, email, password, role = 'customer', country } = req.body;
 
     // Validation
     if (!name || !email || !password) {
@@ -36,6 +36,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       password: hashedPassword,
       role,
       status: 'active',
+      country: typeof country === 'string' && country.trim() ? country.trim() : undefined,
     });
 
     // Generate token
@@ -52,6 +53,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         name: user.name,
         email: user.email,
         role: user.role,
+        country: user.country,
       },
     }, 'User registered successfully', 201);
   } catch (error) {
@@ -108,6 +110,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
         email: user.email,
         role: user.role,
         avatar: user.avatar,
+        country: user.country,
       },
     }, 'Login successful');
   } catch (error) {

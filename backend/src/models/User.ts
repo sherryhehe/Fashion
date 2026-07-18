@@ -8,6 +8,7 @@ export interface IUser extends Document {
   status: 'active' | 'inactive';
   avatar?: string;
   phone?: string;
+  country?: string;
   resetPasswordToken?: string;
   resetPasswordExpiry?: Date;
   createdAt: Date;
@@ -50,6 +51,11 @@ const UserSchema = new Schema<IUser>(
     phone: {
       type: String,
       default: null,
+    },
+    country: {
+      type: String,
+      default: null,
+      trim: true,
     },
     resetPasswordToken: {
       type: String,

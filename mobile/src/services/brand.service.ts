@@ -4,6 +4,7 @@
  */
 
 import apiClient from './api.service';
+import { getUserCountry } from '../utils/userCountry';
 
 export interface Brand {
   _id: string;
@@ -35,7 +36,8 @@ const brandService = {
    * Get all brands (public endpoint - accessible to guests)
    */
   getAll: async (): Promise<BrandResponse> => {
-    return apiClient.get('/brands');
+    const country = await getUserCountry();
+    return apiClient.get(country ? `/brands?country=${encodeURIComponent(country)}` : '/brands');
   },
 
   /**
@@ -49,14 +51,16 @@ const brandService = {
    * Get featured brands (public endpoint)
    */
   getFeatured: async (): Promise<BrandResponse> => {
-    return apiClient.get('/brands/featured');
+    const country = await getUserCountry();
+    return apiClient.get(country ? `/brands/featured?country=${encodeURIComponent(country)}` : '/brands/featured');
   },
 
   /**
    * Get top brands (public endpoint)
    */
   getTopBrands: async (): Promise<BrandResponse> => {
-    return apiClient.get('/brands/top');
+    const country = await getUserCountry();
+    return apiClient.get(country ? `/brands/top?country=${encodeURIComponent(country)}` : '/brands/top');
   },
 
   /**
@@ -93,6 +97,31 @@ const brandService = {
 
     return {
       allowedPaymentMethods: normalized.length > 0 ? Array.from(new Set(normalized)) : ['cash'],
+    };
+  },
+
+  /**
+   * Get per-brand accepted payment methods for checkout.
+   * Returns each brand's accepted method ids ('card' or a custom method _id)
+   * plus a lookup map of method details. The checkout screen intersects the
+   * per-brand lists and, when there is no overlap, asks the customer to order
+   * the brands separately.
+   */
+  getCheckoutPaymentMethods: async (
+    brandNames: string[]
+  ): Promise<{
+    brands: Array<{ name: string; accepts: string[] }>;
+    methods: Record<string, { id: string; name: string; instructions?: string; kind: 'card' | 'custom' }>;
+  }> => {
+    const names = [...new Set(brandNames.map((n) => (n || '').trim()).filter(Boolean))];
+    const query = names.length
+      ? `?names=${names.map((n) => encodeURIComponent(n)).join(',')}`
+      : '';
+    const res: any = await apiClient.get(`/brands/checkout-payment-methods${query}`);
+    const data = res?.data ?? res ?? {};
+    return {
+      brands: Array.isArray(data.brands) ? data.brands : [],
+      methods: data.methods && typeof data.methods === 'object' ? data.methods : {},
     };
   },
 };

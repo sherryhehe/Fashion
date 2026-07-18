@@ -9,6 +9,7 @@ export interface BannerDocument extends Document {
 	 order?: number;
 	 size?: string;
 	 status: 'active' | 'inactive' | 'draft';
+	 countries: string[];
 	 clicks: number;
 	 ctr?: number;
 	 startDate?: Date;
@@ -27,6 +28,7 @@ const BannerSchema = new Schema<BannerDocument>(
 		order: { type: Number, default: 0 },
 		size: { type: String },
 		status: { type: String, enum: ['active', 'inactive', 'draft'], default: 'active' },
+		countries: { type: [String], default: [] },
 		clicks: { type: Number, default: 0 },
 		ctr: { type: Number, default: 0 },
 		startDate: { type: Date },

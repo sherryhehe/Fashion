@@ -24,6 +24,8 @@ import { useCreateOrder, useConfirmOrderPayment } from '../../hooks/useOrders';
 import { useShippingSettings } from '../../hooks/useShippingSettings';
 import authService from '../../services/auth.service';
 import brandService from '../../services/brand.service';
+import countryService, { Country } from '../../services/country.service';
+import SelectModal from '../../components/SelectModal';
 import { showToast } from '../../utils/toast';
 import { computeOrderAmounts } from '../../utils/orderPricing';
 import { requireAuthOrPromptLogin } from '../../utils/guestHelper';
@@ -46,8 +48,13 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
   const [address, setAddress] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [saveInfoChecked, setSaveInfoChecked] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'cod'>('stripe');
-  const [allowedPaymentMethods, setAllowedPaymentMethods] = useState<string[]>(['stripe', 'cash']);
+  // paymentMethod holds either 'card' (Stripe) or a custom PaymentMethod _id
+  const [paymentMethod, setPaymentMethod] = useState<string>('');
+  // Per-brand accepted methods + lookup map (from the checkout-payment-methods endpoint)
+  const [brandAccepts, setBrandAccepts] = useState<Array<{ name: string; accepts: string[] }>>([]);
+  const [methodsMap, setMethodsMap] = useState<Record<string, { id: string; name: string; instructions?: string; kind: 'card' | 'custom' }>>({});
+  // Admin-configured eligible countries
+  const [countries, setCountries] = useState<Country[]>([]);
 
   // Fetch cart and user profile
   const { data: cartData, isLoading: cartLoading } = useCart();
@@ -81,7 +88,7 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
       computeOrderAmounts(
         pricedCartItems,
         platformFeePkr,
-        paymentMethod === 'stripe' ? 'stripe' : 'cod'
+        paymentMethod === 'card' ? 'stripe' : 'cod'
       ),
     [pricedCartItems, platformFeePkr, paymentMethod]
   );
@@ -96,43 +103,69 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
     cartItems.map((item: any) => item?.product?.brand || item?.brand).filter(Boolean)
   )].sort().join(',');
 
-  const normalizeAllowedMethods = (methods: string[] | undefined): string[] => {
-    if (!Array.isArray(methods) || methods.length === 0) {
-      return ['cash'];
-    }
-
-    const normalized: Array<'stripe' | 'cash'> = [];
-    for (const method of methods) {
-      const m = String(method).toLowerCase();
-      if (m === 'card' || m === 'stripe') normalized.push('stripe');
-      else if (m === 'cash') normalized.push('cash');
-    }
-
-    return normalized.length > 0 ? Array.from(new Set(normalized)) : ['cash'];
-  };
-
+  // Load per-brand accepted payment methods for the brands in the cart.
   useEffect(() => {
     const brandNames = cartBrandNames ? cartBrandNames.split(',') : [];
-    if (brandNames.length === 0) {
-      setAllowedPaymentMethods(['stripe', 'cash']);
-      return;
-    }
     let cancelled = false;
-    brandService.getAllowedPaymentMethods(brandNames).then(({ allowedPaymentMethods: allowed }) => {
-      if (!cancelled) setAllowedPaymentMethods(normalizeAllowedMethods(allowed));
-    }).catch(() => {
-      if (!cancelled) setAllowedPaymentMethods(['stripe', 'cash']);
-    });
-    return () => { cancelled = true; };
+    brandService
+      .getCheckoutPaymentMethods(brandNames)
+      .then(({ brands, methods }) => {
+        if (!cancelled) {
+          setBrandAccepts(brands);
+          setMethodsMap(methods);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setBrandAccepts([]);
+          setMethodsMap({});
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [cartBrandNames]);
 
-  // Default payment to first allowed if current is not allowed
+  // Load eligible countries for the checkout country selector.
   useEffect(() => {
-    const allowStripe = allowedPaymentMethods.includes('stripe');
-    const allowCash = allowedPaymentMethods.includes('cash');
-    if (paymentMethod === 'stripe' && !allowStripe && allowCash) setPaymentMethod('cod');
-    if (paymentMethod === 'cod' && !allowCash && allowStripe) setPaymentMethod('stripe');
-  }, [allowedPaymentMethods]);
+    let cancelled = false;
+    countryService
+      .getActive()
+      .then((list) => {
+        if (!cancelled) setCountries(list);
+      })
+      .catch(() => {
+        if (!cancelled) setCountries([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Intersection of accepted methods across every brand in the cart.
+  const availableMethodIds = useMemo(() => {
+    if (brandAccepts.length === 0) return [];
+    let intersection: string[] = [...(brandAccepts[0].accepts || [])];
+    for (let i = 1; i < brandAccepts.length; i++) {
+      const set = new Set(brandAccepts[i].accepts || []);
+      intersection = intersection.filter((id) => set.has(id));
+    }
+    return intersection;
+  }, [brandAccepts]);
+
+  // Multiple brands that share no common payment method → must order separately.
+  const paymentConflict = brandAccepts.length > 1 && availableMethodIds.length === 0;
+  const noMethodsAvailable = brandAccepts.length > 0 && availableMethodIds.length === 0 && !paymentConflict;
+  const allowStripe = availableMethodIds.includes('card');
+  const selectedCustomMethod =
+    paymentMethod && paymentMethod !== 'card' ? methodsMap[paymentMethod] : undefined;
+
+  // Ensure a valid payment method is selected as options load.
+  useEffect(() => {
+    if (availableMethodIds.length > 0 && !availableMethodIds.includes(paymentMethod)) {
+      setPaymentMethod(availableMethodIds[0]);
+    }
+  }, [availableMethodIds]);
 
   // Load user profile data
   useEffect(() => {
@@ -199,6 +232,19 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
       return;
     }
 
+    if (paymentConflict) {
+      showToast.error(
+        'The brands in your cart don\'t share a common payment method. Please check out items from one brand at a time.',
+        'Separate checkout required'
+      );
+      return;
+    }
+
+    if (!paymentMethod || (paymentMethod !== 'card' && !selectedCustomMethod)) {
+      showToast.error('Please select a payment method');
+      return;
+    }
+
     // Prepare order items from cart (same rows as pricedCartItems / backend validation)
     const orderItems = pricedCartItems.map((item: any) => {
       const product = item.product || null;
@@ -237,7 +283,8 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
       const response = await createOrderMutation.mutateAsync({
         items: orderItems,
         shippingAddress,
-        paymentMethod: paymentMethod === 'cod' ? 'cash' : 'stripe',
+        paymentMethod:
+          paymentMethod === 'card' ? 'stripe' : selectedCustomMethod?.name || 'cash',
         notes: saveInfoChecked ? 'Save information for next time' : undefined,
       });
 
@@ -259,7 +306,7 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
         return;
       }
 
-      if (paymentMethod === 'stripe' && !clientSecret) {
+      if (paymentMethod === 'card' && !clientSecret) {
         showToast.error(
           'Card checkout could not start (no payment session from server). Use cash on delivery or try again later.'
         );
@@ -267,7 +314,7 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
       }
 
       // Card payment: show Stripe Payment Sheet
-      if (clientSecret && paymentMethod === 'stripe') {
+      if (clientSecret && paymentMethod === 'card') {
         setIsPaymentSheetOpen(true);
         try {
           const { error: initError } = await initPaymentSheet({
@@ -458,12 +505,13 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
             onChangeText={setCity}
           />
 
-          <TextInput
-            style={styles.input}
-            placeholder="Country"
-            placeholderTextColor="#8E8E93"
-            value={country}
-            onChangeText={setCountry}
+          <SelectModal
+            label="Select your country"
+            placeholder={countries.length === 0 ? 'Loading countries...' : 'Country'}
+            value={country || null}
+            options={countries.map((c) => ({ label: c.name, value: c.name }))}
+            onSelect={setCountry}
+            disabled={countries.length === 0}
           />
 
           <TextInput
@@ -516,31 +564,56 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Payment Method</Text>
           <View style={[styles.formWrapper,styles.paymentMethodWrapper]} >
-          {allowedPaymentMethods.includes('stripe') && (
-            <TouchableOpacity 
-              style={styles.paymentOption}
-              onPress={() => setPaymentMethod('stripe')}
-            >
-              <View style={styles.paymentOptionLeft}>
-                {renderRadioButton(paymentMethod === 'stripe')}
-                <Text style={styles.paymentOptionText}>Stripe (Card)</Text>
-              </View>
-              <View style={styles.mastercardLogo}>
-                <Text style={styles.mastercardText}>STRIPE</Text>
-              </View>
-            </TouchableOpacity>
-          )}
-          {allowedPaymentMethods.includes('stripe') && allowedPaymentMethods.includes('cash') && <View style={styles.lineSeparator} />}
-          {allowedPaymentMethods.includes('cash') && (
-            <TouchableOpacity 
-              style={styles.paymentOption}
-              onPress={() => setPaymentMethod('cod')}
-            >
-              <View style={styles.paymentOptionLeft}>
-                {renderRadioButton(paymentMethod === 'cod')}
-                <Text style={styles.paymentOptionText}>Cash on Delivery (COD)</Text>
-              </View>
-            </TouchableOpacity>
+          {paymentConflict ? (
+            <View style={styles.paymentInstructionsBox}>
+              <Text style={styles.paymentInstructionsText}>
+                The brands in your cart accept different payment methods and have no option in common.
+                Please check out items from one brand at a time.
+              </Text>
+            </View>
+          ) : noMethodsAvailable ? (
+            <Text style={styles.paymentInstructionsText}>
+              No payment methods are currently available for this order. Please contact support.
+            </Text>
+          ) : (
+            availableMethodIds.map((id, idx) => {
+              const isSelected = paymentMethod === id;
+              const showSeparator = idx > 0;
+              if (id === 'card') {
+                return (
+                  <View key="card">
+                    {showSeparator && <View style={styles.lineSeparator} />}
+                    <TouchableOpacity style={styles.paymentOption} onPress={() => setPaymentMethod('card')}>
+                      <View style={styles.paymentOptionLeft}>
+                        {renderRadioButton(isSelected)}
+                        <Text style={styles.paymentOptionText}>Card (Stripe)</Text>
+                      </View>
+                      <View style={styles.mastercardLogo}>
+                        <Text style={styles.mastercardText}>STRIPE</Text>
+                      </View>
+                    </TouchableOpacity>
+                  </View>
+                );
+              }
+              const method = methodsMap[id];
+              if (!method) return null;
+              return (
+                <View key={id}>
+                  {showSeparator && <View style={styles.lineSeparator} />}
+                  <TouchableOpacity style={styles.paymentOption} onPress={() => setPaymentMethod(id)}>
+                    <View style={styles.paymentOptionLeft}>
+                      {renderRadioButton(isSelected)}
+                      <Text style={styles.paymentOptionText}>{method.name}</Text>
+                    </View>
+                  </TouchableOpacity>
+                  {isSelected && !!method.instructions && (
+                    <View style={styles.paymentInstructionsBox}>
+                      <Text style={styles.paymentInstructionsText}>{method.instructions}</Text>
+                    </View>
+                  )}
+                </View>
+              );
+            })
           )}
         </View>
         </View>
@@ -586,16 +659,16 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
         </View>
 
         {/* Submit Order Button */}
-        <TouchableOpacity 
-          style={[styles.submitButton, (createOrderMutation.isPending || isPaymentSheetOpen) && styles.submitButtonDisabled]} 
+        <TouchableOpacity
+          style={[styles.submitButton, (createOrderMutation.isPending || isPaymentSheetOpen || paymentConflict || noMethodsAvailable) && styles.submitButtonDisabled]}
           onPress={handleSubmitOrder}
-          disabled={createOrderMutation.isPending || isPaymentSheetOpen || cartItems.length === 0}
+          disabled={createOrderMutation.isPending || isPaymentSheetOpen || cartItems.length === 0 || paymentConflict || noMethodsAvailable}
         >
           {(createOrderMutation.isPending || isPaymentSheetOpen) ? (
             <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
             <Text style={styles.submitButtonText}>
-              {paymentMethod === 'stripe' ? 'Place order & pay' : 'Submit order'}
+              {paymentMethod === 'card' ? 'Place order & pay' : 'Submit order'}
             </Text>
           )}
         </TouchableOpacity>
@@ -834,6 +907,18 @@ borderColor: '#E8ECF4',
   lineSeparator:{
     height: 1,
     backgroundColor: '#E8ECF4',
+  },
+  paymentInstructionsBox: {
+    backgroundColor: '#F2F2F7',
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  paymentInstructionsText: {
+    fontSize: 14,
+    color: '#3A3A3C',
+    lineHeight: 20,
   },
 
   // Radio Button Styles

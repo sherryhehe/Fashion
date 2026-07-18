@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,9 @@ import AuthScrollView from '../../components/AuthScrollView';
 import InputField from '../../components/SimpleInputField';
 import Button from '../../components/SimpleButton';
 import LoadingScreen from '../../components/LoadingScreen';
+import SelectModal from '../../components/SelectModal';
 import { useRegister } from '../../hooks/useAuth';
+import countryService, { Country } from '../../services/country.service';
 import { showToast } from '../../utils/toast';
 import { styles } from './styles';
 
@@ -29,6 +31,24 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation, route }) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [country, setCountry] = useState('');
+  const [countries, setCountries] = useState<Country[]>([]);
+
+  // Load eligible countries (admin-configured) for the required signup selector
+  useEffect(() => {
+    let cancelled = false;
+    countryService
+      .getActive()
+      .then((list) => {
+        if (!cancelled) setCountries(list);
+      })
+      .catch(() => {
+        if (!cancelled) setCountries([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Use TanStack Query mutation for registration
   const registerMutation = useRegister();
@@ -67,12 +87,18 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation, route }) => {
       return;
     }
 
+    if (!country) {
+      showToast.error('Please select your country');
+      return;
+    }
+
     try {
       // Prepare registration data
       const registrationData = {
         name: name.trim(),
         email: email.trim().toLowerCase(),
         password: password.trim(),
+        country,
       };
 
       // Double-check validation
@@ -186,6 +212,17 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation, route }) => {
         showPasswordToggle
         isPasswordVisible={showConfirmPassword}
         onTogglePassword={() => setShowConfirmPassword(!showConfirmPassword)}
+      />
+
+      {/* Country Selector (eligible countries only) */}
+      <Text style={styles.fieldLabel}>Country</Text>
+      <SelectModal
+        label="Select your country"
+        placeholder={countries.length === 0 ? 'Loading countries...' : 'Select your country'}
+        value={country || null}
+        options={countries.map((c) => ({ label: c.name, value: c.code }))}
+        onSelect={setCountry}
+        disabled={countries.length === 0}
       />
 
       {/* Sign Up Button */}

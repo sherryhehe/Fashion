@@ -2,6 +2,7 @@
  * Home categories (custom homepage sections) - public API for app
  */
 import apiClient from './api.service';
+import { getUserCountry } from '../utils/userCountry';
 
 export interface HomeCategoryWithProducts {
   _id: string;
@@ -13,7 +14,8 @@ export interface HomeCategoryWithProducts {
 
 const homeCategoryService = {
   getActiveForApp: async (): Promise<{ success: boolean; data: HomeCategoryWithProducts[] }> => {
-    return apiClient.get('/home-categories/app');
+    const country = await getUserCountry();
+    return apiClient.get(country ? `/home-categories/app?country=${encodeURIComponent(country)}` : '/home-categories/app');
   },
 };
 

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import Brand from '../models/Brand';
 import Product from '../models/Product';
+import PaymentMethod from '../models/PaymentMethod';
 import { successResponse, errorResponse } from '../utils/responseHelper';
 
 /**
@@ -80,23 +81,109 @@ export const getAllowedPaymentMethods = async (req: Request, res: Response): Pro
 };
 
 /**
+ * Checkout payment methods, resolved per-brand.
+ * For each brand in the cart returns the list of accepted method ids:
+ *   - 'card' when the brand has Stripe/card enabled (allowedPaymentMethods includes 'card')
+ *   - the _id of each active custom payment method the brand enabled
+ * Also returns a `methods` map with display details for every referenced method.
+ * The app groups the cart by brand and:
+ *   - shows the intersection of accepted methods, or
+ *   - asks the customer to check out brands separately when there is no overlap.
+ */
+export const getCheckoutPaymentMethods = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const namesParam = (req.query.names as string) || '';
+    const names = namesParam
+      .split(',')
+      .map((n) => decodeURIComponent(n).trim())
+      .filter(Boolean);
+
+    // All active custom payment methods (id -> details)
+    const activeMethods = await PaymentMethod.find({ isActive: { $ne: false } }).lean();
+    const methodsMap: Record<string, any> = {
+      card: { id: 'card', name: 'Card', kind: 'card' },
+    };
+    const activeIdSet = new Set<string>();
+    for (const m of activeMethods) {
+      const id = String((m as any)._id);
+      activeIdSet.add(id);
+      methodsMap[id] = {
+        id,
+        name: (m as any).name,
+        instructions: (m as any).instructions,
+        kind: 'custom',
+      };
+    }
+
+    if (names.length === 0) {
+      successResponse(res, { brands: [], methods: methodsMap });
+      return;
+    }
+
+    const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const nameRegexes = names.map((n) => new RegExp(`^${escapeRegex(n)}$`, 'i'));
+
+    const brands = await Brand.find({ name: { $in: nameRegexes } })
+      .select('name allowedPaymentMethods enabledPaymentMethods')
+      .lean();
+
+    const brandsResult = brands.map((b: any) => {
+      const accepts: string[] = [];
+      if (Array.isArray(b.allowedPaymentMethods) && b.allowedPaymentMethods.map((x: string) => String(x).toLowerCase()).includes('card')) {
+        accepts.push('card');
+      }
+      if (Array.isArray(b.enabledPaymentMethods)) {
+        for (const pmId of b.enabledPaymentMethods) {
+          const id = String(pmId);
+          if (activeIdSet.has(id)) accepts.push(id);
+        }
+      }
+      return { name: b.name, accepts };
+    });
+
+    successResponse(res, { brands: brandsResult, methods: methodsMap });
+  } catch (error) {
+    console.error('Get checkout payment methods error:', error);
+    errorResponse(res, 'Failed to get checkout payment methods', 500);
+  }
+};
+
+/**
  * Get all brands
  */
 export const getAllBrands = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { status, featured, verified, search } = req.query;
-    
+    const { status, featured, verified, search, country } = req.query;
+
     // Build filter
     const filter: any = {};
     if (status) filter.status = status;
     if (featured !== undefined) filter.featured = featured === 'true';
     if (verified !== undefined) filter.verified = verified === 'true';
-    if (search) {
-      filter.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
-      ];
+    const searchOr = search
+      ? [
+          { name: { $regex: search, $options: 'i' } },
+          { description: { $regex: search, $options: 'i' } },
+          { email: { $regex: search, $options: 'i' } },
+        ]
+      : null;
+
+    // Country gating: only show brands that serve this country (empty list = serves everyone).
+    const countryOr = country
+      ? [
+          { 'countries.0': { $exists: false } },
+          { countries: String(country).trim().toUpperCase() },
+        ]
+      : null;
+
+    // Combine search + country as $and of $or groups (avoids clobbering).
+    const andGroups: any[] = [];
+    if (searchOr) andGroups.push({ $or: searchOr });
+    if (countryOr) andGroups.push({ $or: countryOr });
+    if (andGroups.length === 1) {
+      Object.assign(filter, andGroups[0]);
+    } else if (andGroups.length > 1) {
+      filter.$and = andGroups;
     }
 
     let brands = await Brand.find(filter)
@@ -313,10 +400,11 @@ export const updateBrand = async (req: Request, res: Response): Promise<void> =>
     // Build update data, explicitly handling banner and allowedPaymentMethods
     const finalUpdateData = { ...updateData };
     if (updateData.allowedPaymentMethods !== undefined) {
-      const allowed = Array.isArray(updateData.allowedPaymentMethods)
+      // Respect an explicit selection, including an empty array (Card unchecked).
+      // Custom payment methods are handled separately via enabledPaymentMethods.
+      finalUpdateData.allowedPaymentMethods = Array.isArray(updateData.allowedPaymentMethods)
         ? updateData.allowedPaymentMethods.filter((m: string) => ['card', 'cash'].includes(String(m).toLowerCase()))
-        : ['card', 'cash'];
-      finalUpdateData.allowedPaymentMethods = allowed.length > 0 ? allowed : ['card', 'cash'];
+        : [];
     }
     if (updateData.enabledPaymentMethods !== undefined) {
       finalUpdateData.enabledPaymentMethods = Array.isArray(updateData.enabledPaymentMethods)
@@ -387,11 +475,19 @@ export const deleteBrand = async (req: Request, res: Response): Promise<void> =>
  */
 export const getFeaturedBrands = async (req: Request, res: Response): Promise<void> => {
   try {
-    const brands = await Brand.find({ featured: true, status: 'active' })
+    const { country } = req.query;
+    const q: any = { featured: true, status: 'active' };
+    if (country) {
+      q.$or = [
+        { 'countries.0': { $exists: false } },
+        { countries: String(country).trim().toUpperCase() },
+      ];
+    }
+    const brands = await Brand.find(q)
       .select('-bankInfo')
       .sort({ totalSales: -1 })
       .limit(10);
-    
+
     successResponse(res, brands);
   } catch (error) {
     console.error('Get featured brands error:', error);
@@ -405,12 +501,19 @@ export const getFeaturedBrands = async (req: Request, res: Response): Promise<vo
 export const getTopBrands = async (req: Request, res: Response): Promise<void> => {
   try {
     const limit = parseInt(req.query.limit as string) || 10;
-    
-    const brands = await Brand.find({ status: 'active' })
+    const { country } = req.query;
+    const q: any = { status: 'active' };
+    if (country) {
+      q.$or = [
+        { 'countries.0': { $exists: false } },
+        { countries: String(country).trim().toUpperCase() },
+      ];
+    }
+    const brands = await Brand.find(q)
       .select('-bankInfo')
       .sort({ totalSales: -1, rating: -1 })
       .limit(limit);
-    
+
     successResponse(res, brands);
   } catch (error) {
     console.error('Get top brands error:', error);
