@@ -182,7 +182,7 @@ export default function CategoryList() {
                   columns={columns}
                   onEdit={handleEdit}
                   onDelete={handleDeleteAction}
-                  itemsPerPage={10}
+                  itemsPerPage={8}
                 />
               )}
             </div>

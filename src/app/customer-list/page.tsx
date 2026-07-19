@@ -115,7 +115,7 @@ export default function CustomerList() {
                   data={customers}
                   columns={[...columns, viewDetailsColumn]}
                   showActions={false}
-                  itemsPerPage={15}
+                  itemsPerPage={8}
                 />
               )}
             </div>

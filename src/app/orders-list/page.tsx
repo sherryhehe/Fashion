@@ -151,7 +151,7 @@ export default function OrdersList() {
                   data={orders}
                   columns={columns}
                   showActions={false}
-                  itemsPerPage={15}
+                  itemsPerPage={8}
                 />
               )}
             </div>
